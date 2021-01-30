@@ -146,10 +146,10 @@ recapture <- function(current_state, j, p.m, p.f, rho){
 
 # 3. Mating Prob ----------------------------------------------------------------------------------------------- 
 
-mate <- function(previous_state, sex, j, delta){
+mate <- function(previous_state, j, delta){
   
   # Chose to mate at time t? Previous state is 0/1 here
-  obs <- rbinom(1, 1, delta[j]*previous_state)
+  obs <- rbinom(length(previous_state), 1, delta[j]*previous_state)
 
   return(obs)
 }
@@ -173,21 +173,22 @@ construct_sexes <- function(n, prop.female = 0.5, random = F){
   return(sex)
 }
 
-construct_init_entry <- function(n, k, random = F, inits = NULL){
+construct_init_entry <- function(n, k, random = F, inits = NULL, sort_init = F){
   
   # Select initial entry randomly?
   if(random == T){
-    initial_entry = sort(as.integer(sample(c(1:round(k/2)),size=n,replace=T)))
+    initial_entry = as.integer(sample(c(1:round(k/2)),size=n,replace=T))
   } else {
     # If not do we have pre-specified values?
     if(!is.null(inits)){
       initial_entry <- inits 
     # If not just do fixed intervals across n and k 
     } else {
-      initial_entry <- sort(rep(1:(k-1),ceiling(n/(k-1))))
+      initial_entry <- rep(1:(k-1),ceiling(n/(k-1)))
       initial_entry <- initial_entry[1:n]
     }
   }
+  if(sort_init == T) initial_entry <- sort(initial_entry)
   # Return initial entries
   return(initial_entry)
 }
@@ -247,6 +248,56 @@ construct_recapture <- function(n, k){
 
 # 5. Initialize CR States---------------------------------------------------------------------------------------
 
+initialize_mating_choice <- function(n, initial_entry, delta, mating){
+  # Alive at initial entry
+  previous_state <- rep(1, n)
+  # Choose whether to mate or not
+  initial_mating_choice <- mate(previous_state,initial_entry,delta)
+  # Assign mating status to initial entry
+  for(i in 1:(k-1)){
+    enter_at_i <- which(initial_entry == i)
+    mating[enter_at_i,i] <- initial_mating_choice[enter_at_i]
+  }
+  return(mating)
+}
+
+initialize_partner_status <- function(n, pairs, mating, initial_entry, sex){
+    
+  nf <- length(sex[sex == "F"]) # Number of females
+  nm <- length(sex[sex == "M"]) # Number of males
+  i <- min(initial_entry)
+  enter_at_i <- which(initial_entry == i)
+  female_at_i <- enter_at_i[enter_at_i %in% which(sex == "F")]
+  male_at_i <- enter_at_i[enter_at_i %in% which(sex == "M")]
+  male_index <- male_at_i - nf
+  for(j in 1:n){
+    
+    female_in_arrival <- 1*(j %in% female_at_i)*mating[j,i]
+    
+    # Probability of j and l forming a pair
+    probj <- rep(0,n) #Empty Vector
+    probj[male_index] <- female_in_arrival*20*mating[male_at_i,i] # Available males
+    probj[(nf+1):n] <- 1
+    probj[1:nm] <- 1*(j > nf) #allow for dummy relationships to form
+    
+    # Any pairs that have formed cannot form again
+    if(j == 2){
+      probj <- probj*(1-pairs[1,,i])
+    } else if(j > 2){
+      probj <- probj*(1-colSums(pairs[1:(j-1),,i]))
+    }
+    # Draw partnership
+    pairs[j,,i] <- t(rmultinom(1,1,probj))
+  }
+  # Return updated pairs matrix
+  return(pairs)
+}
+
+
+initialize_survival_status <- function(){}
+initialize_recapture_status <- function(){}
+
+
 # 6. Update Data structures from [t,t+1)------------------------------------------------------------------------
 
 # 7. Simulate Data ---------------------------------------------------------------------------------------------
@@ -255,6 +306,7 @@ construct_recapture <- function(n, k){
 simulate_cr_data <- function(n,
                              k, 
                              prop.female,
+                             delta,
                              phi.f, 
                              phi.m, 
                              gam, 
@@ -264,11 +316,12 @@ simulate_cr_data <- function(n,
                              beta0,
                              beta1,
                              rand_sex = F,
-                             rand_init = F){
+                             rand_init = T,
+                             init = NULL){
   
   # Generate SKeleton Data Structures
   sex <- construct_sexes(n, prop.female, rand_sex)
-  initial_entry <- construct_init_entry(n, k, rand_init) 
+  initial_entry <- construct_init_entry(n, k, rand_init,init) 
   mating <- construct_mated(n, k)
   pairs_list <- construct_pairs(n, k)
   pf <- pairs_list[["pf"]]
@@ -284,6 +337,9 @@ simulate_cr_data <- function(n,
   rpair <- construct_recapture(n,k)
   
   # Initialize Data 
+  mating <- initialize_mating_choice(n, initial_entry,delta, mating)
+  pairs <- initialize_partner_status(n, pairs, mating, initial_entry, sex)
+  
   
   # Simulate Fates
   
