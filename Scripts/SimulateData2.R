@@ -1,6 +1,7 @@
-########################
-# 1. Generic Functions #
-########################
+## 1. Generic Functions -------------------------------------------------------------------------------------
+
+#Inline Paste0 function
+`%+%` <- function(a, b) paste0(a, b)
 
 #Odds function
 odds <- function(p){
@@ -43,9 +44,8 @@ softmax <- function(vector){
   return(out)
 }
 
-#################################
-# 2. S/R Distribution Functions #
-#################################
+
+## 2. S/R Distribution Functions -------------------------------------------------------------------------------------
 
 #Extract joint binomial parameters
 compute_jbin_param_cjs <- function(prob.f,prob.m){
@@ -100,7 +100,7 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
 }
 
 
-#Compute Survival from time t to t+1 for an entity  !!!!!!!!!!!!!!!!!!!!!!
+#Compute Survival from time t to t+1 for an entity  
 survival <- function(previous_state, j, phi.m, phi.f, gam){
   
   # Compute Probability Distribution
@@ -144,58 +144,200 @@ recapture <- function(current_state, j, p.m, p.f, rho){
   return(obs)
 } 
 
-#############################
-# 3. Breeding Probabilities #
-#############################
+# 3. Mating Prob ----------------------------------------------------------------------------------------------- 
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-breed <- function(previous_state, sex, j, delta){
+mate <- function(previous_state, sex, j, delta){
   
-  # Filters
-  alive_male <- (previous_state == 3 && sex == "M")
-  alive_female <- (previous_state == 2 && sex == "F")
-  alive_partnered <- (previous_state == 4)
-  
-  mask <- (alive_male | alive_female | alive_partnered)
-  
-  # Check if breeding occurs
-  if(mask){
-    obs <- rbinom(1,1,delta[j]) 
-  } else {
-    obs <- 0
-  }
+  # Chose to mate at time t? Previous state is 0/1 here
+  obs <- rbinom(1, 1, delta[j]*previous_state)
+
   return(obs)
 }
 
-###############################
-# 4. Construct Model Matrices #
-###############################
+# 4. Construct Model Matrices------------------------------------------------------------------------------------
+
+# Build out data structures and do easy initialization 
 
 # p-q split between males and females
-construct_gender <- function(n, prop.female = 0.5, random = F){
+construct_sexes <- function(n, prop.female = 0.5, random = F){
   # Percent split 
   prop.male <- 1 - prop.female
   #Compute Genders by random sample or fixed count
   if(random == T){
-    gender <- ifelse(rbinom(n,1,prop.female)==1,"F","M")
+    sex <- sort(ifelse(rbinom(n,1,prop.female)==1,"F","M"))
   } else {
-    gender <- c(rep("F",n * prop.female), rep("M", n * prop.male))
+    sex <- sort(c(rep("F",n * prop.female), rep("M", n * prop.male)))
   }
-  # Return vector of gender designations
-  return(gender)
+  
+  # Return vector of sex designations
+  return(sex)
 }
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-construct_mated <- function(gender,k){
+construct_init_entry <- function(n, k, random = F, inits = NULL){
   
-  mated <- matrix(0,nrow=length(gender),ncol = k)
-  
-  
+  # Select initial entry randomly?
+  if(random == T){
+    initial_entry = sort(as.integer(sample(c(1:round(k/2)),size=n,replace=T)))
+  } else {
+    # If not do we have pre-specified values?
+    if(!is.null(inits)){
+      initial_entry <- inits 
+    # If not just do fixed intervals across n and k 
+    } else {
+      initial_entry <- sort(rep(1:(k-1),ceiling(n/(k-1))))
+      initial_entry <- initial_entry[1:n]
+    }
+  }
+  # Return initial entries
+  return(initial_entry)
 }
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-construct_survival <- function(){
-  
+
+#Skeleton Matrix for mate choice at k 
+construct_mated <- function(n,k){
+  # Mate status at time t for each animal 
+  mating <- matrix(NA,nrow=length(sex),ncol = k)
+  # Return Matrix
+  return(mating)
 }
+
+#Skeleton array for pair assignment at k
+construct_pairs <- function(n,k){
+  #Female's partners
+  pf <- matrix(NA, nrow = n, ncol = k)
+  #Male's partners
+  pm <- matrix(NA, nrow = n, ncol = k)
+  #Pair Identities
+  pairs <- array(NA, dim = c(n, n, k))
+  # List of objects
+  pairs_list <- list(pf = pf, pm = pm, pairs = pairs)
+  return(pairs_list)
+}
+
+# Construct pair coefficients
+construct_coef <- function(sex, k){
+  #Intercept
+  intercept <- array(1, dim = c(n,n,k))
+  # Number of times a pair occurred
+  histories <- array(0, dim = c(n,n,k))
+  coef_list <- list(intercept =intercept, histories =histories)
+  return(coef_list)
+}
+
+# Survival matrices for males, females, and 
+construct_survival <- function(sex, k){
+  #Females
+  sf <- matrix(NA, nrow = length(sex[sex == "F"]), ncol = k)
+  #Males
+  sm <- matrix(NA, nrow = length(sex[sex == "M"]), ncol = k)
+  #Pairs (and pair-single/single-pair combinations)
+  spair <- array(NA, dim = c(length(sex), length(sex), k))
+  # Group into list and return data object
+  surv_matrices <- list(sf =sf,
+                        sm = sm,
+                        spair = spair)
+  return(surv_matrices)
+}
+
+# Recapture Array for pairs (don't need separate ones as recapture is not latent)
+construct_recapture <- function(n, k){
+  #Pairs (and pair-single/single-pair combinations)
+  rpair <- array(NA, dim = c(n, n, k))
+  return(rpair)
+}
+
+# 5. Initialize CR States---------------------------------------------------------------------------------------
+
+# 6. Update Data structures from [t,t+1)------------------------------------------------------------------------
+
+# 7. Simulate Data ---------------------------------------------------------------------------------------------
+
+
+simulate_cr_data <- function(n,
+                             k, 
+                             prop.female,
+                             phi.f, 
+                             phi.m, 
+                             gam, 
+                             p.f, 
+                             p.m, 
+                             rho, 
+                             beta0,
+                             beta1,
+                             rand_sex = F,
+                             rand_init = F){
+  
+  # Generate SKeleton Data Structures
+  sex <- construct_sexes(n, prop.female, rand_sex)
+  initial_entry <- construct_init_entry(n, k, rand_init) 
+  mating <- construct_mated(n, k)
+  pairs_list <- construct_pairs(n, k)
+  pf <- pairs_list[["pf"]]
+  pm <- pairs_list[["pm"]]
+  pairs <- pairs_list[["pairs"]]
+  coef_list <- construct_coef(sex, k)
+  intercept <- coef_list[["intercept "]]
+  histories <- coef_list[["histories"]]
+  survival_list <- construct_survival(sex, k)
+  sf <- survival_list[["sf"]]
+  sm <- survival_list[["sm"]]
+  spair <- survival_list[["spair"]]
+  rpair <- construct_recapture(n,k)
+  
+  # Initialize Data 
+  
+  # Simulate Fates
+  
+  # Build partially observed/latent data variables
+  
+  
+  # Return JAGS/NIBMLE (and true) Data
+  model_data <- list(
+    n  = n, # Number of animals sampled
+    k = k, # Number of occasions
+    nf = length(sex[sex == "F"]), # Number of females
+    nm = length(sex[sex == "M"]), # Number of males
+    sex = sex, # Sex of sampled individuals
+    initial_entry = initial_entry, # When did they enter the population
+    mating = mating, # Mate status at time t
+    pf = pf, # partners of females (including slots for singles)
+    pm = pm, # partners of males (including slots for singles)
+    pairs = pairs, # pair histories
+    histories = histories, # number of occasions a pair occurred
+    sf = sf, # true survival of females
+    sm = sm, # true survival of males
+    spair = spair, # true survival of partnerships
+    rpair = rpair # recapture of pairs 
+    )
+  
+  #Return Model object
+  return(model_data)
+}
+
+
+
+# 7. Format Data for Different Purposes ------------------------------------------------------------------------
+
+format_to_std_cjs <- function(model_data){
+  
+  
+  
+  # Store results in list
+  model_data <- list()
+  
+  # Return Standard CJS Data
+  return(model_data)
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
