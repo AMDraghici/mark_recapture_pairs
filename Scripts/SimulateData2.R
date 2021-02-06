@@ -81,7 +81,7 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
   boundary_f <-  which(prob.f == 1| prob.f == 0)
   boundary_m <- which(prob.m == 1| prob.m == 0)
   boundary <- sort(unique(c(boundary_f, boundary_m)))
-  corr[boundary] <- 0
+  corr[boundary] <- 0 #correlation technically wouldn't be zero but it makes the math work out this way
   cor_upper_bound[boundary] <- 0
   cor_lower_bound[boundary] <- 0
   
@@ -342,7 +342,14 @@ initialize_recruit <- function(n, k, sex, initial_entry, recruit_f, recruit_m, r
   for(i in 1:k){
     recruit[1:nf,1:nm,i] <- recruit_f[1:nf,i] %*% t(recruit_m[1:nm,i])
   }
-  return(recruit)
+  
+  #Recruit List
+  recruit_list <- list(recruit_f = recruit_f, 
+                       recruit_m = recruit_m,
+                       recruit = recruit)
+  
+  # Return recruit data 
+  return(recruit_list)
 }
 
 
@@ -386,18 +393,16 @@ initialize_mating_choice <- function(n, initial_entry, delta, mating_f, mating_m
   return(mating_list)
 }
 
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# !!!!! Update this function to be in line with the math method once you code out that process 
-# Like with the coef and softmax function etc..
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-initialize_partner_status <- function(n, pairs, mating, recruit, initial_entry){
+initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recruit, initial_entry){
 
   # When did the first animal get spotted
   i <- min(initial_entry) 
   
-  # Flat probability of partnerships (replace 1* with the model structure)
-  prob_mate <- 1*mating[,,i] * recruit[,,i]
+  psi_t <- compute_partner_probs(n, i, coef_list, betas)
+  
+  # Flat probability of partnerships
+  prob_mate <- psi_t * mating[,,i] * recruit[,,i]
   
   for(j in 1:n){
     # Probability of partnerships forming for j -> 1:n
@@ -463,7 +468,10 @@ propogate_partner_state <- function(pairs, n, pf, time){
 }
 
 # Convert joint survival to marginal states
-propogate_surv_individual <- function(sf, sm, spair, time){
+propogate_surv_individual <- function(sf, sm, spair, time, sex){
+  
+  nf <- length(sex[sex == "F"]) # Number of females
+  nm <- length(sex[sex == "M"]) # Number of males
   
   surv_marginal_female <- c(0,1,0,1)
   surv_marginal_male <- c(0,0,1,1)
@@ -509,14 +517,161 @@ propogate_surv_pairs <- function(sf, sm, spair, time, pf,n){
   
 }
 
+compute_partner_lodds <- function(n, time, coef_list, betas){
+  
+  # Assign memory 
+  eta_t <- matrix(0, nrow = n, ncol = n)
+  
+  beta_vec <- unlist(betas)
+  
+  # Add all the vectorized coefficients
+  for(i in 1:length(beta_vec)){
+    eta_t <- eta_t + coef_list[[i]][,,time]*beta_vec[i]
+  }
+  
+  # Return log-odds of partnerships at time t
+  return(eta_t)
+}
+
+
+compute_partner_probs <- function(n, time, coef_list, betas){
+  
+  # Grab log-odds of pairs forming in order
+  eta_t <- compute_partner_lodds(n, time, coef_list, betas)
+  
+  # convert to probability using softmax 
+  psi_t <- sapply(1:nrow(eta_t),function(x) softmax(eta_t[x,]))
+  
+  #Return raw probability of mating (unconditional)
+  return(psi_t)
+}
+
+# Update History
+update_history <- function(coef_list, pairs, time, sex){
+  
+  # Number of females and males (ignore singles)
+  nf <- length(sex[sex == "F"]) 
+  nm <- length(sex[sex == "M"]) 
+
+  # Add partnerships at time t-1 to current partnership history at t
+  coef_list[["histories"]][1:nf,1:nm,time] <- coef_list[["histories"]][1:nf,1:nm,time-1] +
+    pairs[1:nf,1:nm,time-1]
+  # Return coefficients 
+  return(coef_list)
+}
+
 # compute mating decision at t
-compute_mating <- function(){}
+compute_mating <- function(n, time, delta, recruit, recruit_f, recruit_m,
+                           mating_f, mating_m, mating, sf, sm, sex){
+  
+  # Number of females and males 
+  nf <- length(sex[sex == "F"]) 
+  nm <- length(sex[sex == "M"]) 
+  
+  # Mating by females
+  for(i in 1:nf){
+
+    # Initial Entry
+    init_f_i <- min(which(recruit_f[i,]==1))
+    
+    # If just entered then initialize function has assigned status 
+    if(init_f_i >= time) next
+    
+    # Otherwise update status 
+    mating_f[i,time] <- mate(sf[i,time-1], time, delta)
+    
+  }
+  
+  # Mating by females
+  for(i in 1:nf){
+    
+    # Initial Entry
+    init_m_i <- min(which(recruit_m[i,]==1))
+    
+    # If just entered then initialize function has assigned status 
+    if(init_m_i >= time) next
+    
+    # Otherwise update status 
+    mating_m[i,time] <- mate(sm[i,time-1], time, delta)
+    
+  }
+  
+  #Joint mating distribution
+  mating[1:nf,1:nm,time] <- mating_f[1:nf,time] %*% t(mating_m[1:nm,time])
+  
+  # Group results and join
+  mating_list <- list(mating_f = mating_f,
+                      mating_m = mating_m,
+                      mating = mating)
+  
+  return(mating_list)
+}
 
 # compute partnerships at t
-compute_partnerships <- function(){}
-
+compute_partnerships <- function(n, coef_list, betas, pairs, mating, recruit, time){
+  
+  # Raw probability of mating (without conditions)
+  psi_t <- compute_partner_probs(n, time, coef_list, betas)
+  
+  # Probability of partnerships with mating and recruitment included (surv is baked into mating)
+  prob_mate <- psi_t * mating[,,time] * recruit[,,time]
+  
+  for(j in 1:n){
+    # Probability of partnerships forming for j -> 1:n
+    probj <- prob_mate[j,]
+    
+    # Any pairs that have formed cannot form again
+    if(j == 2){
+      probj <- probj*(1-pairs[1,,time]) #Remove pair j=1 from the prob (colsum only works on matrices)
+    } else if(j > 2){
+      probj <- probj*(1-colSums(pairs[1:(j-1),,time])) #remove all preformed pairs
+    }
+    
+    # Draw partnership
+    pairs[j,,time] <- t(rmultinom(1,1,probj)) # assign a partner 
+  }
+  
+  # Return updated pairs matrix
+  return(pairs)
+}
+  
 # Compute survival state at t
-compute_survival <- function(){}
+compute_survival <- function(spair, sf, sm, pf, time, phi.m, phi.f, gam, recruit_f, recruit_m){
+ 
+  for(i in 1:nrow(pf)){
+    
+    # Identify i's partner
+    partner_i <- pf[i, time]
+    
+    # Is initial entry now or later?
+    init_f_i <- min(which(recruit_f[i,]==1))
+    init_m_i <- min(which(recruit_m[partner_i,]==1))
+
+    # Previous survival states
+    surv_i <- sf[i, time-1]*(init_f_i != time) + 1*(init_f_i == time)
+    surv_m <- sm[partner_i, time-1]*(init_m_i != time) + 1*(init_m_i == time)
+    
+    # Recover joint survival state for this new couple at t-1
+    previous_state_i <- 1 + surv_i + 2*surv_m
+    
+    # If you've entered now then you're alive t so probability becomes 1 
+    phiF <- phi.f
+    phiM <- phi.m 
+
+    phiF[time-1] <- phi.f[time-1]*(init_f_i != time) + 1*(init_f_i == time)   
+    phiM[time-1] <- phi.m[time-1]*(init_m_i != time) + 1*(init_m_i == time)   
+    
+    # Compute joint survival at time t
+    spair[i,partner_i, time] <- survival(previous_state_i,time-1,phiM, phiF, gam)
+  }
+  
+  
+  #Remaining entries are "dead"
+  spair[,,time][is.na(spair[,,time])] <- 1
+  
+  # Return joint survival density
+  return(spair)
+}
 
 
 # Compute recapture state at t
@@ -526,7 +681,7 @@ compute_recapture <- function(rpair, spair, pf, time, p.m, p.f, rho){
   for(i in 1:n){
     j <- pf[i, time]
     current_state <- spair[i,j, time]
-    rpair[i,j, time] <- recapture(current_state,time,p.m,p.f,rho)
+    rpair[i,j, time] <- recapture(current_state, time, p.m, p.f, rho)
   }
  
   # Turn rest to unobserved 
@@ -538,6 +693,27 @@ compute_recapture <- function(rpair, spair, pf, time, p.m, p.f, rho){
 
 # 7. Simulate Data ---------------------------------------------------------------------------------------------
 
+#############
+# FOR TESTING (delete later)
+#############
+
+n <- 1000
+k <- 10
+prop.female <- 0.5
+phi.f <- rep(0.5, k)
+phi.m <- phi.f
+gam <- rep(0.5, k)
+p.f <- phi.f
+p.m <- phi.f
+rho <- gam
+betas <- list(beta0 = 1, beta1 = 0.5)
+delta <- rep(0.5, k)
+rand_sex <- F
+rand_init <- T
+init <- NULL
+
+#options(warn = 2)   
+#options(warn = 0)   
 
 simulate_cr_data <- function(n,
                              k, 
@@ -549,13 +725,12 @@ simulate_cr_data <- function(n,
                              p.f, 
                              p.m, 
                              rho, 
-                             beta0,
-                             beta1,
+                             betas, 
                              rand_sex = F,
                              rand_init = T,
                              init = NULL){
   
-  # Generate SKeleton Data Structures test
+  # Generate SKeleton Data Structures
   
   sex <- construct_sexes(n, prop.female, rand_sex)
   initial_entry <- construct_init_entry(n, k, rand_init,init) 
@@ -564,16 +739,14 @@ simulate_cr_data <- function(n,
   recruit_m  <- recruit_list[["recruit_m"]]
   recruit <- recruit_list[["recruit"]]
   mating_list <- construct_mated(n, k, sex)
-  mating_f = mating_list[["mating_f"]] 
-  mating_m = mating_list[["mating_m"]]  
-  mating = mating_list[["mating"]]
+  mating_f <- mating_list[["mating_f"]] 
+  mating_m <- mating_list[["mating_m"]]  
+  mating <- mating_list[["mating"]]
   pairs_list <- construct_pairs(n, k)
   pf <- pairs_list[["pf"]]
-  pm <- pairs_list[["pm"]]
+  #pm <- pairs_list[["pm"]]
   pairs <- pairs_list[["pairs"]]
   coef_list <- construct_coef(sex, k)
-  intercept <- coef_list[["intercept"]]
-  histories <- coef_list[["histories"]]
   survival_list <- construct_survival(sex, k)
   sf <- survival_list[["sf"]]
   sm <- survival_list[["sm"]]
@@ -583,21 +756,57 @@ simulate_cr_data <- function(n,
   
   # Initialize Data 
   initial_time <- min(initial_entry)
-  recruit <- initialize_recruit(n, k , sex, initial_entry, recruit_f, recruit_m, recruit)
+  recruit_list <- initialize_recruit(n, k , sex, initial_entry, recruit_f, recruit_m, recruit)
+  recruit_f <- recruit_list[["recruit_f"]]
+  recruit_m <- recruit_list[["recruit_m"]]
+  recruit <- recruit_list[["recruit"]]
   mating_list_init <- initialize_mating_choice(n, initial_entry,delta, mating_f,mating_m, mating, sex)
-  mating_f = mating_list_init[["mating_f"]] 
-  mating_m = mating_list_init[["mating_m"]]  
-  mating = mating_list_init[["mating"]]
-  pairs <- initialize_partner_status(n, pairs, mating, recruit, initial_entry)
+  mating_f <- mating_list_init[["mating_f"]] 
+  mating_m <- mating_list_init[["mating_m"]]  
+  mating <- mating_list_init[["mating"]]
+  pairs <- initialize_partner_status(n, coef_list, betas, pairs, mating, recruit, initial_entry)
+  coef_list <- update_history(coef_list, pairs, initial_time + 1, sex)
   pf <- propogate_partner_state(pairs, n, pf, time = initial_time)
   init_surv_list <-  initialize_survival_status(n, initial_entry, sex, sf, sm)
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   spair <- propogate_surv_pairs(sf, sm, spair,initial_time, pf, n)
-  rpair <- compute_recapture(rpair, spair, pf, initial_time, rep(1,k), rep(1,k), rep(1,k))
+  rpair <- compute_recapture(rpair, spair, pf, initial_time, p.m, p.f, rho)
   
   # Simulate Fates
-  for(i in 1:(k-1)){
+  for(time in (initial_time+1):k){
+    # Compute recruitment at t
+    # Ignore for now as I've randomized this for the time being 
+    # When coming back to this think about initialization specifically wrt survival 
+    
+    # Compute mating status at t 
+    
+    mating_list_t <- compute_mating(n, time, delta, 
+                                    recruit, recruit_f, recruit_m, 
+                                    mating_f, mating_m, mating, 
+                                    sf, sm, sex)
+    mating_f <- mating_list_t[["mating_f"]] 
+    mating_m <- mating_list_t[["mating_m"]]  
+    mating <- mating_list_t[["mating"]]
+    
+    # Compute partnership probability at t based on surv at t-1
+    pairs <- compute_partnerships(n, coef_list, betas, pairs, mating, recruit, time)
+    
+    # Update partner histories going into next survival check (at time k we don't need this)
+    if(time < k){
+      coef_list <- update_history(coef_list, pairs, time + 1, sex)
+    }
+    
+    pf <- propogate_partner_state(pairs, n, pf, time)
+    
+    # Compute survival probability at t based on partners at t 
+    spair <- compute_survival(spair, sf, sm, pf, time, phi.m, phi.f, gam, recruit_f, recruit_m)
+    sind_list_t <- propogate_surv_individual(sf, sm, spair, time, sex)
+    sf <- sind_list_t[["sf"]]
+    sm <- sind_list_t[["sm"]]
+    
+    # Compute recapture probability at t based on survival at t
+    rpair <- compute_recapture(rpair, spair, pf, time, p.m, p.f, rho)
     
   }
   
@@ -641,459 +850,3 @@ format_to_std_cjs <- function(model_data){
   # Return Standard CJS Data
   return(model_data)
 }
-
-
-
-
-
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# initiate_population <- function(n,k, prop.female = 0.5){
-# 
-#   ###Sort Population over entire study and compute initial entry time
-#   population <- data_frame(animal_id = 1:n,
-#                            sex = construct_gender(n, prop.female = prop.female)
-#                            ) %>%
-#     mutate(initial_entry = as.integer(sample(c(1:round(k/2)),size=n,replace=T)))
-#   
-#   #Assign Initial Pairs based on entry time (partner must enter together)
-#   init_pop_list <- list()
-#   
-#   # Index of initial entries
-#   initial_entries <- sort(unique(population$initial_entry))
-#   
-#   for(j in initial_entries){
-#     
-#     #Split by gender and initial entry
-#     temp.m <- population %>% filter(sex=="M") %>% filter(initial_entry == j)
-#     temp.f <- population %>% filter(sex=="F") %>% filter(initial_entry == j)
-#     
-#     #Assign Pairs to males (categorical distribution)
-#     temp.m <- temp.m %>% 
-#       mutate(partner_id = as.integer(
-#         sample(
-#           c(rep(0,max(nrow(temp.m)-nrow(temp.f),0)),
-#             unique(temp.f$animal_id)
-#             ),
-#           size=nrow(temp.m),
-#           replace = F)
-#         ))
-#     
-#     #Update Female data to reflect assignment
-#     temp.f <- temp.f %>% 
-#       left_join(temp.m,by=c("animal_id"="partner_id","initial_entry")) %>% 
-#       select(-sex.y) %>% 
-#       rename(partner_id = animal_id.y,
-#              sex = sex.x) %>% 
-#       replace(., is.na(.), as.integer(0))
-#     
-#     #Join tables and store in list indexed by initial entry
-#     init_pop_list[[j]] <- rbind(temp.f,temp.m)
-#     
-#     rm(temp.f,temp.m)
-#     
-#   }  
-#   
-#   #Compute population matrix
-#   population <- bind_rows(init_pop_list)
-#   
-#   #Generate Empty Results Data Frame
-#   results <- merge(population$animal_id,1:k) %>% 
-#     rename("animal_id"="x","time"="y") %>%  
-#     inner_join(population,by=c("animal_id")) %>% 
-#     arrange(animal_id) %>% 
-#     mutate(partner_id = ifelse(time==initial_entry,partner_id,
-#                                ifelse(time<initial_entry,0,NA)),
-#            mating = ifelse(initial_entry==time,ifelse(partner_id==0,0,1),
-#                            ifelse(initial_entry>time,0,NA)),
-#            surv = ifelse(initial_entry==time,ifelse(partner_id==0,
-#                                                     ifelse(sex=="M",3,2),4),
-#                          ifelse(initial_entry>time,1,NA)),
-#            recapture = ifelse(initial_entry==time,ifelse(partner_id==0,
-#                                                          ifelse(sex=="M",3,2),4),
-#                               ifelse(initial_entry>time,1,NA)),
-#            surv_confounded = ifelse(initial_entry==time,surv,
-#                                     ifelse(initial_entry>time,1,NA)),
-#            partner_id_confounded = ifelse(initial_entry==time,partner_id,
-#                                           ifelse(initial_entry>time,0,NA))) 
-#   
-#   # Return Results Template and Population Index
-#   return(list(population = population, 
-#               results = results))
-# }
-# 
-# ###########################
-# #Partnership Probabilities#
-# ###########################
-# 
-# #########################################
-# #Functions for Time-dependent parameters#
-# #########################################
-# 
-# #Set up Intercept
-# add_intercept <- function(reg.array){
-#   time <- dim(reg.array)[3]
-#   chooser <- dim(reg.array)[4]
-#   
-#   for(i in 1:time){
-#     for(j in 1:chooser){
-#       reg.array[,1,i,j] <- 1 
-#     }
-#   }
-#   
-#   return(reg.array)
-#   
-# } 
-# 
-# #Update History
-# #Make sure current iteration of results is up to date
-# update_hist <- function(reg.array,gender,t,results){
-#   
-#   #Pull Current Partnership History
-#   temp.hist <- results %>% 
-#     filter(sex==gender,time==t,initial_entry <= t) %>% 
-#     select(animal_id,partner_id)
-#   
-#   #If there are individuals then update
-#   if(nrow(temp.hist)!=0){
-#     #Sort through each entity
-#     for(i in 1:nrow(temp.hist)){
-#       #Pick the chooser and choosen 
-#       chooser <- as.character(temp.hist[i,1])
-#       chosen <- as.character(temp.hist[i,2])
-#       
-#       #If there is no partner skip to the next iteration
-#       if(chosen == "0"){
-#         next
-#         #Otherwise from this time point into the future increase the partnership hist by 1
-#       } else {
-#         for(j in t:k){
-#           reg.array[chosen,2,j,chooser] <- reg.array[chosen,2,j,chooser] + 1
-#         }
-#       }
-#     }
-#   }
-#   return(reg.array)
-# }
-# 
-# ###############################################
-# #Function to Generate dyad choice Probabilities
-# ###############################################
-# 
-# #Function to Generate Pair Probabilities
-# gen_psi <- function(reg.array,individual,time,covariates){
-#   individual <- as.character(individual)
-#   unweighted <- covariates %*% t(reg.array[,,time,individual])
-#   psi <- softmax(unweighted)
-#   return(as.vector(psi))
-# } 
-# 
-# # Update probability Array
-# update_prob_array <- function(prob.array,reg.array,t,covariates){
-#   choosers <- rownames(prob.array[,,t])
-#   for(i in choosers){
-#     prob.array[i,,t] <- gen_psi(reg.array,i,t,covariates)
-#   }
-#   return(prob.array)
-# }
-# 
-# construct_data_template <- function(n, 
-#                                     k, 
-#                                     prop.female = 0.5, 
-#                                     n.covariates = 2, 
-#                                     beta.m = c(0.5,3),
-#                                     beta.f = c(0.5,3),
-#                                     effect.name.m = c("Intercept","History"),
-#                                     effect.name.f = c("Intercept","History")
-#                                     ){
-#   
-#   #Pull population template
-#   init_pop <- initiate_population(n,k, prop.female)
-#   population <- init_pop[[1]]
-#   results <- init_pop[[2]]
-#   
-#   #Number of males, females
-#   n.males <- population %>% filter(sex == "M") %>% nrow() 
-#   n.females <- population %>% filter(sex == "F") %>% nrow() 
-#   
-#   #Generate Zero Vectors 
-#   z.males <- rep(0,n.males)
-#   z.females <- rep(0,n.females)
-#   z.covariates <- rep(0,n.covariates-1)
-#   z.time <- rep(0,k)
-#   
-#   #Organize vectors
-#   #Male Array
-#   z.vec.m <- c(z.females,z.covariates,z.time,z.males)
-#   dim.vec.m <- c(n.females,n.covariates,k,n.males)
-#   
-#   #Female Array
-#   z.vec.f <- c(z.males,z.covariates,z.time,z.females)
-#   dim.vec.f <- c(n.males,n.covariates,k,n.females)
-#   
-#   #Generate Empty Arrays
-#   reg.array.m <- array(z.vec.m,dim = dim.vec.m) %>% provideDimnames()
-#   reg.array.f <- array(z.vec.f,dim = dim.vec.f) %>% provideDimnames()
-#   
-#   #Rename Male and Female Index on Arrays
-#   male.id <- population %>% 
-#     filter(sex == "M") %>% 
-#     select(animal_id) %>% 
-#     t() %>% 
-#     as.vector() %>% 
-#     sort()
-#   
-#   female.id <- population %>%
-#     filter(sex == "F") %>% 
-#     select(animal_id) %>% 
-#     t() %>% 
-#     as.vector() %>% 
-#     sort()
-#   
-#   #Apply the names
-#   
-#   #Male Choice array
-#   dimnames(reg.array.m)[[4]] <- male.id
-#   dimnames(reg.array.m)[[3]] <- 1:k
-#   dimnames(reg.array.m)[[2]] <- effect.name.f
-#   dimnames(reg.array.m)[[1]] <- female.id
-#   
-#   #Female Choice array
-#   dimnames(reg.array.f)[[4]] <- female.id
-#   dimnames(reg.array.f)[[3]] <- 1:k
-#   dimnames(reg.array.f)[[2]] <- effect.name.m
-#   dimnames(reg.array.f)[[1]] <- male.id
-#   
-#   # Add intercepts
-#   reg.array.f <- add_intercept(reg.array.f)
-#   reg.array.m <- add_intercept(reg.array.m)
-#   
-#   #Initialize Regression array with first time period 
-#   reg.array.f <- update_hist(reg.array.f,"F",1,results)
-#   reg.array.m <- update_hist(reg.array.m,"M",1,results)
-#   
-#   #Choice Probability arrays
-#   
-#   #Organize vectors
-#   #Male array
-#   z.vec.m <- c(z.males,z.females,z.time)
-#   dim.vec.m <- c(n.males,n.females,k)
-#   
-#   #Female array
-#   z.vec.f <- c(z.females,z.males,z.time)
-#   dim.vec.f <- c(n.females,n.males,k)
-#   
-#   #Generate Empty arrays
-#   prob.array.m <- array(z.vec.m,dim = dim.vec.m) %>% provideDimnames()
-#   prob.array.f <- array(z.vec.f,dim = dim.vec.f) %>% provideDimnames()
-#   
-#   #Add Names
-#   #Male Choice array
-#   dimnames(prob.array.m)[[1]] <- male.id
-#   dimnames(prob.array.m)[[2]] <- female.id
-#   dimnames(prob.array.m)[[3]] <- 1:k
-#   
-#   #Female Choice array
-#   dimnames(prob.array.f)[[1]] <- female.id
-#   dimnames(prob.array.f)[[2]] <- male.id
-#   dimnames(prob.array.f)[[3]] <- 1:k
-# 
-#   prob.array.f <- update_prob_array(prob.array.f,reg.array.f,1,beta.m)
-#   prob.array.m <- update_prob_array(prob.array.m,reg.array.m,1,beta.f)
-#   
-#   # Gather important data
-#   out.list <- list(population = population,
-#        results = results, 
-#        reg.array.f = reg.array.f,
-#        reg.array.m = reg.array.m,
-#        prob.array.f = prob.array.f,
-#        prob.array.m = prob.array.m)
-#   
-#   # Return Results
-#   return(out.list)
-# }
-# 
-# simulate_cr_data <- function(n, 
-#                              k, 
-#                              prop.female = 0.5, 
-#                              n.covariates = 2, 
-#                              beta.m = c(0.5,3),
-#                              beta.f = c(0.5,3),
-#                              effect.name.m = c("Intercept","History"),
-#                              effect.name.f = c("Intercept","History"),
-#                              phi.m, 
-#                              phi.f,
-#                              gam,
-#                              p.m,
-#                              p.f,
-#                              rho,
-#                              delta
-#                              ){
-#  
-#    # Generate initial data 
-#    initial_data_list <- 
-#      construct_data_template(n,k,
-#                              prop.female,n.covariates,
-#                              beta.m,beta.f,
-#                              effect.name.m,effect.name.f)
-# 
-#    
-#    # Extract Results
-#    population <- initial_data_list[[1]]
-#    results <- initial_data_list[[2]]
-#    reg.array.f <- initial_data_list[[3]]
-#    reg.array.m <- initial_data_list[[4]]
-#    prob.array.f <- initial_data_list[[5]]
-#    prob.array.m <-  initial_data_list[[6]]
-#    
-#    ##################
-#    #Simulate History#
-#    ##################
-#    
-#    for(i in 1:(k-1)){
-#      
-#      #Split Individuals by Gender or Partner Status
-#      it <- results %>% filter(time == i,sex=="M",partner_id !=0,initial_entry <= i)
-#      jt <- results %>% filter(time == i,sex=="F",partner_id !=0,initial_entry <= i)
-#      kt <- results %>% filter(time == i,partner_id==0,initial_entry <= i)
-#      mt <- rbind(it,kt)
-#      nt <- rbind(it,jt,kt)  
-#      
-#      ntt <- results %>%
-#        filter(time == i+1,initial_entry <= i)
-#      
-#      ntx <- ntt %>% inner_join(nt,by=c("animal_id","sex","initial_entry"))
-#      
-#      ntt$mating <- mapply(breed,ntx$surv.y,ntx$sex,MoreArgs = list(j=i+1,delta=delta))
-#      
-#      ############################
-#      #Seperate Variables present#
-#      ############################
-#      
-#      itt <- ntt %>% filter(mating == 1,sex == "M") 
-#      jtt <- ntt %>% filter(mating == 1,sex == "F")  
-#      ktt <- ntt %>% filter(mating == 0)
-#      
-#      ################
-#      #Mate Selection#
-#      ################
-#      
-#      #Order the choosing gender 
-#      chosers <- if(length(jtt$animal_id) > 1) base::sample(jtt$animal_id,length(jtt$animal_id),replace=FALSE) else if(length(jtt$animal_id)==1) jtt$animal_id else 0
-#      chosen <- itt$animal_id
-#      
-#      #Truncate Choosers
-#      if(length(chosen) < length(chosers)){
-#        chosers <- chosers[1:length(itt$animal_id)]
-#      }
-# 
-#      #Check if there are any breeders
-#      if(length(chosen) != 0 && length(chosers)!=0 && chosers != 0){
-#        #Simulate Selection
-#        for(j in chosers){
-#          #Extract Probability and reweight
-#          psi <- prob.array.f[as.character(j),,i]
-#          psi <- psi[as.character(chosen)]/sum(psi[as.character(chosen)])
-#          #Make Partner Choice
-#          choice_index <- which(rmultinom(1,1,psi)==1)
-#          choice <- names(psi)[choice_index]
-#          #Assign Partners
-#          ntt[ntt$animal_id == as.integer(choice),]$partner_id <- j #Add to choice
-#          ntt[ntt$animal_id == j,]$partner_id <- as.integer(choice) #Add to chosen
-#          #Remove chosen from options
-#          chosen <- chosen[!chosen %in% choice]
-#        }
-#      }
-#      
-# 
-#      #Zero out Non-maters
-#      if(length(ntt[ntt$mating==0,]$partner_id) != 0){
-#        ntt[ntt$mating==0,]$partner_id <- 0
-#      }
-#      
-#      if(length(ntt[ntt$mating==1 & is.na(ntt$partner_id),]$partner_id) != 0){
-#        ntt[ntt$mating==1 & is.na(ntt$partner_id),]$partner_id <- 0
-#      }
-#      
-#      ########################
-#      #Survival and Recapture#
-#      ########################
-#      
-#      for(j in sort(unique(ntt$animal_id))){
-#        
-#        #Make sure not to re-model partners who already have their fates
-#        if(!is.na(ntt[ntt$animal_id == j,7])){next}
-#        
-#        #Extract Key Variables
-#        previous_state <- nt %>% filter(animal_id == j) %>% select(surv) %>% as.integer()
-#        partner_id_j <- ntt %>% filter(animal_id == j) %>% select(partner_id) %>% as.integer()
-#        sex <- ntt %>% filter(animal_id == j) %>% select(sex) %>% as.character()
-#        
-#        if(partner_id_j != 0){
-#          previous_state <- 4
-#        }
-#        
-#        #Simulate Survival, Recapture, and Confounding 
-#        ntt[ntt$animal_id == j,7] <- current_state <- survival(previous_state,i+1,phi.m, phi.f, gam)
-#        ntt[ntt$animal_id == j,8] <- current_observation  <- recapture(current_state,i+1, p.m, p.f, rho)
-#        ntt[ntt$animal_id == j,9] <- current_surv_conf <- ifelse(current_observation==1,NA,current_observation)
-#        ntt[ntt$animal_id == j,10] <- current_partner_conf <-  ifelse(current_observation==4,partner_id_j,NA)
-#        
-#        #Update PartnerID
-#        if(partner_id_j != 0){
-#          #Simulate Survival, Recapture, and Confounding 
-#          ntt[ntt$animal_id == partner_id_j,7] <- current_state 
-#          ntt[ntt$animal_id == partner_id_j,8] <- current_observation  
-#          ntt[ntt$animal_id == partner_id_j,9] <- current_surv_conf
-#          ntt[ntt$animal_id == partner_id_j,10]  <- ifelse(current_observation==4,j,NA)
-#        }
-#        
-#        rm(previous_state,partner_id_j,sex,current_state,current_observation)
-#        
-#      }
-#      
-#      #######################
-#      #Update Master Results#
-#      #######################
-#      
-#      #Filters
-#      animal_filter <- results$animal_id %in% ntt$animal_id
-#      time_filter <- results$time == i + 1
-#      entry_filter <- results$initial_entry < i + 1
-#      
-#      #Assign Mate Status
-#      results[animal_filter & time_filter & entry_filter,]$mating <- ntt$mating
-#      #Assign PartnerId
-#      results[animal_filter & time_filter & entry_filter,]$partner_id <- ntt$partner_id
-#      #Assign Survival
-#      results[animal_filter & time_filter & entry_filter,]$surv <- ntt$surv
-#      #Assign Recapture 
-#      results[animal_filter & time_filter & entry_filter,]$recapture <- ntt$recapture
-#      #Assign Confounded Surv
-#      results[animal_filter & time_filter & entry_filter,]$surv_confounded <- ntt$surv_confounded
-#      #Assign Confounded PartnerID
-#      results[animal_filter & time_filter & entry_filter,]$partner_id_confounded <- ntt$partner_id_confounded
-#      
-#      
-#      ###########################
-#      #Update Regression arrays#
-#      ###########################
-#      
-#      reg.array.f <- update_hist(reg.array.f,"F",i+1,results)
-#      reg.array.m <- update_hist(reg.array.m,"M",i+1,results)
-#      prob.array.f <- update_prob_array(prob.array.f,reg.array.f,i+1,beta.m)
-#      prob.array.m <- update_prob_array(prob.array.m,reg.array.m,i+1,beta.f)
-#    }
-#    
-#    out.list <- list(population,
-#                     results, 
-#                     reg.array.f)
-#    return(out.list)
-# }
