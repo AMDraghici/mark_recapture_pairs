@@ -555,7 +555,7 @@ simulate_cr_data <- function(n,
                              rand_init = T,
                              init = NULL){
   
-  # Generate SKeleton Data Structures
+  # Generate SKeleton Data Structures test
   
   sex <- construct_sexes(n, prop.female, rand_sex)
   initial_entry <- construct_init_entry(n, k, rand_init,init) 
