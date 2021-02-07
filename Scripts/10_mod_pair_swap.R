@@ -1,114 +1,110 @@
 #### Multiple-Partners Joint-Fates Extended Arnason-Schwarz Model 
 
 model{
-  ############################
-  ### 1. Data Augmentation ###
-  ############################
-  
-  # for(n in 1:N){
-  #   
-  # }
-  
-  ##################################
-  # 2. Recruitment into population #
-  ##################################
-  
-  # Female Recruitment
-  for(i in 1:nf){
-    recruit_f[i,1] ~  dbern(eps[1])
-    for(t in 2:(k-1)){
-      recruit_f[i,t] ~ dbern(recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])
-    } 
-  }
-  # Male Recruitment
-  for(j in 1:nm){
-    recruit_m[j,1] ~  dbern(eps[1])
-    for(t in 2:(k-1)){
-      recruit_m[j,t] ~ dbern(recruit_m[j,t-1] + (1-recruit_m[j,t-1]) * eps[t])
-    } 
-  }
-  
-
-  
-  ########################################################
-  ### Conditional Partnership/Survival/Recapture Steps ###
-  ########################################################
-  
-  # Time 1 events
-  
-  for(i in 1:nf){
-    amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,t])
-  }
-  
-  
-  for(j in 1:nm){
-    amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,t])
-  }
-  
-  
-  
-   for(t in 2:k){
+    ############################
+    ### 1. Data Augmentation ###
+    ############################
     
-    #######################
-    # 3. Decision to Mate #
-    #######################
+    # for(n in 1:N){
+    #   
+    # }
     
-    # Female Mating Choice
+    ##################################
+    # 2. Recruitment into population #
+    ##################################
+    
+    # Female Recruitment
     for(i in 1:nf){
-      amating_f[i,t] ~ dbern((1-af[i,t-1]) + (af[i,t-1]) * recruit_f[i,t] * delta[t])
+      recruit_f[i,1] ~  dbern(eps[1])
+      for(t in 2:(k-1)){
+        recruit_f[i,t] ~ dbern(recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])
+      } 
     }
-     
-    # Male Mating Choice
+    # Male Recruitment
     for(j in 1:nm){
-     amating_m[j,t] ~ dbern((1-af[j,t-1]) + (af[j,t-1]) * recruit_m[j,t] * delta[t])
-    } 
-     
-    #####################
-    # 4. Mate Selection #
-    #####################
-     
-    # Compute conditional psi 
-    psi_cond[1:nf,1:nm,t] <- psi[1:nf, 1:nm, t] * (recruit_f[1:nf,t] %*% t(recruit_m[1:nm,t])) * (amating_f[1:nf,t] %*% t(amating_m[1:nm,t]))
-    psi_cond[(nf+1):n, (nm+1):n, t] <- psi[(nf+1):n, (nm+1):n, t]
-    
-    # Assign mate index
-    for(e in 1:n){
-      apf[e,t] ~ dcat(psi_cond[e, ,t])
-    } 
-     
-    #####################
-    # 5. Joint Survival #
-    #####################
-    
-    # Building out the conditional survival states 
-    
-    
-    # Assign survival likelihoods 
-    for(i in 1:n){
-      for(j in 1:n){
-        apair[i, j, t] ~ dcat(c(phi.total1[i,j,t],phi.total2[i,j,t],phi.total3[i,j,t],phi.total4[i,j,t]))
-      }
+      recruit_m[j,1] ~  dbern(eps[1])
+      for(t in 2:(k-1)){
+        recruit_m[j,t] ~ dbern(recruit_m[j,t-1] + (1-recruit_m[j,t-1]) * eps[t])
+      } 
     }
+
+    ########################################################
+    ### Conditional Partnership/Survival/Recapture Steps ###
+    ########################################################
     
-    # Recover Marginal Survival Distribution 
+    # Time 1 events
     
-    
-    
-    ######################
-    # 6. Joint Recapture #
-    ######################
-    
-    # Building out the conditional survival states 
-    
-    # Assign recapture likelihoods 
-    for(i in 1:n){
-      for(j in 1:n){
-        rpair[i, j, t] ~ dcat(c(p.total1[i,j,t],p.total2[i,j,t],p.total3[i,j,t],p.total4[i,j,t]))
-      }
+    for(i in 1:nf){
+      amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,t])
     }
     
     
-  }
+    for(j in 1:nm){
+      amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,t])
+    }
+  
+   # !!!!!!!!!! ADD THE OTHER TIME 1 EVENTS (IF NEEDED)
+  
+    for(t in 2:k){
+    
+      #######################
+      # 3. Decision to Mate #
+      #######################
+      
+      # Female Mating Choice
+      for(i in 1:nf){
+        amating_f[i,t] ~ dbern((1-af[i,t-1]) + (af[i,t-1]) * recruit_f[i,t] * delta[t])
+      }
+       
+      # Male Mating Choice
+      for(j in 1:nm){
+       amating_m[j,t] ~ dbern((1-af[j,t-1]) + (af[j,t-1]) * recruit_m[j,t] * delta[t])
+      } 
+       
+      #####################
+      # 4. Mate Selection #
+      #####################
+       
+      # Compute conditional psi 
+      psi_cond[1:nf,1:nm,t] <- psi[1:nf, 1:nm, t] * (recruit_f[1:nf,t] %*% t(recruit_m[1:nm,t])) * (amating_f[1:nf,t] %*% t(amating_m[1:nm,t]))
+      psi_cond[(nf+1):n, (nm+1):n, t] <- psi[(nf+1):n, (nm+1):n, t]
+      
+      # Assign mate index
+      for(e in 1:n){
+        apf[e,t] ~ dcat(psi_cond[e, 1:n ,t])
+      } 
+       
+      #####################
+      # 5. Joint Survival #
+      #####################
+      
+      # Building out the conditional survival states 
+      
+      
+      # Assign survival likelihoods 
+      for(i in 1:n){
+        for(j in 1:n){
+          apair[i, j, t] ~ dcat(c(phi.total1[i,j,t],phi.total2[i,j,t],phi.total3[i,j,t],phi.total4[i,j,t]))
+        }
+      }
+      
+      # Recover Marginal Survival Distribution 
+      
+      
+      
+      ######################
+      # 6. Joint Recapture #
+      ######################
+      
+      # Building out the conditional survival states 
+      
+      # Assign recapture likelihoods 
+      for(i in 1:n){
+        for(j in 1:n){
+          rpair[i, j, t] ~ dcat(c(p.total1[i,j,t],p.total2[i,j,t],p.total3[i,j,t],p.total4[i,j,t]))
+        }
+      }
+    }
   
   #########################
   # Parameter Constraints #
@@ -125,6 +121,21 @@ model{
   ### Prior distributions ###
   ###########################
 
+  # Build Partnership probabilities (unconditioned)
+  # !!!! Need to modify histories to be latent for now just assume its some random covariate!!!
+  for(t in 1:k){
+    # Linear function 
+    eta[1:n, 1:n, t] <- beta0 + beta1*histories[1:n, 1:n, t]
+    #Softmax by row 
+    for(i in 1:n){
+      psi[i, 1:n ,t] <- exp(eta[i,1:n,t])/sum(eta[i,1:n,t])
+    }
+  }
+  
+  #prior for probs
+  beta0 ~ dnorm(0,1)
+  beta1 ~ dnorm(0,1)
+  
   for(t in 1:(K-1)){
     
     ### Derived Parameters ####
