@@ -5,71 +5,126 @@ model{
   ### 1. Data Augmentation ###
   ############################
   
-  for(n in 1:N){
-    
-  }
+  # for(n in 1:N){
+  #   
+  # }
   
   ##################################
   # 2. Recruitment into population #
   ##################################
   
-  for(t in 1:K){
-    
+  # Female Recruitment
+  for(i in 1:nf){
+    recruit_f[i,1] ~  dbern(eps[1])
+    for(t in 2:(k-1)){
+      recruit_f[i,t] ~ dbern(recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])
+    } 
   }
+  # Male Recruitment
+  for(j in 1:nm){
+    recruit_m[j,1] ~  dbern(eps[1])
+    for(t in 2:(k-1)){
+      recruit_m[j,t] ~ dbern(recruit_m[j,t-1] + (1-recruit_m[j,t-1]) * eps[t])
+    } 
+  }
+  
+
   
   ########################################################
   ### Conditional Partnership/Survival/Recapture Steps ###
   ########################################################
   
-   for(t in 1:K){
+  # Time 1 events
+  
+  for(i in 1:nf){
+    amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,t])
+  }
+  
+  
+  for(j in 1:nm){
+    amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,t])
+  }
+  
+  
+  
+   for(t in 2:k){
     
     #######################
     # 3. Decision to Mate #
     #######################
-     
-    for(i in 1:N){
-      
+    
+    # Female Mating Choice
+    for(i in 1:nf){
+      amating_f[i,t] ~ dbern((1-af[i,t-1]) + (af[i,t-1]) * recruit_f[i,t] * delta[t])
     }
      
-    for(i in 1:Nf){ #Females (Mate Anchor Index)
-      
-      ############################
-      # 3. Partnerships at time t#
-      ############################
-      
-      
-      for(j in 1:Nm){ #Males
-        
-        ###############################
-        # 4. Survival states at time t#
-        ############################### 
-        
-        
-        ################################
-        # 5. Recapture states at time t#
-        ################################ 
-        
+    # Male Mating Choice
+    for(j in 1:nm){
+     amating_m[j,t] ~ dbern((1-af[j,t-1]) + (af[j,t-1]) * recruit_m[j,t] * delta[t])
+    } 
+     
+    #####################
+    # 4. Mate Selection #
+    #####################
+     
+    # Compute conditional psi 
+    psi_cond[1:nf,1:nm,t] <- psi[1:nf, 1:nm, t] * (recruit_f[1:nf,t] %*% t(recruit_m[1:nm,t])) * (amating_f[1:nf,t] %*% t(amating_m[1:nm,t]))
+    psi_cond[(nf+1):n, (nm+1):n, t] <- psi[(nf+1):n, (nm+1):n, t]
+    
+    # Assign mate index
+    for(e in 1:n){
+      apf[e,t] ~ dcat(psi_cond[e, ,t])
+    } 
+     
+    #####################
+    # 5. Joint Survival #
+    #####################
+    
+    # Building out the conditional survival states 
+    
+    
+    # Assign survival likelihoods 
+    for(i in 1:n){
+      for(j in 1:n){
+        apair[i, j, t] ~ dcat(c(phi.total1[i,j,t],phi.total2[i,j,t],phi.total3[i,j,t],phi.total4[i,j,t]))
       }
     }
-     
+    
+    # Recover Marginal Survival Distribution 
+    
+    
+    
+    ######################
+    # 6. Joint Recapture #
+    ######################
+    
+    # Building out the conditional survival states 
+    
+    # Assign recapture likelihoods 
+    for(i in 1:n){
+      for(j in 1:n){
+        rpair[i, j, t] ~ dcat(c(p.total1[i,j,t],p.total2[i,j,t],p.total3[i,j,t],p.total4[i,j,t]))
+      }
+    }
+    
+    
   }
   
   #########################
   # Parameter Constraints #
   #########################
   
-  # Male choice cannot occur more than once at t (no polygamy)
-  # Exception "male 1" which represents being single at t (no likelihood contribution)
-  for(j in 2:Nm){
-    is_chosen_sum[j] <- sum(chosen_index[1:Nm]==j) # # of occurances for choice j 
-    zeroes_vec[j] ~ dinterval(is_chosen_sum[j], 1) # force each choice to occur between [0, 1] times. 
+  # Partner choice cannot occur more than once at t (no polygamy)
+  for(e in 1:n){
+    is_chosen_sum[e] <- sum(apf[1:n]==j) # # of occurances for choice j 
+    zeroes_vec[e] ~ dinterval(is_chosen_sum[e], 1) # force each choice to occur between [0, 1] times. 
   }
   
   
   ###########################
   ### Prior distributions ###
   ###########################
-  
+
   for(t in 1:(K-1)){
     
     ### Derived Parameters ####
@@ -127,6 +182,10 @@ model{
     # Recapture Rates M/F
     PF[t] ~ dbeta(1,1)
     PM[t] ~ dbeta(1,1)
+    
+    # Recruitment 
+    eps[t] ~ dunif(0,1)
+    
   } 
 }
 

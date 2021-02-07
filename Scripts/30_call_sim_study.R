@@ -3,10 +3,10 @@ script_dir <- getwd() %+% "/Scripts/"
 
 source(script_dir %+% "00_fn_sim_pair_data.R")
 
-k = 10
+k = 4
 
 parameter_list <- list(
-  n = 50, 
+  n = 10, 
   k = k, 
   prop.female = 0.5,
   delta = rep(0.9, k),
