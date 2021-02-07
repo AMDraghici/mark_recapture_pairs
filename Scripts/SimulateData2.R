@@ -493,6 +493,44 @@ propogate_surv_individual <- function(sf, sm, spair, time, sex){
   return(ind_surv_list)
 }
 
+
+# Convert marginal recapture states (at the end)
+propogate_recap_individual <- function(n, k, pf, rpair, sex){
+  
+  nf <- length(sex[sex == "F"]) # Number of females
+  nm <- length(sex[sex == "M"]) # Number of males
+  
+  recap_marginal_female <- c(0,1,0,1)
+  recap_marginal_male <- c(0,0,1,1)
+  
+  # Recapture individual level male and female 
+  recap_f <- matrix(NA, nrow = n, ncol = k)
+  recap_f[(nf + 1):n,] <- 0
+  recap_m <- matrix(NA, nrow = n, ncol = k)
+  recap_m[(nm + 1):n,] <- 0
+  
+  # Only update females (not dummy states)
+  for(i in 1:nf){
+    for(time in 1:k){
+      female_observation <- recap_marginal_female[max(rpair[i,,time])]
+      recap_f[i,time] <- female_observation
+    }
+  }
+  
+  # Only update males (not dummy states)
+  for(i in 1:nm){
+    for(time in 1:k){
+      male_observation <- recap_marginal_male[max(rpair[,i,time])]
+      recap_m[i,time] <- male_observation
+    }
+   
+  }
+  
+  # Group and return results 
+  ind_recap_list <- list(recap_f = recap_f, recap_m = recap_m)
+  return(ind_recap_list)
+}
+
 # Convert marginal to joint survival states
 propogate_surv_pairs <- function(sf, sm, spair, time, pf,n){
   
@@ -691,29 +729,152 @@ compute_recapture <- function(rpair, spair, pf, time, p.m, p.f, rho){
   return(rpair)
 }
 
+
+compute_hidden_survival <- function(pf, rpair, spair, sf, sm, k, sex){
+  
+  # Number of females and males 
+  nf <- length(sex[sex == "F"]) 
+  nm <- length(sex[sex == "M"])  
+  n <- length(sex)
+  
+  # Produce inferred survival states
+  af <- matrix(NA, nrow = nrow(sf), ncol = ncol(sf))
+  am <- matrix(NA, nrow = nrow(sm), ncol = ncol(sm))
+  asurv <- array(NA, dim = dim(spair))
+  
+  # States based on observations
+  female_state <- c(NA, 1,  NA, 1) 
+  male_state   <- c(NA, NA, 1,  1)
+  pair_state <- c(NA, NA, NA, 1)
+  
+  # Add observations directly from joint recapture matrix
+  for(i in 1:nrow(pf)){
+    for(time in 1:k){
+      
+      # Joint Recapture of pair i and pf[i,t] at time t
+      x_ijt <- rpair[i, pf[i,time] , time]
+      
+      # Uncouple survival states
+      af[i, time] <- female_state[x_ijt]
+      am[pf[i,time], time] <- male_state[x_ijt]
+      asurv[i, pf[i,time], time] <- pair_state[x_ijt]
+    }
+  }
+  
+  # Go back and add inferred states based on time
+  
+  # Females
+  for(i in 1:nf){
+    
+    # If all unknown skip
+    if(all(is.na(af[i,]))) next
+    
+    # Last time seen alive
+    last_alive <- max(which(af[i,]==1))
+    
+    # If the last time they were seen alive was time 1 then skip 
+    if(last_alive == 1) next 
+
+    # Change all other states prior to last alive to alive
+    af[i, 1:last_alive] <- 1    
+    
+    rm(last_alive)
+  }
+  
+  #Males
+  for(i in 1:nm){
+    
+    # If all unknown skip
+    if(all(is.na(am[i,]))) next
+    
+    # Last time seen alive
+    last_alive <- max(which(am[i,]==1))
+    
+    # If the last time they were seen alive was time 1 then skip 
+    if(last_alive == 1) next 
+    
+    # Change all other states prior to last alive to alive
+    am[i, 1:last_alive] <- 1    
+    
+    rm(last_alive)
+  }
+  
+  # Set dummy states to known zeros 
+  af[(nf+1):n,] <- 0
+  am[(nm+1):n,] <- 0
+  asurv[(nf+1):n,(nm+1):n,] <- 1
+
+  # Store results in a list
+  state_list <- list(af = af,
+                     am = am, 
+                     asurv = asurv)
+  
+  # Return List
+  return(state_list)
+}
+
+
+
+compute_hidden_pairs <- function(pf, rpair, k, sex){
+  
+  # Number of females and males 
+  nf <- length(sex[sex == "F"]) 
+  nm <- length(sex[sex == "M"])  
+  n <- length(sex)
+  
+  # Produce inferred survival states
+  apf <- matrix(NA, nrow = nrow(pf), ncol = ncol(pf))
+  apairs <- array(NA, dim = dim(rpair))
+  amating_f <- matrix(NA, nrow = n, ncol = k)
+  amating_m <- matrix(NA, nrow = n, ncol = k) 
+  
+  # States based on observations
+  pair_state <- c(NA, NA, NA, 1)
+  
+  # Add observations directly from joint recapture matrix
+  for(i in 1:nrow(pf)){
+    for(time in 1:k){
+      
+      # Joint Recapture of pair i and pf[i,t] at time t
+      x_ijt <- rpair[i, pf[i,time] , time]
+      
+      # Uncouple Pair Index
+      apf[i, time] <- pair_state[x_ijt] * pf[i, time]
+      amating_f[i, time] <- pair_state[x_ijt]
+      amating_m[ apf[i, time], time] <- pair_state[x_ijt]
+    }
+  }
+  
+  # Add details to joint density
+  
+  # All pairs (nf+1:n are dummy states)
+  for(i in 1:nf){
+    
+    # If all unknown skip
+    if(all(is.na(apf[i,]))) next
+    
+    time_index <- which(!is.na(apf[i,]))
+    
+    for(time in time_index){
+      # Assign states 
+      apairs[i,,time] <- 0
+      apairs[,apf[i, time], time] <- 0
+      apairs[i,apf[i, time], time] <- 1
+      
+    }
+  }
+  
+  # Store results in a list
+  pairs_list <- list(apf = apf,
+                     apairs = apairs,
+                     amating_f = amating_f,
+                     amating_m = amating_m)
+  
+  # Return List
+  return(pairs_list)
+}
+
 # 7. Simulate Data ---------------------------------------------------------------------------------------------
-
-#############
-# FOR TESTING (delete later)
-#############
-
-n <- 1000
-k <- 10
-prop.female <- 0.5
-phi.f <- rep(0.5, k)
-phi.m <- phi.f
-gam <- rep(0.5, k)
-p.f <- phi.f
-p.m <- phi.f
-rho <- gam
-betas <- list(beta0 = 1, beta1 = 0.5)
-delta <- rep(0.5, k)
-rand_sex <- F
-rand_init <- T
-init <- NULL
-
-#options(warn = 2)   
-#options(warn = 0)   
 
 simulate_cr_data <- function(n,
                              k, 
@@ -771,7 +932,7 @@ simulate_cr_data <- function(n,
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   spair <- propogate_surv_pairs(sf, sm, spair,initial_time, pf, n)
-  rpair <- compute_recapture(rpair, spair, pf, initial_time, p.m, p.f, rho)
+  rpair <- compute_recapture(rpair, spair, pf, initial_time, rep(1,k), rep(1,k), rep(0,k))
   
   # Simulate Fates
   for(time in (initial_time+1):k){
@@ -810,25 +971,60 @@ simulate_cr_data <- function(n,
     
   }
   
+  # Grab individual recaptures
+  recap_ind_list <- propogate_recap_individual(n, k, pf, rpair, sex)
+  recap_f <- recap_ind_list[["recap_f"]] 
+  recap_m <- recap_ind_list[["recap_m"]] 
+  
   # Build partially observed/latent data variables
   
+  # Hidden Survival
+  asurv_list <- compute_hidden_survival (pf, rpair, spair, sf, sm, k, sex)
+  af <- asurv_list[["af"]]
+  am <- asurv_list[["am"]]
+  asurv <- asurv_list[["asurv"]]
+  
+  # Hidden Partnerships and mate choice
+  apairs_list <- compute_hidden_pairs(pf, rpair, k, sex)
+  apf <- apairs_list[["apf"]]
+  apairs  <- apairs_list[["apairs"]]
+  amating_f <- apairs_list[["amating_f"]]
+  amating_m <- apairs_list[["amating_m"]]
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
-    n  = n, # Number of animals sampled
+    
+    # Known data 
+    n = n, # Number of animals sampled
     k = k, # Number of occasions
     nf = length(sex[sex == "F"]), # Number of females
     nm = length(sex[sex == "M"]), # Number of males
     sex = sex, # Sex of sampled individuals
     initial_entry = initial_entry, # When did they enter the population
-    mating = mating, # Mate status at time t
+    recruit_f = recruit_f, 
+    recruit_m = recruit_m,
+    recruit = recruit,
+    
+    # Latent States 
+    mating_f = mating_f, # Mate status of females at t (+ dummy)
+    mating_m = mating_m, # Mate status of males at t (+ dummy)
     pf = pf, # partners of females (including slots for singles)
-    pm = pm, # partners of males (including slots for singles)
     pairs = pairs, # pair histories
-    histories = histories, # number of occasions a pair occurred
+    histories = coef_list[["histories"]], # number of occasions a pair occurred
     sf = sf, # true survival of females
     sm = sm, # true survival of males
     spair = spair, # true survival of partnerships
+  
+    # Observed states
+    af = af, 
+    am = am, 
+    asurv = asurv, 
+    apf = apf, 
+    apairs  = apairs, 
+    amating_f = amating_f,
+    amating_m = amating_m,
+    recap_f = recap_f,
+    recap_m = recap_m,
     rpair = rpair # recapture of pairs 
     )
   
