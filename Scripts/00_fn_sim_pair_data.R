@@ -277,7 +277,7 @@ construct_pairs <- function(n,k){
 }
 
 # Construct pair coefficients
-construct_coef <- function(sex, k){
+construct_coef <- function(n, sex, k){
   #Intercept
   intercept <- array(1, dim = c(n,n,k))
   # Number of times a pair occurred
@@ -287,7 +287,7 @@ construct_coef <- function(sex, k){
 }
 
 # Survival matrices for males, females, and 
-construct_survival <- function(sex, k){
+construct_survival <- function(n, sex, k){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -394,12 +394,18 @@ initialize_mating_choice <- function(n, initial_entry, delta, mating_f, mating_m
 }
 
 
-initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recruit, initial_entry){
+initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recruit, initial_entry, sex){
 
   # When did the first animal get spotted
   i <- min(initial_entry) 
   
+  nf <- length(sex[sex == "F"]) # Number of females
+  nm <- length(sex[sex == "M"]) # Number of males
+  
   psi_t <- compute_partner_probs(n, i, coef_list, betas)
+  
+  # Bias selection towards mates at the start 
+  psi_t[1:nf,1:nm] <- psi_t[1:nf,1:nm] + 100 
   
   # Flat probability of partnerships
   prob_mate <- psi_t * mating[,,i] * recruit[,,i]
@@ -713,7 +719,7 @@ compute_survival <- function(spair, sf, sm, pf, time, phi.m, phi.f, gam, recruit
 
 
 # Compute recapture state at t
-compute_recapture <- function(rpair, spair, pf, time, p.m, p.f, rho){
+compute_recapture <- function(n, rpair, spair, pf, time, p.m, p.f, rho){
   
   # Compute capture status
   for(i in 1:n){
@@ -892,7 +898,7 @@ simulate_cr_data <- function(n,
                              init = NULL){
   
   # Generate SKeleton Data Structures
-  
+  #browser()
   sex <- construct_sexes(n, prop.female, rand_sex)
   initial_entry <- construct_init_entry(n, k, rand_init,init) 
   recruit_list <- construct_recruit(n, k, sex)
@@ -907,8 +913,8 @@ simulate_cr_data <- function(n,
   pf <- pairs_list[["pf"]]
   #pm <- pairs_list[["pm"]]
   pairs <- pairs_list[["pairs"]]
-  coef_list <- construct_coef(sex, k)
-  survival_list <- construct_survival(sex, k)
+  coef_list <- construct_coef(n, sex, k)
+  survival_list <- construct_survival(n, sex, k)
   sf <- survival_list[["sf"]]
   sm <- survival_list[["sm"]]
   spair <- survival_list[["spair"]]
@@ -925,14 +931,14 @@ simulate_cr_data <- function(n,
   mating_f <- mating_list_init[["mating_f"]] 
   mating_m <- mating_list_init[["mating_m"]]  
   mating <- mating_list_init[["mating"]]
-  pairs <- initialize_partner_status(n, coef_list, betas, pairs, mating, recruit, initial_entry)
+  pairs <- initialize_partner_status(n, coef_list, betas, pairs, mating, recruit, initial_entry, sex)
   coef_list <- update_history(coef_list, pairs, initial_time + 1, sex)
   pf <- propogate_partner_state(pairs, n, pf, time = initial_time)
   init_surv_list <-  initialize_survival_status(n, initial_entry, sex, sf, sm)
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   spair <- propogate_surv_pairs(sf, sm, spair,initial_time, pf, n)
-  rpair <- compute_recapture(rpair, spair, pf, initial_time, rep(1,k), rep(1,k), rep(0,k))
+  rpair <- compute_recapture(n, rpair, spair, pf, initial_time, rep(1,k), rep(1,k), rep(0,k))
   
   # Simulate Fates
   for(time in (initial_time+1):k){
@@ -967,7 +973,7 @@ simulate_cr_data <- function(n,
     sm <- sind_list_t[["sm"]]
     
     # Compute recapture probability at t based on survival at t
-    rpair <- compute_recapture(rpair, spair, pf, time, p.m, p.f, rho)
+    rpair <- compute_recapture(n, rpair, spair, pf, time, p.m, p.f, rho)
     
   }
   
@@ -1036,12 +1042,20 @@ simulate_cr_data <- function(n,
 
 # 7. Format Data for Different Purposes ------------------------------------------------------------------------
 
-format_to_std_cjs <- function(model_data){
+format_to_cjs <- function(model_data){
   
+  surv <- rbind(model_data$sf[1:model_data$nf,],model_data$sm[1:model_data$nm,])
+  x <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
+  a <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
   
   
   # Store results in list
-  model_data <- list()
+  model_data <- list(n = model_data$n,
+                     sex = model_data$sex, 
+                     initial_entry = model_data$initial_entry,
+                     surv = surv,
+                     x = x,
+                     a = a)
   
   # Return Standard CJS Data
   return(model_data)
