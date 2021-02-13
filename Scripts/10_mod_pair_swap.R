@@ -34,12 +34,12 @@ model{
     
     # Female Mating at time 1
     for(i in 1:nf){
-      amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,t])
+      amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,1])
     }
     
     # Male mating at time 1
     for(j in 1:nm){
-      amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,t])
+      amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,1])
     }
   
    # !!!!!!!!!! ADD THE OTHER TIME 1 EVENTS (IF NEEDED)
@@ -65,18 +65,16 @@ model{
       # 4. Mate Selection #
       #####################
        
-      # Compute conditional psi 
-      
-      # Partnership status given recruitment and mating
-      psi_cond[1:nf,1:nm,t] <- psi[1:nf, 1:nm, t] * (recruit_f[1:nf,t] %*% t(recruit_m[1:nm,t])) * (amating_f[1:nf,t] %*% t(amating_m[1:nm,t]))
-      # Fill out dummy quadrants of the matrix (2,3,4)
-      psi_cond[(nf+1):n, (nm+1):n, t] <- psi[(nf+1):n, (nm+1):n, t]
-      psi_cond[(nf+1):n, 1:nm, t] <- psi[(nf+1):n, 1:nm, t]
-      psi_cond[1:nf, (nm+1):n, t] <- psi[1:nf, (nm+1):n, t]
+      # Compute conditional psi (on recruitment and mating status)
+      for(i in 1:n){
+        for(j in 1:n){
+          psi_cond[i,j,t] <- psi[i,j,t] * recruit_f[i,t] * recruit_m[j,t] * amating_f[i,t] * amating_m[j,t]
+        }
+      }
       
       # Assign mate index
       for(i in 1:n){
-        apairs[i,,t] ~ dsample(psi_cond[i, 1:n, t], 1)
+        apairs[i,1:n,t] ~ dsample(psi[i, 1:n, t], 1)
       } 
        
       #########################
@@ -84,9 +82,10 @@ model{
       #########################
       
       # Partner choice cannot occur more than once at t (no polygamy)
-      is_chosen_sum[1:n,t] <- apairs[1:n,1:n,t] %*% rep(1,n)
+      #is_chosen_sum[1:n,t] <- apairs[1:n,1:n,t] %*% t(rep(1,n))
       for(i in 1:n){
-        zeroes_vec[i,t] ~ dinterval(is_chosen_sum[i,t], 1) # force each choice to occur between [0, 1] times. 
+        is_chosen_sum[i, t] <- sum(apairs[i, 1:n, t])
+        zeroes_mat[i,t] ~ dinterval(is_chosen_sum[i,t], 1) # force each choice to occur between [0, 1] times. 
       }
       
       #####################
@@ -134,7 +133,7 @@ model{
         # Dummy parameter (its always 1 or zero)
         phim_dummy[j,t] <- equals(max(asurv[,j,t]),4) + equals(max(asurv[,j,t]),3) 
         # Missing values are populated based on asurv (hack to get around data/constant problem)
-        af[j,t] ~ dbern(phim_dummy[j,t]) 
+        am[j,t] ~ dbern(phim_dummy[j,t]) 
       } 
       
       ######################
@@ -147,15 +146,15 @@ model{
           
           #Recapture Matrix (previous state indicators determine prob)
           p.total1[i, j, t] <- equals(asurv[i,j,t], 4) * P00[t] + 
-            equals(asurv[i,j,t], 3) * (1-PF[t]) + 
-            equals(asurv[i,j,t], 2) * (1-PM[t]) + 
+            equals(asurv[i,j,t], 3) * (1-PM[t]) + 
+            equals(asurv[i,j,t], 2) * (1-PF[t]) + 
             equals(asurv[i,j,t], 1)
           
           p.total2[i, j, t] <- equals(asurv[i,j,t], 4) * Pf0[t] + 
-            equals(asurv[i,j,t], 3) * PF[t] 
+            equals(asurv[i,j,t], 2) * PF[t] 
           
           p.total3[i, j, t] <- equals(asurv[i,j,t], 4) * Pm0[t] + 
-            equals(asurv[i,j,t], 2) * PM[t] 
+            equals(asurv[i,j,t], 3) * PM[t] 
           
           p.total4[i, j, t] <- equals(asurv[i,j,t], 4) * Pfm[t]
 
@@ -176,7 +175,9 @@ model{
     eta[1:n, 1:n, t] <- beta0 + beta1*histories[1:n, 1:n, t]
     #Softmax by row 
     for(i in 1:n){
-      psi[i, 1:n ,t] <- exp(eta[i,1:n,t]) # unormalized but JAGS handles this anyway
+      for(j in 1:n){
+        psi[i, j ,t] <- exp(eta[i, j, t])
+      }
     }
   }
   
@@ -184,7 +185,7 @@ model{
   beta0 ~ dnorm(0,1)
   beta1 ~ dnorm(0,1)
   
-  for(t in 1:(K-1)){
+  for(t in 1:k){
     
     ### Derived Parameters ####
     
@@ -209,16 +210,16 @@ model{
     ###Frechet-Hoeffding Bounds for Correlation
     
     # Survival Rates (Gamma)
-    gu[t] <- min(sqrt(OR.Phi[t]), 1/sqrt(OR.Phi[t])) 
-    gl[t] <- -min(sqrt(OP.Phi[t],1/sqrt(OP.Phi[t]))) 
+    gu[t] <-  min(sqrt(OR.Phi[t]), 1/sqrt(OR.Phi[t])) 
+    gl[t] <- -min(sqrt(OP.Phi[t]), 1/sqrt(OP.Phi[t])) 
     
     # Recapture Rates (Rho)
-    ru[t] <- min(sqrt(OR.Phi[t]), 1/sqrt(OR.Phi[t])) 
-    rl[t] <- -min(sqrt(OP.Phi[t],1/sqrt(OP.Phi[t]))) 
+    ru[t] <-  min(sqrt(OR.Phi[t]), 1/sqrt(OR.Phi[t])) 
+    rl[t] <- -min(sqrt(OP.Phi[t]), 1/sqrt(OP.Phi[t])) 
     
     # Odds Ratio and Product of Survival and Recapture Rates
-    OP.Phi[t] <- odds.phiF[t]*odds.phiM[t]
-    OR.Phi[t] <- odds.PF[t]/odds.PM[t]
+    OP.Phi[t] <- odds.PhiF[t]*odds.phiM[t]
+    OR.Phi[t] <- odds.PhiF[t]/odds.phiM[t]
     OP.P[t] <- odds.PF[t]*odds.PM[t]
     OR.P[t] <- odds.PF[t]/odds.PM[t]
     
@@ -243,7 +244,10 @@ model{
     PM[t] ~ dbeta(1,1)
     
     # Recruitment 
-    eps[t] ~ dunif(0,1)
+    eps[t] ~ dbeta(1,1)
+    
+    # Mating
+    delta[t] ~ dbeta(1,1)
     
   } 
 }

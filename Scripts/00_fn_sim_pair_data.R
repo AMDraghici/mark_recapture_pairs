@@ -353,7 +353,7 @@ initialize_recruit <- function(n, k, sex, initial_entry, recruit_f, recruit_m, r
 }
 
 
-initialize_mating_choice <- function(n, initial_entry, delta, mating_f, mating_m, mating, sex){
+initialize_mating_choice <- function(n, k, initial_entry, delta, mating_f, mating_m, mating, sex){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -430,7 +430,7 @@ initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recrui
 }
 
 
-initialize_survival_status <- function(n, initial_entry, sex, sf, sm){
+initialize_survival_status <- function(n, k, initial_entry, sex, sf, sm){
   
   
   nf <- length(sex[sex == "F"]) # Number of females
@@ -864,11 +864,15 @@ compute_hidden_pairs <- function(pf, rpair, k, sex){
     for(time in time_index){
       # Assign states 
       apairs[i,,time] <- 0
-      apairs[,apf[i, time], time] <- 0
+      #apairs[,apf[i, time], time] <- 0
       apairs[i,apf[i, time], time] <- 1
       
     }
   }
+  
+  # Dummy states always available
+  amating_f[(nf+1):n,1:k] <- 1
+  amating_m[(nm+1):n,1:k] <- 1
   
   # Store results in a list
   pairs_list <- list(apf = apf,
@@ -927,14 +931,14 @@ simulate_cr_data <- function(n,
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m <- recruit_list[["recruit_m"]]
   recruit <- recruit_list[["recruit"]]
-  mating_list_init <- initialize_mating_choice(n, initial_entry,delta, mating_f,mating_m, mating, sex)
+  mating_list_init <- initialize_mating_choice(n, k, initial_entry,delta, mating_f, mating_m, mating, sex)
   mating_f <- mating_list_init[["mating_f"]] 
   mating_m <- mating_list_init[["mating_m"]]  
   mating <- mating_list_init[["mating"]]
   pairs <- initialize_partner_status(n, coef_list, betas, pairs, mating, recruit, initial_entry, sex)
   coef_list <- update_history(coef_list, pairs, initial_time + 1, sex)
   pf <- propogate_partner_state(pairs, n, pf, time = initial_time)
-  init_surv_list <-  initialize_survival_status(n, initial_entry, sex, sf, sm)
+  init_surv_list <-  initialize_survival_status(n, k, initial_entry, sex, sf, sm)
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   spair <- propogate_surv_pairs(sf, sm, spair,initial_time, pf, n)
@@ -997,6 +1001,9 @@ simulate_cr_data <- function(n,
   amating_f <- apairs_list[["amating_f"]]
   amating_m <- apairs_list[["amating_m"]]
   
+  # Construct Zeros Matrix
+  zeroes_mat <- matrix(0,ncol = k, nrow = n)
+  
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     
@@ -1031,14 +1038,21 @@ simulate_cr_data <- function(n,
     amating_m = amating_m,
     recap_f = recap_f,
     recap_m = recap_m,
-    rpair = rpair # recapture of pairs 
+    rpair = rpair, # recapture of pairs 
+    
+    # Restriction on JAGS
+    zeroes_mat = zeroes_mat
+    
     )
   
   #Return Model object
   return(model_data)
 }
 
-
+# Wrapper for do-call (helps parallel)
+sim_dat <- function(parameter_list){
+  model_data <- do.call(simulate_cr_data, parameter_list)
+}
 
 # 7. Format Data for Different Purposes ------------------------------------------------------------------------
 
@@ -1060,3 +1074,4 @@ format_to_cjs <- function(model_data){
   # Return Standard CJS Data
   return(model_data)
 }
+#---------------------------------------------------------------------------------------------------------------

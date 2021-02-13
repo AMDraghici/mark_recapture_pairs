@@ -1,11 +1,14 @@
+library(parallel)
+library(dclone)
+
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
 
 source(script_dir %+% "00_fn_sim_pair_data.R")
-
+source(script_dir %+% "02_fn_model_code.R")
 k = 4
 
-parameter_list <- list(
+param_list <- list(
   n = 10, 
   k = k, 
   prop.female = 0.5,
@@ -22,7 +25,37 @@ parameter_list <- list(
   init = rep(1,50)
 )
 
-data <- do.call(simulate_cr_data, parameter_list)
-cjs_data <- format_to_cjs(data)
+# # Pull individual dataset
+# data <- do.call(simulate_cr_data, param_list)
+# cjs_data <- format_to_cjs(data)
+# 
+# 
+# # Multiple Datasets using parallel
+# sim_cr_dat(parameter_list = param_list, iterations =  2)
 
+
+# Run JAGS
+set.seed(42)
+jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  2)[[1]]
+
+## MCMC parameters  
+par_settings <- list('n.iter' = 10, 
+                     'n.thin' = 1,
+                     'n.burn' = 10,
+                     'n.chains' = 2,
+                     'n.adapt' = 10) 
+
+## Jags parameters and model script
+
+# Run Full Model + No Groups
+jags_params <- c("eps","delta", "PhiF", "PhiM", "gamma", "PF", "PM", "rho", "beta0", "beta1")
+jags_model <- script_dir %+% "/10_mod_pair_swap.R"
+
+## Run jags in parallel and save results
+jags_samples <- run_jags_parallel(jags_data, 
+                                  jags_model,
+                                  jags_params, 
+                                  par_settings,
+                                  out_dir,
+                                  outname = "TESTING_MODEL")
 
