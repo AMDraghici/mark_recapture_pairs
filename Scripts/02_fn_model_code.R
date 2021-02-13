@@ -129,10 +129,10 @@ run_jags_parallel <- function(jags_data,
     #If no name is given just use the timestamp
     if(is.null(outname)){
       outfile_name <- "/jags_samples_" %+% tstamp
-      outinit_name <- "/jags_inits_" %+% tstamp
+      #outinit_name <- "/jags_inits_" %+% tstamp
     } else {
       outfile_name <- "/jags_samples_" %+% outname
-      outinit_name <- "/jags_inits_" %+% outname
+      #outinit_name <- "/jags_inits_" %+% outname
     }
     
     #Save JAGS Samples
@@ -140,8 +140,8 @@ run_jags_parallel <- function(jags_data,
     saveRDS(jags_samples,outfile_samples)
     
     #Save Jags Initial Values
-    outfile_inits <- out_dir %+% outinit_name %+% ".rds"
-    saveRDS(jags_init,outfile_inits)
+    #outfile_inits <- out_dir %+% outinit_name %+% ".rds"
+    #saveRDS(jags_init,outfile_inits)
   }
   
   #Return MCMC Results

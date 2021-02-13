@@ -6,6 +6,8 @@ script_dir <- getwd() %+% "/Scripts/"
 
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "02_fn_model_code.R")
+out_dir <- getwd() %+% "/Output/"
+
 k = 4
 
 param_list <- list(
@@ -22,7 +24,7 @@ param_list <- list(
   betas = list(beta0 = 0, beta1 = 100),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,50)
+  init = rep(1,10)
 )
 
 # # Pull individual dataset
@@ -41,9 +43,9 @@ jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  2)[[1]]
 ## MCMC parameters  
 par_settings <- list('n.iter' = 10, 
                      'n.thin' = 1,
-                     'n.burn' = 10,
+                     'n.burn' = 5,
                      'n.chains' = 2,
-                     'n.adapt' = 10) 
+                     'n.adapt' = 5) 
 
 ## Jags parameters and model script
 
