@@ -751,7 +751,7 @@ compute_hidden_survival <- function(pf, rpair, spair, sf, sm, k, sex){
   # States based on observations
   female_state <- c(NA, 1,  NA, 1) 
   male_state   <- c(NA, NA, 1,  1)
-  pair_state <- c(NA, NA, NA, 1)
+  pair_state <- c(NA, NA, NA, 4)
   
   # Add observations directly from joint recapture matrix
   for(i in 1:nrow(pf)){
