@@ -11,20 +11,20 @@ out_dir <- getwd() %+% "/Output/"
 k = 4
 
 param_list <- list(
-  n = 10, 
+  n = 100, 
   k = k, 
   prop.female = 0.5,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(1, k),
-  p.f = rep(0.8, k),
-  p.m = rep(0.8, k),
-  rho = rep(0.8, k),
+  gam = rep(0.5, k),
+  p.f = rep(1, k),
+  p.m = rep(1, k),
+  rho = rep(1, k),
   betas = list(beta0 = 0, beta1 = 100),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,10)
+  init = rep(1,100)
 )
 
 # # Pull individual dataset
@@ -41,16 +41,16 @@ set.seed(42)
 jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  2)[[1]]
 
 ## MCMC parameters  
-par_settings <- list('n.iter' = 500, 
+par_settings <- list('n.iter' = 1000, 
                      'n.thin' = 1,
-                     'n.burn' = 500,
+                     'n.burn' = 1000,
                      'n.chains' = 2,
-                     'n.adapt' = 500) 
+                     'n.adapt' = 1000)
 
 ## Jags parameters and model script
 
 # Run Full Model + No Groups
-jags_params <- c("delta", "PhiF","PhiM","gamma","beta0","beta1")
+jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1")
 jags_model <- script_dir %+% "/12_testing.R"
 
 ## Run jags in parallel and save results

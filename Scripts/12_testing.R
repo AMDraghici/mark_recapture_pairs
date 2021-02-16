@@ -35,12 +35,12 @@ model{
   
   # Female Mating at time 1
   for(i in 1:nf){
-    amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,1])
+    mating_f[i,1] ~ dbern(delta[1]*recruit_f[i,1])
   }
   
   # Male mating at time 1
   for(j in 1:nm){
-    amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,1])
+    mating_m[j,1] ~ dbern(delta[1]*recruit_m[j,1])
   }
   
   # Model Joint Partnership/Survival/Recapture outcomes 
@@ -52,12 +52,12 @@ model{
     
     # Female Mating Choice at time t
     for(i in 1:nf){
-      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta[t])
+      mating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta[t])
     }
     
     # Male Mating Choice at time t
     for(j in 1:nm){
-      amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta[t])
+      mating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta[t])
     } 
     
     #####################
@@ -67,7 +67,7 @@ model{
     # Compute conditional psi (on recruitment and mating status)
     for(i in 1:nf){
       for(j in 1:nm){
-        psi_cond[i,j,t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t]
+        psi_cond[i,j,t] <- psi[i,j,t] * mating_f[i,t] * mating_m[j,t]
       }
     }
     
@@ -87,46 +87,42 @@ model{
 
     # Assign mate index
     for(i in 1:n){
-      pf[i,t] ~ dcat(psi[i, 1:n, t])
+      pf[i,t] ~ dcat(psi_cond[i, 1:n, t])
     }
 
 
-    
-    #pf[1:n,t] ~ dsample(rep(1,n),n)
     #########################
     # Parameter Constraints #
     #########################
     
-    #Partner choice cannot occur more than once at t (no polygamy)
-   #is_chosen_sum[1:n,t] <- apairs[1:n,1:n,t] %*% t(rep(1,n))
-   # for(i in 1:nm){
-   #  is_chosen_sum[i, t] <- sum(pf[1:n,t] == i)
-   #  zeroes_mat[i,t] ~ dinterval(is_chosen_sum[i,t], 1) # force each choice to occur between [0, 1] times.
-   # }
+   #partner choice cannot occur more than once at t (no polygamy)
+   for(i in 1:n){
+    is_chosen_sum[i, t] <- sum(pf[1:n,t] == i)
+    zeroes_mat[i,t] ~ dinterval(is_chosen_sum[i,t], 1) # force each choice to occur between [0, 1] times.
+   }
 
     #####################
     # 5. Joint Survival #
     #####################
     
-    
-    # 5a. Survival Probability for apairs
+    # 5a. Survival Probability for pairs
     for(i in 1:nf){
       for(j in 1:nm){
         
         # Marginal probability of survival for females #apairs[i,j,t]
         phi.totalF[i,j,t] <- equals(pf[i,t],j)*PhiF[t-1] + 
-          (1 - equals(pf[i,t],j))*af[i,t-1]
+          (1 - equals(pf[i,t],j))
         
         # P[Y^F_T]
-        afmat[i,j,t] ~ dbern(phi.totalF[i,j,t])
+        afmat[i,j,t] ~ dbern(phi.totalF[i,j,t]*af[i,t-1])
         
         # Conditional probability of survival for males
         phi.totalM_F[i,j,t] <- equals(pf[i,t],j)*(afmat[i,j,t]*(Phifm[t-1]/PhiF[t-1]) + 
                                          (1 - afmat[i,j,t])*(Phim0[t-1]/(1-PhiF[t-1]))) + 
-          (1 - equals(pf[i,t],j))*am[j,t-1]
+          (1 - equals(pf[i,t],j))
         
         #P[Y^M_T|Y^F_T]
-        ammat[i,j,t] ~ dbern(phi.totalM_F[i,j,t])        
+        ammat[i,j,t] ~ dbern(phi.totalM_F[i,j,t]*am[j,t-1])        
       }
     }
     
@@ -135,9 +131,7 @@ model{
     for(i in (nf+1):n){
       for(j in 1:nm){
         # Probability of survival for males
-        phi.totalM_F[i,j,t] <- equals(pf[i,t],j)*(PhiM[t-1]) + 
-          (1 - equals(pf[i,t],j))
-        
+        phi.totalM_F[i,j,t] <- equals(pf[i,t],j)*(PhiM[t-1]) + (1 - equals(pf[i,t],j))
         #P[Y^M_T]
         ammat[i,j,t] ~ dbern(phi.totalM_F[i,j,t]*am[j,t-1]) 
       }
@@ -148,9 +142,7 @@ model{
     for(i in 1:nf){
       for(j in (nm+1):n){
         # Probability of survival for females
-        phi.totalF[i,j,t] <- equals(pf[i,t],j)*(PhiF[t-1]) + 
-          (1 - equals(pf[i,t],j))
-        
+        phi.totalF[i,j,t] <- equals(pf[i,t],j)*(PhiF[t-1]) +  (1 - equals(pf[i,t],j))
         #P[Y^F_T]
         afmat[i,j,t] ~ dbern(phi.totalF[i,j,t]*af[i,t-1]) 
       }
@@ -178,14 +170,51 @@ model{
     # 6. Joint Recapture #
     ######################
     
+    # 6a. Recapture Probability for pairs
+    for(i in 1:nf){
+      for(j in 1:nm){
+        # Marginal probability of recapture for females
+        p.totalF[i,j,t] <- equals(pf[i,t],j)*PF[t] + (1 - equals(pf[i,t],j))*recap_f[i,t]
+        # P[X^F_T]
+        rfmat[i,j,t] ~ dbern(p.totalF[i,j,t]*af[i,t])
+        # Conditional probability of recapture for males
+        p.totalM_F[i,j,t] <- equals(pf[i,t],j)*(rfmat[i,j,t]*(Pfm[t]/PF[t]) + (1 - rfmat[i,j,t])*(Pm0[t]/(1-PF[t]))) + 
+          (1 - equals(pf[i,t],j))*recap_m[j,t]
+        #P[X^M_T|X^F_T]
+        rmmat[i,j,t] ~ dbern(p.totalM_F[i,j,t]*am[i,t])        
+      }
+    }
+    
+    # 6b. Recapture probability for single Males
+    for(i in (nf+1):n){
+      for(j in 1:nm){
+        # Probability of recapture for males
+        p.totalM_F[i,j,t] <- (equals(pf[i,t],j)*(PM[t]) + (1 - equals(pf[i,t],j))*recap_m[j,t])
+        
+        #P[Y^M_T]
+        rmmat[i,j,t] ~ dbern(p.totalM_F[i,j,t]*am[i,t]) 
+      }
+    }
     
     
+    # 5c. Survival Probability for single Females
+    for(i in 1:nf){
+      for(j in (nm+1):n){
+        # Marginal probability of recapture for females
+        p.totalF[i,j,t] <- equals(pf[i,t],j)*PF[t] + (1 - equals(pf[i,t],j))*recap_f[i,t]
+        
+        # P[X^F_T]
+        rfmat[i,j,t] ~ dbern(p.totalF[i,j,t]*af[i,t])
+      }
+    }
+    
+  }
   ###########################
   ### Prior distributions ###
   ###########################
   
   # Build Partnership probabilities (unconditioned)
-  # !!!! Need to modify histories to be latent for now just assume its some random covariate!!!
+  # !!!! Need to modify histories to be latent for now just assume its some random covariate
   for(t in 1:k){
     # Linear function 
     eta[1:n, 1:n, t] <- beta0 + beta1*histories[1:n, 1:n, t]

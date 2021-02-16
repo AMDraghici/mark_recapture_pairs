@@ -514,8 +514,8 @@ propogate_recap_individual <- function(n, k, pf, rpair, sex){
   recap_f[(nf + 1):n,] <- 0
   recap_m <- matrix(NA, nrow = n, ncol = k)
   recap_m[(nm + 1):n,] <- 0
-  rfmat <- array(NA,dim = dim(rpair))
-  rmmat <- array(NA,dim = dim(rpair))
+  rfmat <- array(0,dim = dim(rpair))
+  rmmat <- array(0,dim = dim(rpair))
   
   
   # Only update females (not dummy states)
