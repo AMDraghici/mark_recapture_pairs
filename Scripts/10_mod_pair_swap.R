@@ -18,6 +18,7 @@ model{
         recruit_f[i,t] ~ dbern(recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])
       } 
     }
+  
     # Male Recruitment
     for(j in 1:nm){
       recruit_m[j,1] ~  dbern(eps[1])
@@ -74,7 +75,7 @@ model{
       
       # Assign mate index
       for(i in 1:n){
-        apairs[i,1:n,t] ~ dsample(psi[i, 1:n, t], 1)
+        apairs[i,1:n,t] ~ dsample(psi_cond[i, 1:n, t], 1)
       } 
        
       #########################

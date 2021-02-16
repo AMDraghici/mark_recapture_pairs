@@ -514,12 +514,16 @@ propogate_recap_individual <- function(n, k, pf, rpair, sex){
   recap_f[(nf + 1):n,] <- 0
   recap_m <- matrix(NA, nrow = n, ncol = k)
   recap_m[(nm + 1):n,] <- 0
+  rfmat <- array(NA,dim = dim(rpair))
+  rmmat <- array(NA,dim = dim(rpair))
+  
   
   # Only update females (not dummy states)
   for(i in 1:nf){
     for(time in 1:k){
       female_observation <- recap_marginal_female[max(rpair[i,,time])]
       recap_f[i,time] <- female_observation
+      rfmat[i,,time] <- female_observation
     }
   }
   
@@ -528,12 +532,13 @@ propogate_recap_individual <- function(n, k, pf, rpair, sex){
     for(time in 1:k){
       male_observation <- recap_marginal_male[max(rpair[,i,time])]
       recap_m[i,time] <- male_observation
+      rmmat[,i,time] <- male_observation
     }
    
   }
   
   # Group and return results 
-  ind_recap_list <- list(recap_f = recap_f, recap_m = recap_m)
+  ind_recap_list <- list(recap_f = recap_f, recap_m = recap_m, rfmat = rfmat, rmmat = rmmat)
   return(ind_recap_list)
 }
 
@@ -746,7 +751,10 @@ compute_hidden_survival <- function(pf, rpair, spair, sf, sm, k, sex){
   # Produce inferred survival states
   af <- matrix(NA, nrow = nrow(sf), ncol = ncol(sf))
   am <- matrix(NA, nrow = nrow(sm), ncol = ncol(sm))
-  asurv <- array(NA, dim = dim(spair))
+  #asurv <- array(NA, dim = dim(spair))
+  afmat <- array(NA, dim = dim(spair))
+  ammat <- array(NA, dim = dim(spair))
+  
   
   # States based on observations
   female_state <- c(NA, 1,  NA, 1) 
@@ -763,7 +771,9 @@ compute_hidden_survival <- function(pf, rpair, spair, sf, sm, k, sex){
       # Uncouple survival states
       af[i, time] <- female_state[x_ijt]
       am[pf[i,time], time] <- male_state[x_ijt]
-      asurv[i, pf[i,time], time] <- pair_state[x_ijt]
+      #asurv[i, pf[i,time], time] <- pair_state[x_ijt]
+      afmat[i,,time] <-  female_state[x_ijt]
+      ammat[,pf[i,time],time] <- male_state[x_ijt]
     }
   }
   
@@ -805,15 +815,18 @@ compute_hidden_survival <- function(pf, rpair, spair, sf, sm, k, sex){
     rm(last_alive)
   }
   
-  # Set dummy states to known zeros 
-  af[(nf+1):n,] <- 0
-  am[(nm+1):n,] <- 0
-  asurv[(nf+1):n,(nm+1):n,] <- 1
-
+  # Set dummy states to known ones 
+  af[(nf+1):n,] <- 1
+  am[(nm+1):n,] <- 1
+  #asurv[(nf+1):n,(nm+1):n,] <- 1
+  ammat[,(nm+1):n,] <- 1
+  afmat[(nf+1):n,,] <- 1
+  
   # Store results in a list
   state_list <- list(af = af,
                      am = am, 
-                     asurv = asurv)
+                     ammat = ammat,
+                     afmat = afmat)
   
   # Return List
   return(state_list)
@@ -985,6 +998,9 @@ simulate_cr_data <- function(n,
   recap_ind_list <- propogate_recap_individual(n, k, pf, rpair, sex)
   recap_f <- recap_ind_list[["recap_f"]] 
   recap_m <- recap_ind_list[["recap_m"]] 
+  rfmat <- recap_ind_list[["rfmat"]] 
+  rmmat <- recap_ind_list[["rmmat"]] 
+    
   
   # Build partially observed/latent data variables
   
@@ -992,7 +1008,8 @@ simulate_cr_data <- function(n,
   asurv_list <- compute_hidden_survival (pf, rpair, spair, sf, sm, k, sex)
   af <- asurv_list[["af"]]
   am <- asurv_list[["am"]]
-  asurv <- asurv_list[["asurv"]]
+  afmat <- asurv_list[["afmat"]]
+  ammat <- asurv_list[["ammat"]]
   
   # Hidden Partnerships and mate choice
   apairs_list <- compute_hidden_pairs(pf, rpair, k, sex)
@@ -1031,7 +1048,8 @@ simulate_cr_data <- function(n,
     # Observed states
     af = af, 
     am = am, 
-    asurv = asurv, 
+    afmat = afmat,
+    ammat = ammat,
     apf = apf, 
     apairs  = apairs, 
     amating_f = amating_f,
@@ -1039,7 +1057,8 @@ simulate_cr_data <- function(n,
     recap_f = recap_f,
     recap_m = recap_m,
     rpair = rpair, # recapture of pairs 
-    
+    rfmat = rfmat, 
+    rmmat = rmmat,
     # Restriction on JAGS
     zeroes_mat = zeroes_mat
     
