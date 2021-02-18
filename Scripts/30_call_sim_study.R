@@ -4,7 +4,7 @@ library(dclone)
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
 
-source(script_dir %+% "00_fn_sim_pair_data.R")
+source(script_dir %+% "00_fn_sim_pair_data_rework.R")
 source(script_dir %+% "02_fn_model_code.R")
 out_dir <- getwd() %+% "/Output/"
 
@@ -37,8 +37,8 @@ param_list <- list(
 
 
 # Run JAGS
-set.seed(42)
-jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  2)[[1]]
+#set.seed(42)
+jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  10)[[1]]
 
 ## MCMC parameters  
 par_settings <- list('n.iter' = 1000, 

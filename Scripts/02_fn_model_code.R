@@ -23,7 +23,7 @@ sim_cr_dat <- function(parameter_list,iterations, ncores = detectCores() - 1){
   )
   
   clusterExport(cl, export, envir = environment())
-  clusterEvalQ(cl, source(paste0(path2scripts,"/00_fn_sim_pair_data.R")))
+  clusterEvalQ(cl, source(paste0(path2scripts,"/00_fn_sim_pair_data_rework.R")))
   
   # Set Random Seeds
   clusterSetRNGStream(cl)
