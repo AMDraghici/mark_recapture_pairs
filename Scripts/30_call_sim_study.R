@@ -11,7 +11,7 @@ out_dir <- getwd() %+% "/Output/"
 k = 4
 
 param_list <- list(
-  n = 100, 
+  n = 10, 
   k = k, 
   prop.female = 0.5,
   delta = rep(0.9, k),
@@ -24,12 +24,12 @@ param_list <- list(
   betas = list(beta0 = 0, beta1 = 100),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,100)
+  init = rep(1,10)
 )
 
 # # Pull individual dataset
 # data <- do.call(simulate_cr_data, param_list)
-# cjs_data <- format_to_cjs(data)
+#cjs_data <- format_to_cjs(jags_data)
 # 
 # 
 # # Multiple Datasets using parallel
@@ -41,16 +41,16 @@ param_list <- list(
 jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  10)[[1]]
 
 ## MCMC parameters  
-par_settings <- list('n.iter' = 1000, 
+par_settings <- list('n.iter' = 100, 
                      'n.thin' = 1,
-                     'n.burn' = 1000,
+                     'n.burn' = 10,
                      'n.chains' = 2,
-                     'n.adapt' = 1000)
+                     'n.adapt' = 10)
 
 ## Jags parameters and model script
 
 # Run Full Model + No Groups
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1")
+jags_params <- c("apairs")
 jags_model <- script_dir %+% "/12_testing.R"
 
 ## Run jags in parallel and save results
@@ -60,7 +60,3 @@ jags_samples <- run_jags_parallel(jags_data,
                                   par_settings,
                                   out_dir,
                                   outname = "TESTING_MODEL")
-
-x <- as.matrix(jags_samples[[1]])[1,]
-x <- as.data.frame(x)
-rownames_to_column(x) %>% filter(rowname %in% paste0("apf[",as.character(1:10),",2]"))

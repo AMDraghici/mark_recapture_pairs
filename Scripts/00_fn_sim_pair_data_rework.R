@@ -963,7 +963,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
   # Produce inferred survival states
   apairs_f <- matrix(NA, nrow = nrow(pairs_f), ncol = ncol(pairs_f))
   apairs_m <- matrix(NA, nrow = nrow(pairs_m), ncol = ncol(pairs_m))
-  apairs <- array(NA, dim = dim(rpair))
+  apairs <- array(NA, dim =c(nf,nm,k))
   amating_f <- matrix(NA, nrow = nf+1, ncol = k)
   amating_m <- matrix(NA, nrow = nm+1, ncol = k) 
   
