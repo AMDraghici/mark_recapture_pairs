@@ -1,15 +1,13 @@
 #### Multiple-Partners Joint-Fates Extended Arnason-Schwarz Model 
 
 model{
-  ############################
-  ### 1. Data Augmentation ###
-  ############################
+  
+  #1. Data Augmentation----------------------------------------------------------------------------------------------------------------------
   
   # Nothing yet 
   
-  ##################################
-  # 2. Recruitment into population #
-  ##################################
+ 
+  # 2. Recruitment into population-----------------------------------------------------------------------------------------------------------
   
   # Female Recruitment
   for(i in 1:nf){
@@ -27,11 +25,11 @@ model{
     } 
   }
   
-  ########################################################
-  ### Conditional Partnership/Survival/Recapture Steps ###
-  ########################################################
+  # Conditional Partnership/Survival/Recapture Steps ----------------------------------------------------------------------------------------
   
-  # Time 1 events
+  # Time 1 events ---------------------------------------------------------------------------------------------------------------------------
+  
+  # Mating at Time 1 
   
   # Female Mating at time 1
   for(i in 1:nf){
@@ -43,12 +41,89 @@ model{
     amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,1])
   }
   
-  # Model Joint Partnership/Survival/Recapture outcomes 
+  # Pair - Formation at Time 1
+  
+  # Compute conditional psi (on recruitment and mating status)
+  for(i in 1:nf){
+    for(j in 1:nm){
+      psi_cond[i,j,1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1]
+    }
+  }
+  
+  # First attempted partnership
+  apairs[1,1,1] ~ dbern(psi_cond[1,1,1])
+  
+  # Remaining attempts for female 1 
+  for(j in 2:nm){
+    apairs[1,j,1] ~  dbern(psi_cond[1,j,1] * (1 - sum(apairs[1, 1:(j-1), 1])))
+  }
+  
+  # Attempts for females 2-nf 
+  for(i in 2:nf){
+    # First try
+    apairs[i, 1, 1] ~  dbern(psi_cond[i,1,1]* (1 - sum(apairs[1:(i-1), 1, 1])))
+    for(j in 2:nm){
+      apairs[i,j,1] ~ dbern(psi_cond[i,j,1] * (1 - sum(apairs[i, 1:(j-1), 1])) * (1 - sum(apairs[1:(i-1), j, 1])))
+    }
+  }
+  
+  # If no pairs assigned then assign single to boundaries 
+  for(i in 1:nf){ # Females
+    single_female[i, 1] <- 1 - sum(apairs[i,1:nm,1]) # if no pairs then classify as single
+  }
+  
+  for(j in 1:nm){ # Males
+    single_male[j, 1] <- 1 - sum(apairs[1:nf,j,1]) # if no pairs then classify as single
+  }
+  
+  # Survival at time 1 is ensured - therefore value is coded as 1 in the data for all individuals
+  
+  # Recapture at time 1 
+  
+  
+  # Recapture Probability for pairs
+  for(i in 1:nf){
+    for(j in 1:nm){
+      # Marginal probability of recapture for females
+      p.totalF[i,j,1] <- apairs[i,j,1]*PF[1] + (1 - apairs[i,j,1])*recap_f[i,1]
+      # P[X^F_1]
+      rfmat[i,j,1] ~ dbern(p.totalF[i,j,1])
+      # Conditional probability of recapture for males
+      p.totalM_F[i,j,1] <- apairs[i,j,1]*(rfmat[i,j,1]*(Pfm[1]/PF[1]) + (1 - rfmat[i,j,1])*(Pm0[1]/(1-PF[1]))) + 
+        (1 - apairs[i,j,1])*recap_m[j,1]
+      #P[X^M_T|X^F_1]
+      rmmat[i,j,1] ~ dbern(p.totalM_F[i,j,1])        
+    }
+  }
+  
+  # Recapture probability for single Males
+  for(j in 1:nm){
+    # Probability of recapture for males
+    p.totalM_F[nf+1,j,1] <- single_male[j,1]*PM[1] + (1 - single_male[j,1])*recap_m[j,1]
+    
+    #P[Y^M_1]
+    rmmat[nf+1,j,1] ~ dbern(p.totalM_F[nf+1,j,1] * recruit_m[j,1]) 
+  }
+  
+  
+  # Recapture Probability for single Females
+  for(i in 1:nf){
+    # Marginal probability of recapture for females
+    p.totalF[i, nm+1, 1] <- single_female[i,1] * PF[1] + (1 - single_female[i,1])*recap_f[i,1]
+    
+    # P[X^F_1]
+    rfmat[i, nm+1, 1] ~ dbern(p.totalF[i,nm+1,1] * recruit_f[i,1])
+  }
+  
+
+
+
+
+  
+  # Model Events from t=2 to k --------------------------------------------------------------------------------------------------------------
   for(t in 2:k){
     
-    #######################
-    # 3. Decision to Mate #
-    #######################
+    # 3. Decision to Mate -------------------------------------------------------------------------------------------------------------------
     
     # Female Mating Choice at time t
     for(i in 1:nf){
@@ -60,13 +135,11 @@ model{
       amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta[t])
     } 
     
-    #####################
-    # 4. Mate Selection #
-    #####################
+    
+    # 4. Mate Selection -------------------------------------------------------------------------------------------------------------------
     # JAGs does not play well with multinomial trials
     # Solution - series of conditional binomial trials with constraints for singles
     # Probabilities have to be unconditioned after sampling
-    
     
     # Compute conditional psi (on recruitment and mating status)
     for(i in 1:nf){
@@ -101,25 +174,25 @@ model{
       single_male[j, t] <- 1 - sum(apairs[1:nf,j,t]) # if no pairs then classify as single
     }
     
-    #####################
-    # 5. Joint Survival #
-    #####################
+    # 5. Joint Survival ---------------------------------------------------------------------------------------------------------------------
     
     # 5a. Survival Probability for pairs
     for(i in 1:nf){
       for(j in 1:nm){
         
-        # Marginal probability of survival for females #apairs[i,j,t]
+        # Marginal probability of survival for females
         phi.totalF[i,j,t] <- apairs[i,j,t]*PhiF[t-1] + (1 - apairs[i,j,t])
         
         # P[Y^F_T]
-        afmat[i,j,t] ~ dbern(phi.totalF[i,j,t]*af[i,t-1])
+        afmat[i,j,t] ~ dbern(phi.totalF[i,j,t])
         
         # Conditional probability of survival for males given female survival 
-        phi.totalM_F[i,j,t] <- apairs[i,j,t]*(afmat[i,j,t]*(Phifm[t-1]/PhiF[t-1]) + (1 - afmat[i,j,t])*(Phim0[t-1]/(1-PhiF[t-1]))) + (1 - apairs[i,j,t])
+        phi.totalM_F[i,j,t] <- apairs[i,j,t]*(afmat[i,j,t]*(Phifm[t-1]/PhiF[t-1]) + 
+                                                (1 - afmat[i,j,t])*(Phim0[t-1]/(1-PhiF[t-1]))) +
+          (1 - apairs[i,j,t])
         
         #P[Y^M_T|Y^F_T]
-        ammat[i,j,t] ~ dbern(phi.totalM_F[i,j,t]*am[j,t-1])        
+        ammat[i,j,t] ~ dbern(phi.totalM_F[i,j,t])        
       }
     }
     
@@ -127,7 +200,7 @@ model{
     # 5b. Survival probability for single Males
     for(j in 1:nm){
       # Probability of survival for males
-      phi.totalM_F[nf+1,j,t] <- single_male[j,t]*(PhiM[t-1]) + (1 - single_male[j,t])
+      phi.totalM_F[nf+1,j,t] <- single_male[j,t]*recruit_m[j,t]*(PhiM[t-1] - 1) + 1
       #P[Y^M_T]
       ammat[nf+1,j,t] ~ dbern(phi.totalM_F[nf+1,j,t]*am[j,t-1]) 
     }
@@ -136,32 +209,32 @@ model{
     # 5c. Survival Probability for single Females
     for(i in 1:nf){
       # Probability of survival for females
-      phi.totalF[i,nm+1,t] <- single_female[i,t]*(PhiF[t-1]) +  (1 - single_female[i,t])
+      phi.totalF[i,nm+1,t] <- single_female[i,t]*recruit_f[i,t]*(PhiF[t-1] - 1) +  1
       #P[Y^F_T]
       afmat[i,nm+1,t] ~ dbern(phi.totalF[i,nm+1,t]*af[i,t-1]) 
     }
     
     # Recover Marginal Survival Distribution for future conditioning
+    # This is a small hack to get around the way JAGS defines data
+    # Missing values are populated based on joint survival distribution
     
     #Females
     for(i in 1:nf){
       # Dummy parameter (its always 1 or zero)
-      phif_dummy[i,t] <- sum(afmat[i,,t]*c(apairs[i,,t],single_female[i,t]))
-      # Missing values are populated based on asurv (hack to get around data/constant problem)
+      phif_dummy[i,t] <- sum(afmat[i,1:(nm+1),t]*c(apairs[i,1:nm,t],single_female[i,t]))
+      # Missing values 
       af[i,t] ~ dbern(phif_dummy[i,t]) 
     }
     
     #Males
     for(j in 1:nm){
       # Dummy parameter (its always 1 or zero)
-      phim_dummy[j,t] <- sum(ammat[,j,t]*c(apairs[,j,t], single_male[j,t]))
-      # Missing values are populated based on asurv (hack to get around data/constant problem)
+      phim_dummy[j,t] <- sum(ammat[1:(nf+1),j,t]*c(apairs[1:nf, j, t], single_male[j,t]))
+      # Missing values 
       am[j,t] ~ dbern(phim_dummy[j,t]) 
     } 
     
-    ######################
-    # 6. Joint Recapture #
-    ######################
+    # 6. Joint Recapture --------------------------------------------------------------------------------------------------------------------
     
     # 6a. Recapture Probability for pairs
     for(i in 1:nf){
@@ -184,25 +257,26 @@ model{
       p.totalM_F[nf+1,j,t] <- single_male[j,t]*PM[t] + (1 - single_male[j,t])*recap_m[j,t]
       
       #P[Y^M_T]
-      rmmat[nf+1,j,t] ~ dbern(p.totalM_F[nf+1,j,t]*am[j,t]) 
+      rmmat[nf+1,j,t] ~ dbern(p.totalM_F[nf+1,j,t]* am[j,t] * recruit_m[j,t]) 
     }
     
     
     # 6c. Recapture Probability for single Females
     for(i in 1:nf){
       # Marginal probability of recapture for females
-      p.totalF[i,nm+1,t] <- single_female[i,t]*PF[t] + (1 - single_female[i,t])*recap_f[i,t]
+      p.totalF[i, nm+1, t] <- single_female[i,t] * PF[t] + (1 - single_female[i,t])*recap_f[i,t]
       
       # P[X^F_T]
-      rfmat[i,nm+1,t] ~ dbern(p.totalF[i,nm+1,t]*af[i,t])
+      rfmat[i, nm+1, t] ~ dbern(p.totalF[i,nm+1,t]* af[i,t] * recruit_f[i,t])
     }
     
   }
-  ###########################
-  ### Prior distributions ###
-  ###########################
   
-  # Build Partnership probabilities (unconditioned)
+  
+  # 7. Prior Distributions-------------------------------------------------------------------------------------------------------------------
+  # CHoose better priors after model is finalized
+  
+  # Build Partnership probabilities (unconditioned) THIS IS DERIVED ANYWAY
   # !!!! Need to modify histories to be latent for now just assume its some random covariate
   for(t in 1:k){
     # Linear function 
@@ -219,11 +293,23 @@ model{
     }
   }
   
-  #prior for mating
+  #Prior for linear terms in pair selection
   beta0 ~ dnorm(0,1)
   beta1 ~ dnorm(0,1)
   
+  # Recruitment 
   for(t in 1:k){
+    eps[t] ~ dbeta(1,1)
+  }
+  
+  # Attempt to Mate 
+  for(t in 1:k){
+    delta[t] ~ dbeta(1,1)
+  }
+  
+  
+  # Survival Terms
+  for(t in 1:(k-1)){
     
     ### Derived Parameters ####
     
@@ -233,17 +319,12 @@ model{
     Phim0[t] <- PhiM[t] - Phifm[t]
     Phifm[t] <- gamma[t]*sig.PhiF[t]*sig.PhiM[t] + PhiF[t]*PhiM[t]
     
-    #Joint Capture probabilities for paired individuals
-    P00[t] <- 1 - PF[t] - PM[t] + Pfm[t]
-    Pf0[t] <- PF[t] - Pfm[t]
-    Pm0[t] <- PM[t] - Pfm[t]
-    Pfm[t] <- rho[t]*sig.PF[t]*sig.PM[t] + PF[t]*PM[t]
-    
-    ###Binomial SD for survival and recapture 
+    ###Binomial SD for survival 
     sig.PhiF[t] <- sqrt(PhiF[t]*(1-PhiF[t]))
     sig.PhiM[t] <- sqrt(PhiM[t]*(1-PhiM[t]))
-    sig.PF[t] <- sqrt(PF[t]*(1-PF[t]))
-    sig.PM[t] <- sqrt(PM[t]*(1-PM[t]))
+    
+    ##Correlation (with FH bounds)
+    gamma[t] ~ dunif(gl[t], gu[t])
     
     ###Frechet-Hoeffding Bounds for Correlation
     
@@ -251,41 +332,56 @@ model{
     gu[t] <-  min(sqrt(OR.Phi[t]), 1/sqrt(OR.Phi[t])) 
     gl[t] <- -min(sqrt(OP.Phi[t]), 1/sqrt(OP.Phi[t])) 
     
-    # Recapture Rates (Rho)
-    ru[t] <-  min(sqrt(OR.Phi[t]), 1/sqrt(OR.Phi[t])) 
-    rl[t] <- -min(sqrt(OP.Phi[t]), 1/sqrt(OP.Phi[t])) 
-    
-    # Odds Ratio and Product of Survival and Recapture Rates
+    # Odds Ratio and Product of Survival Rates
     OP.Phi[t] <- odds.PhiF[t]*odds.phiM[t]
     OR.Phi[t] <- odds.PhiF[t]/odds.phiM[t]
-    OP.P[t] <- odds.PF[t]*odds.PM[t]
-    OR.P[t] <- odds.PF[t]/odds.PM[t]
     
-    ### Odds of Survival and Recapture Rates
+    ### Odds of Recapture Rates
     odds.phiM[t] <- PhiM[t]/(1 - PhiM[t])
     odds.PhiF[t] <- PhiF[t]/(1 - PhiF[t])
-    odds.PM[t] <- PM[t]/(1 - PM[t])
-    odds.PF[t] <- PF[t]/(1 - PF[t])
-    
-    ### Prior Parameters ####
-    
-    ##Correlation S/R (with FH bounds)
-    gamma[t] ~ dunif(gl[t], gu[t])
-    rho[t] ~ dunif(rl[t], ru[t])
     
     ##Survival Rates M/F
     PhiF[t] ~ dbeta(1,1)
     PhiM[t] ~ dbeta(1,1)
     
+  }
+  
+  # Recapture Terms
+  for(t in 1:k){
+    
+    ### Derived Parameters ####
+    
+    #Joint Capture probabilities for paired individuals
+    P00[t] <- 1 - PF[t] - PM[t] + Pfm[t]
+    Pf0[t] <- PF[t] - Pfm[t]
+    Pm0[t] <- PM[t] - Pfm[t]
+    Pfm[t] <- rho[t]*sig.PF[t]*sig.PM[t] + PF[t]*PM[t]
+    
+    ###Binomial SD for recapture 
+    sig.PF[t] <- sqrt(PF[t]*(1-PF[t]))
+    sig.PM[t] <- sqrt(PM[t]*(1-PM[t]))
+    
+    ###Frechet-Hoeffding Bounds for Correlation
+    
+    # Recapture Rates (Rho)
+    ru[t] <-  min(sqrt(OR.P[t]), 1/sqrt(OR.P[t])) 
+    rl[t] <- -min(sqrt(OP.P[t]), 1/sqrt(OP.P[t])) 
+    
+    # Odds Ratio and Product of Recapture Rates
+    OP.P[t] <- odds.PF[t]*odds.PM[t]
+    OR.P[t] <- odds.PF[t]/odds.PM[t]
+    
+    ### Odds of Survival and Recapture Rates
+    odds.PM[t] <- PM[t]/(1 - PM[t])
+    odds.PF[t] <- PF[t]/(1 - PF[t])
+    
+    ### Prior Parameters ####
+    
+    ##Correlation (with FH bounds)
+    rho[t] ~ dunif(rl[t], ru[t])
+    
     # Recapture Rates M/F
     PF[t] ~ dbeta(1,1)
     PM[t] ~ dbeta(1,1)
-    
-    # Recruitment 
-    eps[t] ~ dbeta(1,1)
-    
-    # Mating
-    delta[t] ~ dbeta(1,1)
-    
   } 
 }

@@ -991,7 +991,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
       x_ijt <- rpair[pairs_m[j, time], j , time]
       
       # Uncouple Pair Index
-      apairs_m[j, time] <- pair_state[x_ijt] * pairs_m[i, time]
+      apairs_m[j, time] <- pair_state[x_ijt] * pairs_m[j, time]
       amating_m[j, time] <- pair_state[x_ijt]
       if(!is.na(pair_state[x_ijt]))  amating_f[ apairs_m[j, time], time] <- pair_state[x_ijt]
     }
