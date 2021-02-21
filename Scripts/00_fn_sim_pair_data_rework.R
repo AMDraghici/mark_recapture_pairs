@@ -1100,7 +1100,6 @@ simulate_cr_data <- function(n,
     # When coming back to this think about initialization specifically wrt survival 
     
     # Compute mating status at t 
-    
     mating_list_t <- compute_mating(sex, time, delta, 
                                     recruit, recruit_f, recruit_m, 
                                     mating_f, mating_m, mating, 
@@ -1111,25 +1110,21 @@ simulate_cr_data <- function(n,
     
     # Compute partnership probability at t based on surv at t-1
     pairs <- compute_partnerships(sex, coef_list, betas, pairs, mating, recruit, time)
-    
     # Update partner histories going into next survival check (at time k we don't need this)
     if(time < k){
       coef_list <- update_history(coef_list, pairs, time + 1, sex)
     }
-    
+
     pairs_ind_list <- propogate_partner_state(pairs, sex, pairs_f, pairs_m, time)
     pairs_f <- pairs_ind_list[["pairs_f"]]
     pairs_m <- pairs_ind_list[["pairs_m"]]
-    
     # Compute survival probability at t based on partners at t 
     spair <- compute_survival(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, time, phi.m, phi.f, gam)
     sind_list_t <- propogate_surv_individual(sf, sm, spair, time, sex)
     sf <- sind_list_t[["sf"]]
     sm <- sind_list_t[["sm"]]
-    
     # Compute recapture probability at t based on survival at t
     rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho)
-    
   }
   
   # Grab individual recaptures

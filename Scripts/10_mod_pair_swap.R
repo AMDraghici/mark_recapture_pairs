@@ -35,12 +35,12 @@ model{
   
   # Female Mating at time 1
   for(i in 1:nf){
-    mating_f[i,1] ~ dbern(delta[1]*recruit_f[i,1])
+    amating_f[i,1] ~ dbern(delta[1]*recruit_f[i,1])
   }
   
   # Male mating at time 1
   for(j in 1:nm){
-    mating_m[j,1] ~ dbern(delta[1]*recruit_m[j,1])
+    amating_m[j,1] ~ dbern(delta[1]*recruit_m[j,1])
   }
   
   # Model Joint Partnership/Survival/Recapture outcomes 
@@ -52,12 +52,12 @@ model{
     
     # Female Mating Choice at time t
     for(i in 1:nf){
-      mating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta[t])
+      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta[t])
     }
     
     # Male Mating Choice at time t
     for(j in 1:nm){
-      mating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta[t])
+      amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta[t])
     } 
     
     #####################
@@ -71,7 +71,7 @@ model{
     # Compute conditional psi (on recruitment and mating status)
     for(i in 1:nf){
       for(j in 1:nm){
-        psi_cond[i,j,t] <- psi[i,j,t] * mating_f[i,t] * mating_m[j,t]
+        psi_cond[i,j,t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t]
       }
     }
     
