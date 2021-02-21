@@ -1172,7 +1172,7 @@ simulate_cr_data <- function(n,
     pairs_f = pairs_f, # partners of females 
     pairs_m = pairs_m, # partners of males
     pairs = pairs, # pair histories
-    histories = coef_list[["histories"]], # number of occasions a pair occurred
+    known_histories = coef_list[["histories"]], # number of occasions a pair occurred
     sf = sf, # true survival of females
     sm = sm, # true survival of males
     spair = spair, # true survival of partnerships

@@ -8,10 +8,10 @@ source(script_dir %+% "00_fn_sim_pair_data_rework.R")
 source(script_dir %+% "02_fn_model_code.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 4
+k = 5
 
 param_list <- list(
-  n = 10, 
+  n = 50, 
   k = k, 
   prop.female = 0.5,
   delta = rep(0.9, k),
@@ -21,16 +21,16 @@ param_list <- list(
   p.f = rep(0.5, k),
   p.m = rep(0.7, k),
   rho = rep(0.6, k),
-  betas = list(beta0 = 0, beta1 = 10),
+  betas = list(beta0 = 1, beta1 = 10),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,10)
+  init = rep(1,50)
 )
 
 # # Pull individual dataset
 set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
-cjs_data <- format_to_cjs(jags_data)
+#cjs_data <- format_to_cjs(jags_data)
 # 
 # 
 # # Multiple Datasets using parallel
@@ -41,11 +41,11 @@ cjs_data <- format_to_cjs(jags_data)
 # jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 
 ## MCMC parameters  
-par_settings <- list('n.iter' = 20, 
-                     'n.thin' = 1,
-                     'n.burn' = 10,
-                     'n.chains' = 2,
-                     'n.adapt' = 10)
+par_settings <- list('n.iter' = 5000, 
+                     'n.thin' = 20,
+                     'n.burn' = 5000,
+                     'n.chains' = 4,
+                     'n.adapt' = 2000)
 
 ## Jags parameters and model script
 
@@ -73,17 +73,6 @@ jags_samples <- run_jags_parallel(jags_data,
 #                                     outname = "TESTING_MODEL")
 #   
 # }
-
-
-# Error in checkForRemoteErrors(val) : 
-#   2 nodes produced errors; first error: Error in node amating_f[49,4]
-# Node inconsistent with parents
-# Data isn't being passed through Hidden state correctly - correct this next 
-# Initializing graph nodes and adapting chains with 10 iterations ... 
-# Error in checkForRemoteErrors(val) : 
-#   2 nodes produced errors; first error: Error in node amating_f[18,3]
-# Node inconsistent with parents
-
 
 # To do
 # Build logic for first encounter 

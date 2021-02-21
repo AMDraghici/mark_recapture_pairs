@@ -43,6 +43,19 @@ model{
   
   # Pair - Formation at Time 1
   
+  # Build Partnership probabilities (unconditioned) 
+  
+  # Link function for individual components 
+  for(i in 1:nf){
+    for(j in 1:nm){
+      eta[i,j, 1] <- beta0 # Linear function
+      psi_raw[i, j ,1] <- exp(eta[i, j, 1])
+    }
+    
+    # Normalize Multivariate Logit Function (how does jags not have this)
+    psi[i,1:nm, 1] <- psi_raw[i,1:nm, 1]/sum(psi_raw[i, 1:nm , 1])
+  }
+  
   # Compute conditional psi (on recruitment and mating status)
   for(i in 1:nf){
     for(j in 1:nm){
@@ -115,10 +128,6 @@ model{
     rfmat[i, nm+1, 1] ~ dbern(p.totalF[i,nm+1,1] * recruit_f[i,1])
   }
   
-
-
-
-
   
   # Model Events from t=2 to k --------------------------------------------------------------------------------------------------------------
   for(t in 2:k){
@@ -140,6 +149,28 @@ model{
     # JAGs does not play well with multinomial trials
     # Solution - series of conditional binomial trials with constraints for singles
     # Probabilities have to be unconditioned after sampling
+    
+    # Build Partnership probabilities 
+    
+    # Recover total history 
+      for(i in 1:nf){
+        for(j in 1:nm){
+          histories[i, j, t] <- sum(apairs[i, j, 1:(t-1)])
+        }
+      }
+    
+    # Linear function 
+    eta[1:nf, 1:nm, t] <- beta0 + beta1*histories[1:nf, 1:nm, t]
+      
+    # Link function for individual components 
+    for(i in 1:nf){
+      for(j in 1:nm){
+        psi_raw[i, j, t] <- exp(eta[i, j, t])
+      }
+      
+      # Normalize Multivariate Logit Function (how does jags not have this)
+      psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/sum(psi_raw[i, 1:nm ,t])
+    }
     
     # Compute conditional psi (on recruitment and mating status)
     for(i in 1:nf){
@@ -274,24 +305,6 @@ model{
   
   
   # 7. Prior Distributions-------------------------------------------------------------------------------------------------------------------
-  # CHoose better priors after model is finalized
-  
-  # Build Partnership probabilities (unconditioned) THIS IS DERIVED ANYWAY
-  # !!!! Need to modify histories to be latent for now just assume its some random covariate
-  for(t in 1:k){
-    # Linear function 
-    eta[1:nf, 1:nm, t] <- beta0 + beta1*histories[1:nf, 1:nm, t]
-    
-    # Link function for individual components 
-    for(i in 1:nf){
-      for(j in 1:nm){
-        psi_raw[i, j ,t] <- exp(eta[i, j, t])
-      }
-      
-      # Normalize Multivariate Logit Function (how does jags not have this)
-      psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/sum(psi_raw[i, 1:nm ,t])
-    }
-  }
   
   #Prior for linear terms in pair selection
   beta0 ~ dnorm(0,1)
@@ -361,6 +374,9 @@ model{
     sig.PF[t] <- sqrt(PF[t]*(1-PF[t]))
     sig.PM[t] <- sqrt(PM[t]*(1-PM[t]))
     
+    ##Correlation (with FH bounds)
+    rho[t] ~ dunif(rl[t], ru[t])
+    
     ###Frechet-Hoeffding Bounds for Correlation
     
     # Recapture Rates (Rho)
@@ -376,9 +392,6 @@ model{
     odds.PF[t] <- PF[t]/(1 - PF[t])
     
     ### Prior Parameters ####
-    
-    ##Correlation (with FH bounds)
-    rho[t] ~ dunif(rl[t], ru[t])
     
     # Recapture Rates M/F
     PF[t] ~ dbeta(1,1)
