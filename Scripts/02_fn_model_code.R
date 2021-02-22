@@ -104,7 +104,7 @@ run_jags_parallel <- function(jags_data,
             n.iter = par_settings$n.burn)
   
   #Sample from distribution in parallel
-  cat("Sampling distribution with " %+% par_settings$n.iter %+% " iterations with thinning of " %+% par_settings$n.thin %+%" ... \n ")
+  cat("Sampling distribution with " %+% par_settings$n.iter %+% " iterations and thinning of " %+% par_settings$n.thin %+%" ... \n ")
   jags_samples <- parCodaSamples(cl = cl, 
                                  model = 'pair_swap', 
                                  variable.names = jags_params, 
