@@ -1,8 +1,12 @@
 library(parallel)
 library(dclone)
+library(tidyverse)
+library(readxl)
+library(lubridate)
 
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
+dat_dir <- getwd() %+% "/Data/FW__Harlequin_Ducks/"
 
 source(script_dir %+% "00_fn_sim_pair_data_rework.R")
 source(script_dir %+% "02_fn_model_code.R")
