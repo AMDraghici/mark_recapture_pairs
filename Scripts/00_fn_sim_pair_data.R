@@ -1077,16 +1077,25 @@ sim_dat <- function(parameter_list){
 
 format_to_cjs <- function(model_data){
   
-  surv <- rbind(model_data$sf[1:model_data$nf,],model_data$sm[1:model_data$nm,])
   x <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
   a <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
+  initial_entry <- c()
+  
+  # Add female initial capture
+  for(i in 1:model_data$nf){
+    initial_entry[i] <- min(which(model_data$recruit_f[i,] == 1))
+  }
+  
+  # Add male initial capture
+  for(j in (model_data$nf+1):(model_data$nf + model_data$nm)){
+    initial_entry[j] <- min(which(model_data$recruit_m[j-model_data$nf,] == 1))
+  }
   
   
   # Store results in list
-  model_data <- list(n = model_data$n,
-                     sex = model_data$sex, 
-                     initial_entry = model_data$initial_entry,
-                     surv = surv,
+  model_data <- list(n = model_data$nf + model_data$nm,
+                     sex = c(rep("F", model_data$nf),rep("M", model_data$nm)), 
+                     initial_entry = initial_entry,
                      x = x,
                      a = a)
   

@@ -224,16 +224,204 @@ assign_ids_bysex <- function(cap.data){
   
 }
 
+# Build Jags Data for recruitment 
+populate_recruit <- function(cap.data, nf, nm, k){
+  
+  # Recruitment matrices
+  recruit_f <- matrix(NA, nrow = nf+1, ncol = k)
+  recruit_m <- matrix(NA, nrow = nm+1, ncol = k)
+  
+  # Extract initial entry by id 
+  female_init <- cap.data %>% select(sex, jags_id, initial_entry) %>% filter(sex == "F") %>% arrange(jags_id) %>% distinct()
+  male_init <- cap.data %>% select(sex, jags_id, initial_entry) %>% filter(sex == "M") %>% arrange(jags_id) %>% distinct()
+  
+  # Populate Female 
+  for(i in 1:nrow(female_init)){
+    f_id <- female_init$jags_id[i]
+    init_id <- female_init$initial_entry[i]
+    recruit_f[f_id, init_id:k] <- 1
+  }
+  
+  # Populate Male 
+  for(i in 1:nrow(male_init)){
+    m_id <- male_init$jags_id[i]
+    init_m_id <- male_init$initial_entry[i]
+    recruit_m[m_id, init_m_id:k] <- 1
+  }
+  
+  # Return recruitment list
+  return(list(recruit_f = recruit_f, recruit_m = recruit_m))
+  
+}
+
+
+populate_mating <- function(cap.data, nf, nm, k){
+  
+  
+  return(list(amating_f = amating_f, amating_m = amating_m))
+}
+
+populate_pairs <- function(cap.data, nf, nm, k){
+  
+  #
+  
+  # Remove impossible states (eg. incestuous pairs)
+  
+  
+  # Return pairs list
+  return(list(apairs))
+}
+
+# Build survival matrices
+populate_surv <- function(cap.data, nf, nm, k){
+
+  #Conditional Paired Survival matrices
+  ammat <- array(NA , dim = c(nf+1,nm+1,k))
+  afmat <- array(NA , dim = c(nf+1,nm+1,k))
+  af <- matrix(NA, nrow = nf+1, ncol = k)
+  am <- matrix(NA, nrow = nm+1, ncol = k)
+  
+  # Survival data.frames
+  surv_f <- cap.data %>%
+    select(sex, jags_id, time, surv_individual_confounded) %>%
+    filter(sex == "F") %>% 
+    arrange(jags_id) %>% 
+    distinct()
+  
+  surv_m <- cap.data %>% 
+    select(sex, jags_id, time, surv_individual_confounded) %>%
+    filter(sex == "M") %>% 
+    arrange(jags_id) %>%
+    distinct()
+  
+  # Populate survival matrices for females
+  for(i in 1:nrow(surv_f)){
+    id <- surv_f$jags_id[i]
+    t <- surv_f$time[i]
+    afmat[id,,t] <- surv_f$surv_individual_confounded[i]
+    af[id, t] <- surv_f$surv_individual_confounded[i]
+  }
+  
+  # Populate survival matrices for males
+  for(i in 1:nrow(surv_m)){
+    id <- surv_m$jags_id[i]
+    t <- surv_m$time[i]
+    ammat[,id,t] <- surv_m$surv_individual_confounded[i]
+    am[id, t] <- surv_m$surv_individual_confounded[i]
+  }
+  # Return surv data
+  return(list(afmat = afmat, af = af, ammat = ammat, am = am))
+}
+
+# Build recapture matrices
+populate_recap <- function(cap.data, nf, nm, k){
+  
+  # Assign memory 
+  rmmat <- array(NA , dim = c(nf+1, nm+1, k))
+  rfmat <- array(NA , dim = c(nf+1, nm+1, k))
+  recap_f <- matrix(NA, nrow = nf+1, ncol = k)
+  recap_m <- matrix(NA, nrow = nm+1, ncol = k)
+  
+  # Recapture data.frames
+  recapture_f <- cap.data %>%
+    select(sex, jags_id, time, recapture_individual) %>%
+    filter(sex == "F") %>% 
+    arrange(jags_id) %>% 
+    distinct()
+  
+  recapture_m <- cap.data %>% 
+    select(sex, jags_id, time, recapture_individual) %>%
+    filter(sex == "M") %>% 
+    arrange(jags_id) %>%
+    distinct()
+  
+  # Populate recapture matrices for females
+  for(i in 1:nrow(recapture_f)){
+    id <- recapture_f$jags_id[i]
+    t <- recapture_f$time[i]
+    rfmat[id,,t] <- recapture_f$recapture_individual[i]
+    recap_f[id, t] <- recapture_f$recapture_individual[i]
+  }
+  
+  # Populate recapture matrices for males
+  for(i in 1:nrow(recapture_m)){
+    id <- recapture_m$jags_id[i]
+    t <- recapture_m$time[i]
+    rmmat[,id,t] <- recapture_m$recapture_individual[i]
+    recap_m[id, t] <- recapture_m$recapture_individual[i]
+  }
+  
+  # Return recap data
+  return(list(rfmat = rfmat, recap_f = recap_f, rmmat = rmmat, recap_m = recap_m))
+}
+
+# Prepare data for jags
+build_jags_data <- function(cap.data){
+  
+  # Index values
+  nf <- cap.data %>% select(sex, jags_id) %>% filter(sex=="F") %>% distinct() %>% arrange(jags_id) %>% nrow()
+  nm <- cap.data %>% select(sex, jags_id) %>% filter(sex=="M") %>% distinct() %>% arrange(jags_id) %>% nrow()
+  k <- cap.data %>% select(time) %>% distinct() %>% nrow()
+  
+  # Recruitment matrices
+  recruit_list <- populate_recruit(cap.data, nf, nm, k)
+  recruit_f <- recruit_list[["recruit_f"]]
+  recruit_m <- recruit_list[["recruit_m"]]
+  
+  # Attempt to mate matrix
+  amating_f <- matrix(NA, nrow = nf, ncol = k)
+  amating_m <- matrix(NA, nrow = nm, ncol = k)
+  
+  # Joint Pairs Matrices
+  apairs <- array(NA, dim = c(nf+1, nm+1, k))
+  
+  #Conditional Paired Survival matrices
+  surv_list <- populate_surv(cap.data, nf, nm, k)
+  ammat <- surv_list[["ammat"]]
+  afmat <- surv_list[["afmat"]]
+  af <- surv_list[["af"]]
+  am <- surv_list[["am"]]
+  
+  # Conditional Paired Recapture Matrices
+  recap_list <- populate_recap(cap.data, nf, nm, k)
+  rmmat <- recap_list[["rmmat"]]
+  rfmat <- recap_list[["rfmat"]]
+  recap_f <- recap_list[["recap_f"]]
+  recap_m <- recap_list[["recap_m"]]
+  
+  # Store results in list 
+  jags_data <- list(nf = nf, 
+                    nm = nm,
+                    k = k,
+                    recruit_f = recruit_f,
+                    recruit_m = recruit_m,
+                    amating_f = amating_f,
+                    amating_m = amating_m,
+                    apairs = apairs, 
+                    ammat = ammat, 
+                    afmat = afmat, 
+                    af = af,
+                    am = am, 
+                    rmmat = rmmat,
+                    rfmat = rfmat,
+                    recap_f = recap_f,
+                    recap_m = recap_m)
+  
+  # Return model data
+  return(jags_data)
+}
+
 
 # NExt steps
 
 # (DONE) Add individual covariates (weight/size/etc)
 # (DONE) Add key identifiers for non-breeders (Age/Mother/Watershed Area)
 # (DONE) Address previous states for survival
-# Map animal_ids to male_id and female_id ranging from 1:Nm and 1:Nf respectively 
+# (DONE) Map animal_ids to male_id and female_id ranging from 1:Nm and 1:Nf respectively 
 # Build out model matrices (joint states and stuff)
+# Deal with NA values in the single slots (go back and check what the model does with these)
 # Add Data augmentation 
-# How to deal with those who are known to be mated (mother with YoY)
+# How to deal with those who are known to be mated (mother with YoY -- probably just data augment)
 # Update model to account for new information
 # Update data simulation to match what we see here
 # Build vanilla M/F JS model with recruitment 
