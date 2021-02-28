@@ -20,9 +20,6 @@ gather_hq_data <- function(dat_dir,
   return(list(book1 = dat1, book2 = dat2))
 }
 
-hq_data <- gather_hq_data(dat_dir)
-
-
 process_bandlist <- function(hq_data){
   BandList <- hq_data[["book1"]][[1]]  %>%
     rename(year_class = `Year Class`,
@@ -143,7 +140,8 @@ build_cr_df <- function(hq_data){
   return(cap.data)
 } 
 
-cap.data <- build_cr_df(hq_data) %>%  add_implied_states() %>% assign_ids_bysex()
+cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+#jags_data <- build_jags_data(cap.data)
 
 add_implied_states <- function(cap.data){
   
@@ -196,6 +194,10 @@ add_implied_states <- function(cap.data){
       cap.data[cap.data$animal_id == i,"mother_id"] <- 0
     }
   }
+  
+  # Update mate status to be zero if age is zero (for hatch year)
+  cap.data <- cap.data %>% mutate(mated = ifelse(age == 0, 0, mated))
+  
   # Return cleaned data
   return(cap.data)
 }
@@ -257,19 +259,67 @@ populate_recruit <- function(cap.data, nf, nm, k){
 
 populate_mating <- function(cap.data, nf, nm, k){
   
+  # Attempt to mate matrix
+  amating_f <- matrix(NA, nrow = nf, ncol = k)
+  amating_m <- matrix(NA, nrow = nm, ncol = k)
+  
+  # Mating status of females/males
+  female_mating <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, mated) %>% distinct()
+  male_mating <- cap.data %>% filter(sex == "M") %>% select(time, jags_id, mated) %>% distinct()
+  
+  # Assign mate status to females
+  for(i in 1:nrow(female_mating)){
+    f_id <- female_mating$jags_id[i]
+    t <- female_mating$time[i]
+    amating_f[f_id,t] <- female_mating$mated[i]
+  }
+  
+  # Assing mate status to males
+  for(i in 1:nrow(male_mating)){
+    m_id <- male_mating$jags_id[i]
+    t <- male_mating$time[i]
+    amating_m[m_id,t] <- male_mating$mated[i]
+  }
   
   return(list(amating_f = amating_f, amating_m = amating_m))
 }
 
 populate_pairs <- function(cap.data, nf, nm, k){
   
-  #
+  #Pairs matrix
+  apairs <- array(NA, dim = c(nf, nm, k))
   
-  # Remove impossible states (eg. incestuous pairs)
+  # Females and partners
+  female_mates <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
+  male_mates <- cap.data %>% filter(sex == "M") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
   
+  # Assign pairs
+  for(t in 1:k){
+    for(i in 1:nf){
+      female_id <- female_mates[female_mates$time == t,"jags_id"][i]
+      female_partner_id <- female_mates[female_mates$time == t,"jags_partner_id"][i]
+      if(is.na(female_partner_id)) next #skip if no partner
+      for(j in 1:nm){
+        # Zero out other pair formation
+        apairs[female_id, , t] <- 0
+        apairs[,female_partner_id,t] <- 0
+        # Add formed pair 
+        apairs[female_id, female_partner_id, t] <- 1
+      }
+    }
+  }
+  
+  # Replace NA values with zero for mother-child pairs
+  impossible_pairs <- male_mates %>% filter(!is.na(jags_mother_id)) %>% select(jags_id, jags_mother_id) %>% distinct()
+  # Go through impossible pairings and zero them out across all time
+  for(l in 1:nrow(impossible_pairs)){
+    male_id <- impossible_pairs$jags_id[l]
+    mother_id <- impossible_pairs$jags_mother_id[l]
+    apairs[mother_id,male_id,] <- 0
+  }
   
   # Return pairs list
-  return(list(apairs))
+  return(apairs)
 }
 
 # Build survival matrices
@@ -369,11 +419,12 @@ build_jags_data <- function(cap.data){
   recruit_m <- recruit_list[["recruit_m"]]
   
   # Attempt to mate matrix
-  amating_f <- matrix(NA, nrow = nf, ncol = k)
-  amating_m <- matrix(NA, nrow = nm, ncol = k)
+  mating_list <- populate_mating(cap.data, nf,nm ,k)
+  amating_f <- mating_list[["amating_f"]]
+  amating_m <-  mating_list[["amating_m"]]
   
   # Joint Pairs Matrices
-  apairs <- array(NA, dim = c(nf+1, nm+1, k))
+  apairs <- populate_pairs(cap.data, nf, nm, k)
   
   #Conditional Paired Survival matrices
   surv_list <- populate_surv(cap.data, nf, nm, k)
@@ -418,10 +469,14 @@ build_jags_data <- function(cap.data){
 # (DONE) Add key identifiers for non-breeders (Age/Mother/Watershed Area)
 # (DONE) Address previous states for survival
 # (DONE) Map animal_ids to male_id and female_id ranging from 1:Nm and 1:Nf respectively 
-# Build out model matrices (joint states and stuff)
+# (DONE) Build out model matrices (joint states and stuff)
+
+# Special mating cases
+# Check for special cases in joint matrix (deal with known mates but unknown partners)
+# ie. How to deal with those who are known to be mated (mother with YoY -- probably just data augment)
 # Deal with NA values in the single slots (go back and check what the model does with these)
-# Add Data augmentation 
-# How to deal with those who are known to be mated (mother with YoY -- probably just data augment)
+# Add Data augmentation (addresses one point above)
+
 # Update model to account for new information
 # Update data simulation to match what we see here
 # Build vanilla M/F JS model with recruitment 
