@@ -10,31 +10,39 @@ dat_dir <- getwd() %+% "/Data/FW__Harlequin_Ducks/"
 
 source(script_dir %+% "00_fn_sim_pair_data_rework.R")
 source(script_dir %+% "02_fn_model_code.R")
+source(script_dir %+% "02_fn_process_live_data.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 5
+## HDUCK Data
+# 
+# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+# jags_data <- build_jags_data(cap.data)
+## SIM DATA
 
-param_list <- list(
-  n = 50, 
+k = 4
+n = 50
+
+jags_samples <- list(
+  n = n, 
   k = k, 
   prop.female = 0.5,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
   gam = rep(0.5, k),
-  p.f = rep(0.5, k),
-  p.m = rep(0.7, k),
+  p.f = rep(0.4, k),
+  p.m = rep(0.4, k),
   rho = rep(0.6, k),
-  betas = list(beta0 = 1, beta1 = 10),
+  betas = list(beta0 = 1, beta1 = 2),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,50)
+  init = rep(1,n)
 )
 
 # # Pull individual dataset
 set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
-#cjs_data <- format_to_cjs(jags_data)
+cjs_data <- format_to_cjs(jags_data)
 # 
 # 
 # # Multiple Datasets using parallel
@@ -46,16 +54,38 @@ jags_data <- do.call(simulate_cr_data, param_list)
 
 ## MCMC parameters  
 par_settings <- list('n.iter' = 5000, 
-                     'n.thin' = 20,
-                     'n.burn' = 5000,
+                     'n.thin' = 10,
+                     'n.burn' = 1000,
                      'n.chains' = 4,
-                     'n.adapt' = 2000)
+                     'n.adapt' = 1000)
 
 ## Jags parameters and model script
 
+# Run standard Model
+
+jags_params <- c("pF", "pM", "phiF", "phiM")
+jags_model <- script_dir %+% "/14_cjs_mod.R"
+
+
+jags_samples <- run_jags_parallel(cjs_data, 
+                                  jags_model,
+                                  jags_params, 
+                                  par_settings,
+                                  out_dir,
+                                  outname = "T1_CJS_STD")
+
+
 # Run Full Model + No Groups
+## MCMC parameters  
+par_settings <- list('n.iter' = 5000, 
+                     'n.thin' = 10,
+                     'n.burn' = 1000,
+                     'n.chains' = 4,
+                     'n.adapt' = 1000)
+
+
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
-jags_model <- script_dir %+% "/10_mod_pair_swap.R"
+jags_model <- script_dir %+% "/11_mod_pair_swap.R"
 
 
 jags_samples <- run_jags_parallel(jags_data, 
@@ -63,7 +93,7 @@ jags_samples <- run_jags_parallel(jags_data,
                                   jags_params, 
                                   par_settings,
                                   out_dir,
-                                  outname = "TESTING_MODEL")
+                                  outname = "TESTING_MODEL2")
 
 # 
 # for(i in 1:100){

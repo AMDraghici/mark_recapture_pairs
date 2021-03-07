@@ -136,7 +136,7 @@ model{
     
     # Female Mating Choice at time t
     for(i in 1:nf){
-      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta])
+      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta)
     }
     
     # Male Mating Choice at time t
@@ -218,7 +218,7 @@ model{
         afmat[i,j,t] ~ dbern(phi.totalF[i,j,t])
         
         # Conditional probability of survival for males given female survival 
-        phi.totalM_F[i,j,t] <- apairs[i,j,t]*(afmat[i,j,t]*(Phifm/PhiF) + (1 - afmat[i,j,t])*(Phim0/(1-PhiF))) +(1 - apairs[i,j,t])
+        phi.totalM_F[i,j,t] <- apairs[i,j,t]*(afmat[i,j,t]*(Phifm/PhiF) + (1 - afmat[i,j,t])*(Phim0/(1-PhiF))) + (1 - apairs[i,j,t])
         
         #P[Y^M_T|Y^F_T]
         ammat[i,j,t] ~ dbern(phi.totalM_F[i,j,t])        

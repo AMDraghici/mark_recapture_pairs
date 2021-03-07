@@ -418,7 +418,7 @@ initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recrui
     if(j == 2){
       probj <- probj*(1-pairs[1,,i]) #Remove pair j=1 from the prob (colsum only works on matrices)
     } else if(j > 2){
-      probj <- probj*(1-colSums(pairs[1:(j-1),,i])) #remove all preformed pairs
+      probj <- probj*(1-colSums(pairs[1:(j-1),,i])) #remove all pre-formed pairs
     }
     
     # Draw partnership
@@ -1094,6 +1094,7 @@ format_to_cjs <- function(model_data){
   
   # Store results in list
   model_data <- list(n = model_data$nf + model_data$nm,
+                     k = model_data$k,
                      sex = c(rep("F", model_data$nf),rep("M", model_data$nm)), 
                      initial_entry = initial_entry,
                      x = x,

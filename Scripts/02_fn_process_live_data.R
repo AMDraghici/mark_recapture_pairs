@@ -140,9 +140,6 @@ build_cr_df <- function(hq_data){
   return(cap.data)
 } 
 
-cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-#jags_data <- build_jags_data(cap.data)
-
 add_implied_states <- function(cap.data){
   
   # Animal IDs and amount of time 
