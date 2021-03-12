@@ -22,7 +22,7 @@ out_dir <- getwd() %+% "/Output/"
 k = 4
 n = 50
 
-jags_samples <- list(
+param_list <- list(
   n = n, 
   k = k, 
   prop.female = 0.5,
