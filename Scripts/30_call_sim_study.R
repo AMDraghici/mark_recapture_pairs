@@ -19,8 +19,8 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 ## SIM DATA
 
-k = 4
-n = 50
+k = 3
+n = 20
 
 param_list <- list(
   n = n, 
@@ -29,18 +29,18 @@ param_list <- list(
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0.5, k),
-  p.f = rep(0.4, k),
-  p.m = rep(0.4, k),
-  rho = rep(0.6, k),
-  betas = list(beta0 = 1, beta1 = 2),
+  gam = rep(0.85, k),
+  p.f = rep(0.60, k),
+  p.m = rep(0.60, k),
+  rho = rep(0.50, k),
+  betas = list(beta0 = 0, beta1 = 1),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n)
 )
 
 # # Pull individual dataset
-set.seed(42)
+set.seed(4224)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 # 
@@ -53,11 +53,11 @@ cjs_data <- format_to_cjs(jags_data)
 # jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 
 ## MCMC parameters  
-par_settings <- list('n.iter' = 5000, 
+par_settings <- list('n.iter' = 10000, 
                      'n.thin' = 10,
-                     'n.burn' = 1000,
+                     'n.burn' = 2000,
                      'n.chains' = 4,
-                     'n.adapt' = 1000)
+                     'n.adapt' = 2000)
 
 ## Jags parameters and model script
 
@@ -77,18 +77,18 @@ jags_samples <- run_jags_parallel(cjs_data,
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 5000, 
+par_settings <- list('n.iter' = 10000, 
                      'n.thin' = 10,
-                     'n.burn' = 1000,
+                     'n.burn' = 2000,
                      'n.chains' = 4,
-                     'n.adapt' = 1000)
+                     'n.adapt' = 2000)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
 jags_model <- script_dir %+% "/11_mod_pair_swap.R"
 
 
-jags_samples <- run_jags_parallel(jags_data, 
+jags_samples2 <- run_jags_parallel(jags_data, 
                                   jags_model,
                                   jags_params, 
                                   par_settings,
