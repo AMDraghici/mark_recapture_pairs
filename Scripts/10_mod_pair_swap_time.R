@@ -303,6 +303,15 @@ model{
     
   }
   
+  for(i in 1:nf){
+    rfmat[i,t] ~ dbern(PF[t] * af[i,t])
+  }
+
+  for(j in 1:nm){
+    p.totalM[j] <- single_male[j,t] * PM[t] + # Male was single
+      (1 - single_male[j,t]) * (outer(apairs[,j,t], rfmat[i,t]) * (...) + # Male mated and female captured
+                                (1 - outer(apairs[,j,t], rfmat[i,t])) * (...)) # Male mated and female not captured
+  }
   
   # 7. Prior Distributions-------------------------------------------------------------------------------------------------------------------
   
