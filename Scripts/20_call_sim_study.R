@@ -48,44 +48,43 @@ cjs_data <- format_to_cjs(jags_data)
 # # Multiple Datasets using parallel
 # sim_cr_dat(parameter_list = param_list, iterations =  2)
 
-
 # # Run JAGS
 # jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
-
-## MCMC parameters  
-par_settings <- list('n.iter' = 10000, 
-                     'n.thin' = 10,
-                     'n.burn' = 2000,
-                     'n.chains' = 4,
-                     'n.adapt' = 2000)
-
-## Jags parameters and model script
-
-# Run standard Model
-
-jags_params <- c("pF", "pM", "phiF", "phiM")
-jags_model <- script_dir %+% "/14_cjs_mod.R"
-
-
-jags_samples <- run_jags_parallel(cjs_data, 
-                                  jags_model,
-                                  jags_params, 
-                                  par_settings,
-                                  out_dir,
-                                  outname = "T1_CJS_STD")
+# 
+# ## MCMC parameters  
+# par_settings <- list('n.iter' = 10000, 
+#                      'n.thin' = 10,
+#                      'n.burn' = 2000,
+#                      'n.chains' = 4,
+#                      'n.adapt' = 2000)
+# 
+# ## Jags parameters and model script
+# 
+# # Run standard Model
+# 
+# jags_params <- c("pF", "pM", "phiF", "phiM")
+# jags_model <- script_dir %+% "/14_cjs_mod.R"
+# 
+# 
+# jags_samples <- run_jags_parallel(cjs_data, 
+#                                   jags_model,
+#                                   jags_params, 
+#                                   par_settings,
+#                                   out_dir,
+#                                   outname = "T1_CJS_STD")
 
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 10000, 
+par_settings <- list('n.iter' = 1e4, 
                      'n.thin' = 10,
-                     'n.burn' = 2000,
-                     'n.chains' = 4,
-                     'n.adapt' = 2000)
+                     'n.burn' = 1e3,
+                     'n.chains' = 2,
+                     'n.adapt' = 1e3)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
-jags_model <- script_dir %+% "/11_mod_pair_swap.R"
+jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 
 
 jags_samples2 <- run_jags_parallel(jags_data, 
@@ -94,28 +93,6 @@ jags_samples2 <- run_jags_parallel(jags_data,
                                   par_settings,
                                   out_dir,
                                   outname = "TESTING_MODEL2")
-
-# 
-# for(i in 1:100){
-#   dat <- jags_data[[i]]
-#   ## Run jags in parallel and save results
-#   jags_samples <- run_jags_parallel(dat, 
-#                                     jags_model,
-#                                     jags_params, 
-#                                     par_settings,
-#                                     out_dir,
-#                                     outname = "TESTING_MODEL")
-#   
-# }
-# 
-# Setting up 4 parallel workers ... 
-# Initializing graph nodes and adapting chains with 2000 iterations ... 
-# Burning-in chains with 5000 iterations ... 
-# Sampling distribution with 5000 iterations with thinning of 20 ... 
-# MCMC has finished - time statistics are: ...
-# user   system  elapsed 
-# 0.53     0.12 23076.74 
-# Saving samples and initial values to output directory...
 
 # To do
 # Build logic for first encounter 

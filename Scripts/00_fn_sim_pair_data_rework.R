@@ -942,8 +942,8 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   afmat[(nf+1),,] <- 1
   
   # Store results in a list
-  state_list <- list(af = af,
-                     am = am, 
+  state_list <- list(af = cbind(rep(1,nrow(af)),af),
+                     am = cbind(rep(1,nrow(am)),am), 
                      ammat = ammat,
                      afmat = afmat)
   
@@ -963,7 +963,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
   # Produce inferred survival states
   apairs_f <- matrix(NA, nrow = nrow(pairs_f), ncol = ncol(pairs_f))
   apairs_m <- matrix(NA, nrow = nrow(pairs_m), ncol = ncol(pairs_m))
-  apairs <- array(NA, dim =c(nf,nm,k))
+  apairs <- array(NA, dim =c(nf+1,nm+1,k))
   amating_f <- matrix(NA, nrow = nf+1, ncol = k)
   amating_m <- matrix(NA, nrow = nm+1, ncol = k) 
   
@@ -1009,9 +1009,9 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
     
     for(time in time_index){
       # Assign states 
-      apairs[i,,time] <- 0
-      apairs[,apairs_f[i, time], time] <- 0
-      apairs[i,apairs_f[i, time], time] <- 1
+      apairs[i+1,,time] <- 0
+      apairs[,apairs_f[i, time]+1, time] <- 0
+      apairs[i+1,apairs_f[i, time]+1, time] <- 1
       
     }
   }
@@ -1020,6 +1020,9 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
   amating_f[(nf+1),1:k] <- 1
   amating_m[(nm+1),1:k] <- 1
   
+  apairs[1:(nf+1),1,] <- 0
+  apairs[1,1:(nm+1),] <- 0
+    
   # Store results in a list
   pairs_list <- list(apairs_m = apairs_m,
                      apairs_f = apairs_f,
