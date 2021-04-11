@@ -31,19 +31,30 @@ logit <- function(p){
   return(out)
 }
 
-#Inverse Logistic Function
-inv.logit <- function(x){
-  out <- (1+exp(-x))^(-1)
-  return(out)
-}
+# #Inverse Logistic Function
+# inv.logit <- function(x){
+#   out <- (1+exp(-x))^(-1)
+#   return(out)
+# }
 
 
 #Softmax Function
-softmax <- function(vector){
-  out <- exp(vector)/sum(exp(vector))
-  return(out)
-}
+# softmax <- function(vector){
+#   out <- exp(vector)/sum(exp(vector))
+#   return(out)
+# }
 
+# Numerically Stable Version
+softmax <- function(par){
+  n.par <- length(par)
+  par1 <- sort(par, decreasing = TRUE)
+  Lk <- par1[1]
+  for (k in 1:(n.par-1)) {
+    Lk <- max(par1[k+1], Lk) + log1p(exp(-abs(par1[k+1] - Lk))) 
+  }
+  val <- exp(par - Lk)
+  return(val)
+}
 
 ## 2. S/R Distribution Functions -------------------------------------------------------------------------------------
 
@@ -540,16 +551,12 @@ propogate_recap_individual <- function(sex, k, rpair){
   recap_f[(nf + 1),] <- 0
   recap_m <- matrix(NA, nrow = nm+1, ncol = k)
   recap_m[(nm + 1),] <- 0
-  rfmat <- array(0,dim = dim(rpair))
-  rmmat <- array(0,dim = dim(rpair))
-  
   
   # Only update females (not dummy states)
   for(i in 1:nf){
     for(time in 1:k){
       female_observation <- recap_marginal_female[max(rpair[i,,time])]
       recap_f[i,time] <- female_observation
-      rfmat[i,,time] <- female_observation
     }
   }
   
@@ -558,13 +565,12 @@ propogate_recap_individual <- function(sex, k, rpair){
     for(time in 1:k){
       male_observation <- recap_marginal_male[max(rpair[,i,time])]
       recap_m[i,time] <- male_observation
-      rmmat[,i,time] <- male_observation
     }
     
   }
   
   # Group and return results 
-  ind_recap_list <- list(recap_f = recap_f, recap_m = recap_m, rfmat = rfmat, rmmat = rmmat)
+  ind_recap_list <- list(recap_f = recap_f, recap_m = recap_m)
   return(ind_recap_list)
 }
 
@@ -856,9 +862,6 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   # Produce inferred survival states
   af <- matrix(NA, nrow = nrow(sf), ncol = ncol(sf))
   am <- matrix(NA, nrow = nrow(sm), ncol = ncol(sm))
-  afmat <- array(NA, dim = dim(spair))
-  ammat <- array(NA, dim = dim(spair))
-  
   
   # States based on observations
   female_state <- c(NA, 1,  NA, 1) 
@@ -875,8 +878,6 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
       # Uncouple survival states
       af[i, time] <- female_state[x_ijt]
       am[pairs_f[i,time], time] <- male_state[x_ijt]
-      afmat[i,,time] <-  female_state[x_ijt]
-      ammat[,pairs_f[i,time],time] <- male_state[x_ijt]
     }
   }
   
@@ -892,7 +893,6 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
       
       # Uncouple survival states
       am[j, time] <- male_state[x_ijt]
-      ammat[,j,time] <- male_state[x_ijt]
     }
   }
   
@@ -938,14 +938,10 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   # Set dummy states to known ones 
   af[(nf+1),] <- 1
   am[(nm+1),] <- 1
-  ammat[,(nm+1),] <- 1
-  afmat[(nf+1),,] <- 1
   
   # Store results in a list
   state_list <- list(af = cbind(rep(1,nrow(af)),af),
-                     am = cbind(rep(1,nrow(am)),am), 
-                     ammat = ammat,
-                     afmat = afmat)
+                     am = cbind(rep(1,nrow(am)),am))
   
   # Return List
   return(state_list)
@@ -1051,6 +1047,14 @@ simulate_cr_data <- function(n,
                              rand_init = T,
                              init = NULL){
   
+  # Make sure the number of individuals simulated is even
+  if(!n %% 2 == 0){
+    n <- n + 1
+    if(!is.null(init)){
+      init[n] <- 1
+    }
+  }
+  
   # Generate SKeleton Data Structures
   #browser()
   sex <- construct_sexes(n, prop.female, rand_sex)
@@ -1094,13 +1098,10 @@ simulate_cr_data <- function(n,
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   spair <- propogate_surv_pairs(sex, sf, sm, spair, initial_time, pairs_f, pairs_m)
-  rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, initial_time, rep(1,k), rep(1,k), rep(0,k))
+  rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, initial_time, p.m, p.f, rho)
   
   # Simulate Fates
   for(time in (initial_time+1):k){
-    # Compute recruitment at t
-    # Ignore for now as I've randomized this for the time being 
-    # When coming back to this think about initialization specifically wrt survival 
     
     # Compute mating status at t 
     mating_list_t <- compute_mating(sex, time, delta, 
@@ -1121,11 +1122,13 @@ simulate_cr_data <- function(n,
     pairs_ind_list <- propogate_partner_state(pairs, sex, pairs_f, pairs_m, time)
     pairs_f <- pairs_ind_list[["pairs_f"]]
     pairs_m <- pairs_ind_list[["pairs_m"]]
+    
     # Compute survival probability at t based on partners at t 
     spair <- compute_survival(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, time, phi.m, phi.f, gam)
     sind_list_t <- propogate_surv_individual(sf, sm, spair, time, sex)
     sf <- sind_list_t[["sf"]]
     sm <- sind_list_t[["sm"]]
+    
     # Compute recapture probability at t based on survival at t
     rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho)
   }
@@ -1134,23 +1137,16 @@ simulate_cr_data <- function(n,
   recap_ind_list <- propogate_recap_individual(sex, k, rpair)
   recap_f <- recap_ind_list[["recap_f"]] 
   recap_m <- recap_ind_list[["recap_m"]] 
-  rfmat <- recap_ind_list[["rfmat"]] 
-  rmmat <- recap_ind_list[["rmmat"]] 
-  
-  
+
   # Build partially observed/latent data variables
   
   # Hidden Survival
   asurv_list <- compute_hidden_survival(pairs_f, pairs_m, rpair, spair, sf, sm, k, sex)
   af <- asurv_list[["af"]]
   am <- asurv_list[["am"]]
-  afmat <- asurv_list[["afmat"]]
-  ammat <- asurv_list[["ammat"]]
   
   # Hidden Partnerships and mate choice
   apairs_list <- compute_hidden_pairs(pairs_f, pairs_m, rpair, k, sex)
-  apairs_f <- apairs_list[["apairs_f"]]
-  apairs_m <- apairs_list[["apairs_m"]]
   apairs  <- apairs_list[["apairs"]]
   amating_f <- apairs_list[["amating_f"]]
   amating_m <- apairs_list[["amating_m"]]
@@ -1167,9 +1163,8 @@ simulate_cr_data <- function(n,
     initial_entry = initial_entry, # When did they enter the population
     recruit_f = recruit_f, 
     recruit_m = recruit_m,
-    recruit = recruit,
     
-    # Latent States 
+    # Latent States (true values - hidden in real data)
     mating_f = mating_f, # Mate status of females at t (+ dummy)
     mating_m = mating_m, # Mate status of males at t (+ dummy)
     pairs_f = pairs_f, # partners of females 
@@ -1180,21 +1175,14 @@ simulate_cr_data <- function(n,
     sm = sm, # true survival of males
     spair = spair, # true survival of partnerships
     
-    # Observed states
-    af = af, 
-    am = am, 
-    afmat = afmat,
-    ammat = ammat,
-    apairs_f = apairs_f,
-    apairs_m = apairs_m,
-    apairs  = apairs, 
-    amating_f = amating_f,
-    amating_m = amating_m,
-    recap_f = recap_f,
-    recap_m = recap_m,
-    rpair = rpair, # recapture of pairs 
-    rfmat = rfmat, 
-    rmmat = rmmat
+    # Observed /Inferred states (Missing Values are possible)
+    af = af,  # Female Survival with missing values
+    am = am,  # Male Survival with missing values
+    apairs  = apairs, # Joint Pairs Matrices (array across time)
+    amating_f = amating_f, # Mating Status Females at T
+    amating_m = amating_m,  # Mating Status Males at T
+    recap_f = recap_f, # Observed Recapture of Females
+    recap_m = recap_m # Observed Recapture of Males
   )
   
   #Return Model object
@@ -1206,7 +1194,7 @@ sim_dat <- function(parameter_list){
   model_data <- do.call(simulate_cr_data, parameter_list)
 }
 
-# 7. Format Data for Different Purposes ------------------------------------------------------------------------
+# 7. Format Data for Different Purposes -------------------------------------------------------------------------------
 
 
 format_to_cjs <- function(model_data){
@@ -1238,4 +1226,4 @@ format_to_cjs <- function(model_data){
   return(model_data)
 }
 
-#---------------------------------------------------------------------------------------------------------------
+#----------------------------------------------------------------------------------------------------------------------

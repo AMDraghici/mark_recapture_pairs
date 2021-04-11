@@ -149,7 +149,7 @@ run_jags_parallel <- function(jags_data,
 }
 
 
-# 3. Investigate Results for a Single Run (live data for example)
+# 3. Investigate Results for a Single Run (live data for example)-------------------------------------------------------------------
 
 # Grab Summary statistics 
 gather_posterior_summary <- function(fit){

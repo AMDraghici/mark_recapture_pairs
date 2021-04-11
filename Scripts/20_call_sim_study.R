@@ -20,7 +20,7 @@ out_dir <- getwd() %+% "/Output/"
 ## SIM DATA
 
 k = 8
-n = 100
+n = 25
 
 param_list <- list(
   n = n, 
@@ -97,6 +97,7 @@ jags_samples2 <- run_jags_parallel(jags_data,
 
 
 gather_posterior_summary(jags_samples2) %>% plot_caterpillar(params = jags_params)
+
 # To do
 # Build logic for first encounter 
 # Fix data generation (hidden states)
