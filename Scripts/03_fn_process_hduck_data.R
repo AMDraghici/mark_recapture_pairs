@@ -387,7 +387,6 @@ populate_recap <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(recapture_m)){
     id <- recapture_m$jags_id[i]
     t <- recapture_m$time[i]
-    rmmat[,id,t] <- recapture_m$recapture_individual[i]
     recap_m[id, t] <- recapture_m$recapture_individual[i]
   }
   

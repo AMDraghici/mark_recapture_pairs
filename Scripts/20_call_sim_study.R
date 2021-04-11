@@ -8,16 +8,16 @@ library(lubridate)
 script_dir <- getwd() %+% "/Scripts/"
 dat_dir <- getwd() %+% "/Data/FW__Harlequin_Ducks/"
 
-source(script_dir %+% "00_fn_sim_pair_data_rework.R")
+source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "02_fn_model_code.R")
-source(script_dir %+% "02_fn_process_live_data.R")
+source(script_dir %+% "03_fn_process_hduck_data.R")
 out_dir <- getwd() %+% "/Output/"
 
 ## HDUCK Data
-# 
-# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-# jags_data <- build_jags_data(cap.data)
-## SIM DATA
+
+cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+jags_data <- build_jags_data(cap.data)
+# SIM DATA
 
 k = 8
 n = 25
@@ -84,7 +84,7 @@ par_settings <- list('n.iter' = 1e3,
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
-jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
+jags_model <- script_dir %+% "/10_mod_pair_swap_notime.R"
 
 
 jags_samples2 <- run_jags_parallel(jags_data, 
