@@ -323,8 +323,6 @@ populate_pairs <- function(cap.data, nf, nm, k){
 populate_surv <- function(cap.data, nf, nm, k){
 
   #Conditional Paired Survival matrices
-  ammat <- array(NA , dim = c(nf+1,nm+1,k))
-  afmat <- array(NA , dim = c(nf+1,nm+1,k))
   af <- matrix(NA, nrow = nf+1, ncol = k)
   am <- matrix(NA, nrow = nm+1, ncol = k)
   
@@ -345,7 +343,6 @@ populate_surv <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(surv_f)){
     id <- surv_f$jags_id[i]
     t <- surv_f$time[i]
-    afmat[id,,t] <- surv_f$surv_individual_confounded[i]
     af[id, t] <- surv_f$surv_individual_confounded[i]
   }
   
@@ -353,19 +350,16 @@ populate_surv <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(surv_m)){
     id <- surv_m$jags_id[i]
     t <- surv_m$time[i]
-    ammat[,id,t] <- surv_m$surv_individual_confounded[i]
     am[id, t] <- surv_m$surv_individual_confounded[i]
   }
   # Return surv data
-  return(list(afmat = afmat, af = af, ammat = ammat, am = am))
+  return(list(af = af, am = am))
 }
 
 # Build recapture matrices
 populate_recap <- function(cap.data, nf, nm, k){
   
   # Assign memory 
-  rmmat <- array(NA , dim = c(nf+1, nm+1, k))
-  rfmat <- array(NA , dim = c(nf+1, nm+1, k))
   recap_f <- matrix(NA, nrow = nf+1, ncol = k)
   recap_m <- matrix(NA, nrow = nm+1, ncol = k)
   
@@ -386,7 +380,6 @@ populate_recap <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(recapture_f)){
     id <- recapture_f$jags_id[i]
     t <- recapture_f$time[i]
-    rfmat[id,,t] <- recapture_f$recapture_individual[i]
     recap_f[id, t] <- recapture_f$recapture_individual[i]
   }
   
@@ -394,12 +387,11 @@ populate_recap <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(recapture_m)){
     id <- recapture_m$jags_id[i]
     t <- recapture_m$time[i]
-    rmmat[,id,t] <- recapture_m$recapture_individual[i]
     recap_m[id, t] <- recapture_m$recapture_individual[i]
   }
   
   # Return recap data
-  return(list(rfmat = rfmat, recap_f = recap_f, rmmat = rmmat, recap_m = recap_m))
+  return(list(recap_f = recap_f, recap_m = recap_m))
 }
 
 # Prepare data for jags
@@ -425,15 +417,11 @@ build_jags_data <- function(cap.data){
   
   #Conditional Paired Survival matrices
   surv_list <- populate_surv(cap.data, nf, nm, k)
-  ammat <- surv_list[["ammat"]]
-  afmat <- surv_list[["afmat"]]
   af <- surv_list[["af"]]
   am <- surv_list[["am"]]
   
   # Conditional Paired Recapture Matrices
   recap_list <- populate_recap(cap.data, nf, nm, k)
-  rmmat <- recap_list[["rmmat"]]
-  rfmat <- recap_list[["rfmat"]]
   recap_f <- recap_list[["recap_f"]]
   recap_m <- recap_list[["recap_m"]]
   
@@ -446,12 +434,8 @@ build_jags_data <- function(cap.data){
                     amating_f = amating_f,
                     amating_m = amating_m,
                     apairs = apairs, 
-                    ammat = ammat, 
-                    afmat = afmat, 
                     af = af,
                     am = am, 
-                    rmmat = rmmat,
-                    rfmat = rfmat,
                     recap_f = recap_f,
                     recap_m = recap_m)
   
