@@ -19,8 +19,8 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 ## SIM DATA
 
-k = 3
-n = 20
+k = 8
+n = 100
 
 param_list <- list(
   n = n, 
@@ -76,11 +76,11 @@ cjs_data <- format_to_cjs(jags_data)
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 1e4, 
-                     'n.thin' = 10,
-                     'n.burn' = 1e3,
+par_settings <- list('n.iter' = 1e3, 
+                     'n.thin' = 1,
+                     'n.burn' = 1e2,
                      'n.chains' = 2,
-                     'n.adapt' = 1e3)
+                     'n.adapt' = 1e2)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
@@ -94,6 +94,9 @@ jags_samples2 <- run_jags_parallel(jags_data,
                                   out_dir,
                                   outname = "TESTING_MODEL2")
 
+
+
+gather_posterior_summary(jags_samples2) %>% plot_caterpillar(params = jags_params)
 # To do
 # Build logic for first encounter 
 # Fix data generation (hidden states)

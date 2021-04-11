@@ -147,3 +147,47 @@ run_jags_parallel <- function(jags_data,
   #Return MCMC Results
   return(jags_samples)
 }
+
+
+# 3. Investigate Results for a Single Run (live data for example)
+
+# Grab Summary statistics 
+gather_posterior_summary <- function(fit){
+  
+  # Summarize Results
+  summ <- summary(fit)
+  
+  # Put results into dataframe
+  summ_stats <- as.data.frame(summ$statistics) %>% rownames_to_column(var = "Parameter")
+  summ_quant <- as.data.frame(summ$quantiles) %>% rownames_to_column(var = "Parameter")
+  post_stats <- inner_join(summ_stats, summ_quant, by = "Parameter") %>% 
+    mutate(Parameter_Name = gsub("[[]","",gsub("[[0-9]]+","",inner_join(summ_stats, summ_quant)$Parameter))) # add unique par name
+  
+  # Return Results
+  return(post_stats)
+}
+
+# Create Caterpillar Plot of Estimates
+plot_caterpillar <- function(post_stats, 
+                             params = c("PhiF","PhiM", "PF","PM"), 
+                             yrange = NULL, 
+                             title = "Caterpillar Plot of Posterior Estimates"
+                             ){
+  p1 <- post_stats %>% 
+    filter(Parameter_Name %in% params) %>% 
+    mutate(Parameter = fct_reorder(Parameter,Mean)) %>% 
+    ggplot() + 
+    geom_linerange(aes(x = Parameter, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "#005b96")  +
+    geom_linerange(aes(x = Parameter, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "#005b96") + 
+    geom_point(aes(x = Parameter, y = Mean), color = "#011f4b", size = 4) +
+    labs(x = "Parameter", y = "Posterior Values", title = title) +
+    theme(plot.title = element_text(hjust = 0.5))
+  
+  if(!is.null(yrange)){
+    p1 <- p1 +  coord_cartesian(ylim = yrange)
+  }
+  
+  return(p1)
+}
+
+
