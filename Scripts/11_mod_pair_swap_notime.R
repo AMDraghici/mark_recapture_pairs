@@ -25,6 +25,15 @@ model{
     } 
   }
   
+  # Initialize History Array (All Zero at time 1)
+  for(i in 1:nf){
+    for(j in 1:nm){
+      histories[i, j, 1] <- 0
+    }
+  }
+  
+  
+  
   # Conditional Partnership/Survival/Recapture Steps ----------------------------------------------------------------------------------------
   
   # Model Events from t=1 to k --------------------------------------------------------------------------------------------------------------
@@ -49,25 +58,16 @@ model{
     # Probabilities have to be unconditioned after sampling
     
     # Build Partnership probabilities 
-    #!!!!!!!!!!!!!!!!!!!!!!!!! HISTORIES NEED TO HAVE INDEXING FIXED!!!!!!
-    # Recover total history 
-    for(i in 1:nf){
-      for(j in 1:nm){
-        #histories[i, j, t] <- sum(apairs[i+1, j+1, 1:(t-1)])
-        eta[i, j, t] <- beta0
-      }
-    }
     
-    # Linear function 
-    #eta[1:nf, 1:nm, t] <- beta0 + beta1*histories[1:nf, 1:nm, t]
-    
+    # SOFTMAX CALCULATION 
     # Link function for individual components 
     for(i in 1:nf){
       for(j in 1:nm){
-        psi_raw[i, j, t] <- exp(eta[i, j, t])
+        eta[i, j, t] <- beta0 + beta1*histories[i, j, t]  # Linear function (History + Baseline)
+        psi_raw[i, j, t] <- exp(eta[i, j, t])             # Exponential Transform
       }
       
-      # Normalize Multivariate Logit Function (how does jags not have this)
+      # Normalize Multivariate Logit (SOFTMAX) Function 
       psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/sum(psi_raw[i, 1:nm ,t])
     }
     
@@ -79,6 +79,7 @@ model{
     }
 
     # Attempts at partnerships forming
+    # Monogamous pairings only 
     for(i in 1:nf){
       for(j in 1:nm){
         apairs[i+1,j+1,t] ~ dbern(psi_cond[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])) * (1 - sum(apairs[1:i, j+1, t])))
@@ -92,6 +93,13 @@ model{
     
     for(j in 1:nm){ # Males
       single_male[j, t] <- 1 - sum(apairs[1:nf+1,j+1,t]) # if no pairs then classify as single
+    }
+    
+    # Update Total History for Next Time Step
+    for(i in 1:nf){
+      for(j in 1:nm){
+        histories[i, j, t+1] <- sum(apairs[i+1, j+1, 1:t])
+      }
     }
     
     # 5. Joint Survival ---------------------------------------------------------------------------------------------------------------------
