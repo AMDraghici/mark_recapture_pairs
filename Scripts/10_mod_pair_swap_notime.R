@@ -64,25 +64,21 @@ model{
     for(i in 1:nf){
       for(j in 1:nm){
         eta[i, j, t] <- beta0 + beta1*histories[i, j, t]  # Linear function (History + Baseline)
-        psi_raw[i, j, t] <- exp(eta[i, j, t])             # Exponential Transform
+        psi_raw[i, j, t] <- exp(eta[i, j, t]) * amating_f[i,t] * amating_m[j,t] # Exponential Transform
       }
       
+      # Normalizing constant (with +1 adjustment for case of sum = zero)
+      psi_norm[i,t] <- sum(psi_raw[i, 1:nm ,t]) + equals(sum(psi_raw[i, 1:nm ,t]), 0)
+      
       # Normalize Multivariate Logit (SOFTMAX) Function 
-      psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/sum(psi_raw[i, 1:nm ,t])
+      psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/psi_norm[i,t]
     }
     
-    # Compute conditional psi (on recruitment and mating status)
-    for(i in 1:nf){
-      for(j in 1:nm){
-        psi_cond[i,j,t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t]
-      }
-    }
-
     # Attempts at partnerships forming
     # Monogamous pairings only 
     for(i in 1:nf){
       for(j in 1:nm){
-        apairs[i+1,j+1,t] ~ dbern(psi_cond[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])) * (1 - sum(apairs[1:i, j+1, t])))
+        apairs[i+1,j+1,t] ~ dbern(psi[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])) * (1 - sum(apairs[1:i, j+1, t])))
       }
     }
     
@@ -175,7 +171,8 @@ model{
   sig.PhiM <- sqrt(PhiM*(1-PhiM))
   
   ##Correlation (with FH bounds)
-  gamma ~ dunif(gl, gu)
+  gamma <- (gu - gl)*gamma_raw + gl 
+  gamma_raw ~ dbeta(3,3) 
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -192,8 +189,8 @@ model{
   odds.PhiF <- PhiF/(1 - PhiF)
   
   ##Survival Rates M/F
-  PhiF ~ dbeta(1,1)
-  PhiM ~ dbeta(1,1)
+  PhiF ~ dbeta(2,2)
+  PhiM ~ dbeta(2,2)
   
   # Recapture Terms
   ### Derived Parameters ####
@@ -208,8 +205,9 @@ model{
   sig.PF <- sqrt(PF*(1-PF))
   sig.PM <- sqrt(PM*(1-PM))
   
-  ##Correlation (with FH bounds)
-  rho ~ dunif(rl, ru)
+  ##Correlation using four parameter beta (with FH bounds)
+  rho <- (ru - rl)*rho_raw + rl 
+  rho_raw ~ dbeta(3,3) 
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -228,6 +226,6 @@ model{
   ### Prior Parameters ####
   
   # Recapture Rates M/F
-  PF ~ dbeta(1,1)
-  PM ~ dbeta(1,1)
+  PF ~ dbeta(2,2)
+  PM ~ dbeta(2,2)
 }

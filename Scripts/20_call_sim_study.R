@@ -14,13 +14,13 @@ source(script_dir %+% "03_fn_process_hduck_data.R")
 out_dir <- getwd() %+% "/Output/"
 
 ## HDUCK Data
-
-cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-jags_data <- build_jags_data(cap.data)
+# 
+# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+# jags_data <- build_jags_data(cap.data)
 # SIM DATA
 
 k = 8
-n = 25
+n = 100
 
 param_list <- list(
   n = n, 
@@ -78,9 +78,9 @@ cjs_data <- format_to_cjs(jags_data)
 ## MCMC parameters  
 par_settings <- list('n.iter' = 1e3, 
                      'n.thin' = 1,
-                     'n.burn' = 1e2,
+                     'n.burn' = 1e3,
                      'n.chains' = 2,
-                     'n.adapt' = 1e2)
+                     'n.adapt' = 1e3)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")

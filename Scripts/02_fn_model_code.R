@@ -167,6 +167,30 @@ gather_posterior_summary <- function(fit){
   return(post_stats)
 }
 
+add_true_values <- function(post, param_list){
+  
+  true_vals <- c(param_list$p.f[1],
+                 param_list$p.m[1],
+                 param_list$phi.f[1],
+                 param_list$phi.m[1],
+                 param_list$delta[1],
+                 param_list$betas$beta0[1],
+                 param_list$betas$beta1[1],
+                 c(1,rep(0,param_list$k-1)),
+                 param_list$rho[1],
+                 param_list$gam[1]
+  )
+  
+  true_names <- c("PF","PM","PhiF","PhiM","delta","beta0","beta1",
+                  "eps[" %+% 1:param_list$k %+% "]","rho","gamma")
+  
+  true_df <- data.frame("Parameter" = true_names, "true" = true_vals)
+  
+  # Join values together
+  post2 <- post %>% inner_join(true_df, by = "Parameter")
+  return(post2)
+}
+
 # Create Caterpillar Plot of Estimates
 plot_caterpillar <- function(post_stats, 
                              params = c("PhiF","PhiM", "PF","PM"), 
@@ -177,9 +201,9 @@ plot_caterpillar <- function(post_stats,
     filter(Parameter_Name %in% params) %>% 
     mutate(Parameter = fct_reorder(Parameter,Mean)) %>% 
     ggplot() + 
-    geom_linerange(aes(x = Parameter, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "#005b96")  +
-    geom_linerange(aes(x = Parameter, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "#005b96") + 
-    geom_point(aes(x = Parameter, y = Mean), color = "#011f4b", size = 4) +
+    geom_linerange(aes(x = Parameter, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+    geom_linerange(aes(x = Parameter, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+    geom_point(aes(x = Parameter, y = Mean), size = 5, alpha = 0.75, color = "lightblue") +
     labs(x = "Parameter", y = "Posterior Values", title = title) +
     theme(plot.title = element_text(hjust = 0.5))
   
