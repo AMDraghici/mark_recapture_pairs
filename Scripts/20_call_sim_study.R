@@ -96,8 +96,8 @@ jags_samples2 <- run_jags_parallel(jags_data,
 
 
 
-gather_posterior_summary(jags_samples2) %>% plot_caterpillar(params = jags_params)
-
+gather_posterior_summary(jags_samples2) %>%  add_true_values(param_list) %>% plot_caterpillar(params = jags_params) +
+  geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 # To do
 # Build logic for first encounter 
 # Fix data generation (hidden states)
