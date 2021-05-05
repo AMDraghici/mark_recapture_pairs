@@ -30,10 +30,10 @@ param_list <- list(
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
   gam = rep(0.85, k),
-  p.f = rep(0.60, k),
-  p.m = rep(0.60, k),
+  p.f = rep(0.75, k),
+  p.m = rep(0.75, k),
   rho = rep(0.50, k),
-  betas = list(beta0 = 0, beta1 = 1),
+  betas = list(beta0 = 0, beta1 = 2),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n)
@@ -83,7 +83,7 @@ par_settings <- list('n.iter' = 1e3,
                      'n.adapt' = 1e3)
 
 
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
+jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta", "eps")
 jags_model <- script_dir %+% "/10_mod_pair_swap_notime.R"
 
 
@@ -95,8 +95,9 @@ jags_samples2 <- run_jags_parallel(jags_data,
                                   outname = "TESTING_MODEL2")
 
 
-
-gather_posterior_summary(jags_samples2) %>%  add_true_values(param_list) %>% plot_caterpillar(params = jags_params) +
+gather_posterior_summary(jags_samples2) %>% 
+  add_true_values(param_list) %>% 
+  plot_caterpillar(params = jags_params) +
   geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 # To do
 # Build logic for first encounter 

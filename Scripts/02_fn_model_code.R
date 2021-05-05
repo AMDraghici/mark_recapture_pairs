@@ -174,14 +174,14 @@ add_true_values <- function(post, param_list){
                  param_list$phi.f[1],
                  param_list$phi.m[1],
                  param_list$delta[1],
-                 param_list$betas$beta0[1],
+                # param_list$betas$beta0[1],
                  param_list$betas$beta1[1],
                  c(1,rep(0,param_list$k-1)),
                  param_list$rho[1],
                  param_list$gam[1]
   )
   
-  true_names <- c("PF","PM","PhiF","PhiM","delta","beta0","beta1",
+  true_names <- c("PF","PM","PhiF","PhiM","delta","beta",
                   "eps[" %+% 1:param_list$k %+% "]","rho","gamma")
   
   true_df <- data.frame("Parameter" = true_names, "true" = true_vals)

@@ -63,7 +63,7 @@ model{
     # Link function for individual components 
     for(i in 1:nf){
       for(j in 1:nm){
-        eta[i, j, t] <- beta0 + beta1*histories[i, j, t]  # Linear function (History + Baseline)
+        eta[i, j, t] <- beta*histories[i, j, t]  # Linear function (History + Baseline)
         psi_raw[i, j, t] <- exp(eta[i, j, t]) * amating_f[i,t] * amating_m[j,t] # Exponential Transform
       }
       
@@ -77,8 +77,17 @@ model{
     # Attempts at partnerships forming
     # Monogamous pairings only 
     for(i in 1:nf){
+      
+      # Normalize with respect to males who found pairs
       for(j in 1:nm){
-        apairs[i+1,j+1,t] ~ dbern(psi[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])) * (1 - sum(apairs[1:i, j+1, t])))
+        psi_cond_raw[i,j,t] <- psi[i,j,t]*(1 - sum(apairs[1:i, j+1, t]))
+      }
+      psi_norm_raw[i,t] <- sum(psi_cond_raw[i, 1:nm ,t]) + equals(sum(psi_cond_raw[i, 1:nm ,t]), 0)
+      psi_cond[i,1:nm,t] <- psi_cond_raw[i,1:nm,t]/psi_norm_raw[i,t]
+      
+      # Assign pairs using normalized probability density 
+      for(j in 1:nm){
+        apairs[i+1,j+1,t] ~ dbern(psi_cond[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])))# * (1 - sum(apairs[1:i, j+1, t])))
       }
     }
     
@@ -145,8 +154,7 @@ model{
   # 7. Prior Distributions-------------------------------------------------------------------------------------------------------------------
   
   #Prior for linear terms in pair selection
-  beta0 ~ dnorm(0,1)
-  beta1 ~ dnorm(0,1)
+  beta ~ dnorm(0,1)
   
   # Recruitment 
   for(t in 1:k){
