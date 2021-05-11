@@ -20,7 +20,7 @@ out_dir <- getwd() %+% "/Output/"
 # SIM DATA
 
 k = 8
-n = 100
+n = 40
 
 param_list <- list(
   n = n, 
@@ -29,18 +29,18 @@ param_list <- list(
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0.85, k),
+  gam = rep(0.4, k),
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
-  rho = rep(0.50, k),
-  betas = list(beta0 = 0, beta1 = 2),
+  rho = rep(0.70, k),
+  betas = list(beta0 = 1.0, beta1 = 0),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n)
 )
 
 # # Pull individual dataset
-set.seed(4224)
+set.seed(100)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 # 
@@ -114,3 +114,7 @@ gather_posterior_summary(jags_samples2) %>%
 # Run that study and compare to standard models
 # For both studies will likely need to take a learning detour and figure out sharcnet 
 # Writing/conferences/chapter 2 vs journal article
+# 
+# 
+# test <- readRDS(out_dir %+% "jags_samples_TESTING_MODEL2.rds")
+# test -> jags_samples2

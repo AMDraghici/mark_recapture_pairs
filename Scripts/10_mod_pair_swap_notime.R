@@ -25,15 +25,7 @@ model{
     } 
   }
   
-  # Initialize History Array (All Zero at time 1)
-  for(i in 1:nf){
-    for(j in 1:nm){
-      histories[i, j, 1] <- 0
-    }
-  }
-  
-  
-  
+
   # Conditional Partnership/Survival/Recapture Steps ----------------------------------------------------------------------------------------
   
   # Model Events from t=1 to k --------------------------------------------------------------------------------------------------------------
@@ -57,15 +49,11 @@ model{
     # Solution - series of conditional binomial trials with constraints for singles
     # Probabilities have to be unconditioned after sampling
     
-    # Build Partnership probabilities 
-    
-    # SOFTMAX CALCULATION 
-    # Link function for individual components 
+    # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
-      for(j in 1:nm){
-        eta[i, j, t] <- beta*histories[i, j, t]  # Linear function (History + Baseline)
-        psi_raw[i, j, t] <- exp(eta[i, j, t]) * amating_f[i,t] * amating_m[j,t] # Exponential Transform
-      }
+      
+      # 
+      psi_raw[i, 1:nm, t] <- amating_f[i,t] * amating_m[1:nm,t] 
       
       # Normalizing constant (with +1 adjustment for case of sum = zero)
       psi_norm[i,t] <- sum(psi_raw[i, 1:nm ,t]) + equals(sum(psi_raw[i, 1:nm ,t]), 0)
@@ -87,7 +75,7 @@ model{
       
       # Assign pairs using normalized probability density 
       for(j in 1:nm){
-        apairs[i+1,j+1,t] ~ dbern(psi_cond[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])))# * (1 - sum(apairs[1:i, j+1, t])))
+        apairs[i+1,j+1,t] ~ dbern(psi_cond[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])))
       }
     }
     
@@ -98,13 +86,6 @@ model{
     
     for(j in 1:nm){ # Males
       single_male[j, t] <- 1 - sum(apairs[1:nf+1,j+1,t]) # if no pairs then classify as single
-    }
-    
-    # Update Total History for Next Time Step
-    for(i in 1:nf){
-      for(j in 1:nm){
-        histories[i, j, t+1] <- sum(apairs[i+1, j+1, 1:t])
-      }
     }
     
     # 5. Joint Survival ---------------------------------------------------------------------------------------------------------------------
@@ -152,9 +133,6 @@ model{
   
   
   # 7. Prior Distributions-------------------------------------------------------------------------------------------------------------------
-  
-  #Prior for linear terms in pair selection
-  beta ~ dnorm(0,1)
   
   # Recruitment 
   for(t in 1:k){
