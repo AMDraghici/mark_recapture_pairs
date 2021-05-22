@@ -52,7 +52,7 @@ model{
     # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
       
-      # 
+      #
       psi_raw[i, 1:nm, t] <- amating_f[i,t] * amating_m[1:nm,t] 
       
       # Normalizing constant (with +1 adjustment for case of sum = zero)
@@ -75,7 +75,8 @@ model{
       
       # Assign pairs using normalized probability density 
       for(j in 1:nm){
-        apairs[i+1,j+1,t] ~ dbern(psi_cond[i,j,t] * (1 - sum(apairs[i+1, 1:j, t])))
+        #psi_cond_norm[i,j,t] <- sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0)
+        apairs[i+1,j+1,t] ~ dbern((psi_cond[i,j,t]) * (1 - sum(apairs[i+1, 1:j, t])))
       }
     }
     
@@ -101,8 +102,8 @@ model{
       
       # Probability of male surviving given partnership and partner recapture status
       phi.totalM[j, t] <- single_male[j,t] * PhiM + # Male was single
-        (1 - single_male[j,t]) * (inprod(apairs[1:nf+1,j+1,t], af[1:nf,t+1]) * (Phifm/PhiF) + # Male mated and female captured
-                                    (1 - inprod(apairs[1:nf+1,j+1,t], af[1:nf,t+1])) * (Phim0/(1-PhiF))) # Male mated and female not captured
+        (1 - single_male[j,t]) * (inprod(apairs[1:nf+1,j+1,t], af[1:nf,t+1]) * (Phifm/PhiF) + # Male mated and female surived
+                                    (1 - inprod(apairs[1:nf+1,j+1,t], af[1:nf,t+1])) * (Phim0/(1-PhiF))) # Male mated and female perished
       
       # Draw Survival Event 
       am[j, t+1] ~ dbern(phi.totalM[j,t] * am[j,t])    
