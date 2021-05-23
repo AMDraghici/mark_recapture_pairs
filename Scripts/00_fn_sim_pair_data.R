@@ -1045,7 +1045,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   # Produce inferred survival states
   apairs_f <- matrix(NA, nrow = nrow(pairs_f), ncol = ncol(pairs_f))
   apairs_m <- matrix(NA, nrow = nrow(pairs_m), ncol = ncol(pairs_m))
-  apairs <- array(NA, dim =c(nf+1,nm+1,k))
+  apairs <- array(NA, dim =c(nf+1,nm+1,k+1))
   amating_f <- matrix(NA, nrow = nf+1, ncol = k)
   amating_m <- matrix(NA, nrow = nm+1, ncol = k) 
   arepartner <- matrix(NA, nrow = nf, ncol = k)
@@ -1057,6 +1057,12 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   for(i in 1:nf){
     for(time in 1:k){
       
+      if(time >=2){
+        x_ijt_minus_1 <- x_ijt 
+      } else{
+        x_ijt_minus_1 <- 4
+      }
+      
       # Joint Recapture of pair i and pf[i,t] at time t
       x_ijt <- rpair[i, pairs_f[i,time] , time]
       
@@ -1065,7 +1071,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
       amating_f[i, time] <- pair_state[x_ijt]
       
       # Observed Repartnership
-      arepartner[i,time] <- pair_state[x_ijt] * repartner[i, time]
+      arepartner[i,time] <- pair_state[x_ijt] * pair_state[x_ijt_minus_1] * repartner[i, time]
       
       if(!is.na(pair_state[x_ijt]))  amating_m[ apairs_f[i, time], time] <- pair_state[x_ijt]
     }
@@ -1096,9 +1102,9 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
     
     for(time in time_index){
       # Assign states 
-      apairs[i+1,,time] <- 0
-      apairs[,apairs_f[i, time]+1, time] <- 0
-      apairs[i+1,apairs_f[i, time]+1, time] <- 1
+      apairs[i+1,,time+1] <- 0
+      apairs[,apairs_f[i, time]+1, time+1] <- 0
+      apairs[i+1,apairs_f[i, time]+1, time+1] <- 1
       
     }
   }
@@ -1109,7 +1115,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   
   apairs[1:(nf+1),1,] <- 0
   apairs[1,1:(nm+1),] <- 0
-  
+  apairs[,,1] <- 0 
   arepartner[,1] <- 0 
     
   # Store results in a list

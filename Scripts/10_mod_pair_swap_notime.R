@@ -25,6 +25,12 @@ model{
     } 
   }
   
+  # Initialize History Array (All Zero at time 1)
+  for(i in 1:nf){
+    for(j in 1:nm){
+      histories[i, j, 1] <- 0
+    }
+  }
 
   # Conditional Partnership/Survival/Recapture Steps ----------------------------------------------------------------------------------------
   
@@ -43,6 +49,11 @@ model{
       amating_m[j,t] ~ dbern(am[j,t] * recruit_m[j,t] * delta)
     } 
     
+    # Choose to re-form pairs 
+    for(i in 1:nf){
+      logit(prob_repartner[i,t]) <- 0 + beta1*inprod(histories[i, 1:nm , t],  t(apairs[i + 1, 1:nm + 1, t])) 
+      arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * inprod(apairs[i + 1, 1:nm + 1, t], amating_m[1:nm,t]))
+    }
     
     # 4. Mate Selection -------------------------------------------------------------------------------------------------------------------
     # JAGs does not play well with multinomial trials
@@ -52,8 +63,8 @@ model{
     # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
       
-      #
-      psi_raw[i, 1:nm, t] <- amating_f[i,t] * amating_m[1:nm,t] 
+      # Flat likelihood of mating conditional on decision to mate
+      psi_raw[i, 1:nm, t] <- amating_f[i,t] * amating_m[1:nm,t] * (1 - arepartner[i,t]) * (1 - apairs[i+1,1:nm+1,t]) + arepartner[i,t] * apairs[i+1,1:nm+1,t]
       
       # Normalizing constant (with +1 adjustment for case of sum = zero)
       psi_norm[i,t] <- sum(psi_raw[i, 1:nm ,t]) + equals(sum(psi_raw[i, 1:nm ,t]), 0)
@@ -68,25 +79,33 @@ model{
       
       # Normalize with respect to males who found pairs
       for(j in 1:nm){
-        psi_cond_raw[i,j,t] <- psi[i,j,t]*(1 - sum(apairs[1:i, j+1, t]))
+        psi_cond_raw[i,j,t] <- psi[i,j,t]*(1 - sum(apairs[1:i, j+1, t+1]))
       }
       psi_norm_raw[i,t] <- sum(psi_cond_raw[i, 1:nm ,t]) + equals(sum(psi_cond_raw[i, 1:nm ,t]), 0)
       psi_cond[i,1:nm,t] <- psi_cond_raw[i,1:nm,t]/psi_norm_raw[i,t]
       
       # Assign pairs using normalized probability density 
       for(j in 1:nm){
-        #psi_cond_norm[i,j,t] <- sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0)
-        apairs[i+1,j+1,t] ~ dbern((psi_cond[i,j,t]) * (1 - sum(apairs[i+1, 1:j, t])))
+        psi_cond_norm[i,j,t] <- 1 #sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0)
+        apairs[i+1,j+1,t+1] ~ dbern((psi_cond[i,j,t]/psi_cond_norm[i,j,t]) * (1 - sum(apairs[i+1, 1:j, t+1])))
       }
     }
     
     # If no pairs assigned then assign single to boundaries 
     for(i in 1:nf){ # Females
-      single_female[i, t] <- 1 - sum(apairs[i+1,1:nm+1,t]) # if no pairs then classify as single
+      single_female[i, t] <- 1 - sum(apairs[i+1,1:nm+1,t+1]) # if no pairs then classify as single
     }
     
     for(j in 1:nm){ # Males
-      single_male[j, t] <- 1 - sum(apairs[1:nf+1,j+1,t]) # if no pairs then classify as single
+      single_male[j, t] <- 1 - sum(apairs[1:nf+1,j+1,t+1]) # if no pairs then classify as single
+    }
+    
+    
+    # Update Total History for Next Time Step
+    for(i in 1:nf){
+      for(j in 1:nm){
+        histories[i, j, t+1] <- sum(apairs[i+1, j+1, 1:(t+1)])
+      }
     }
     
     # 5. Joint Survival ---------------------------------------------------------------------------------------------------------------------
@@ -102,8 +121,8 @@ model{
       
       # Probability of male surviving given partnership and partner recapture status
       phi.totalM[j, t] <- single_male[j,t] * PhiM + # Male was single
-        (1 - single_male[j,t]) * (inprod(apairs[1:nf+1,j+1,t], af[1:nf,t+1]) * (Phifm/PhiF) + # Male mated and female surived
-                                    (1 - inprod(apairs[1:nf+1,j+1,t], af[1:nf,t+1])) * (Phim0/(1-PhiF))) # Male mated and female perished
+        (1 - single_male[j,t]) * (inprod(apairs[1:nf+1,j+1,t+1], af[1:nf,t+1]) * (Phifm/PhiF) + # Male mated and female surived
+                                    (1 - inprod(apairs[1:nf+1,j+1,t+1], af[1:nf,t+1])) * (Phim0/(1-PhiF))) # Male mated and female perished
       
       # Draw Survival Event 
       am[j, t+1] ~ dbern(phi.totalM[j,t] * am[j,t])    
@@ -123,8 +142,8 @@ model{
       
       # Probability of male being captured given partnership and partner recapture status
       p.totalM[j, t] <- single_male[j,t] * PM + # Male was single
-        (1 - single_male[j,t]) * (inprod(apairs[1:nf+1,j+1,t], recap_f[1:nf,t]) * (Pfm/PF) + # Male mated and female captured
-                                  (1 - inprod(apairs[1:nf+1,j+1,t], recap_f[1:nf,t])) * (Pm0/(1-PF))) # Male mated and female not captured
+        (1 - single_male[j,t]) * (inprod(apairs[1:nf+1,j+1,t+1], recap_f[1:nf,t]) * (Pfm/PF) + # Male mated and female captured
+                                  (1 - inprod(apairs[1:nf+1,j+1,t+1], recap_f[1:nf,t])) * (Pm0/(1-PF))) # Male mated and female not captured
       
       # Draw Recapture Probability 
       recap_m[j, t] ~ dbern(p.totalM[j,t]*am[j,t+1])    
@@ -143,6 +162,10 @@ model{
   # Attempt to Mate 
   delta ~ dbeta(1,1)
   
+  # Pairs reforming
+  ##beta0 ~ dnorm(0, 1/4)
+  beta1 ~ dnorm(0, 1/4)
+
   # Survival Terms
   
   ### Derived Parameters ####

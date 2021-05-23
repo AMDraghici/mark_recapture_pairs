@@ -33,7 +33,7 @@ param_list <- list(
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
   rho = rep(0.70, k),
-  betas = list(beta0 = 1.0, beta1 = 3),
+  betas = list(beta0 = 0.0, beta1 = 3),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n)
@@ -83,7 +83,7 @@ par_settings <- list('n.iter' = 1e3,
                      'n.adapt' = 1e3)
 
 
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta", "eps")
+jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
 jags_model <- script_dir %+% "/10_mod_pair_swap_notime.R"
 
 
