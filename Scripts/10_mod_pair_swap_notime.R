@@ -62,31 +62,40 @@ model{
     
     # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
-      
       # Flat likelihood of mating conditional on decision to mate
-      psi_raw[i, 1:nm, t] <- amating_f[i,t] * amating_m[1:nm,t] * (1 - arepartner[i,t]) * (1 - apairs[i+1,1:nm+1,t]) + arepartner[i,t] * apairs[i+1,1:nm+1,t]
+      psi_female[i, 1:nm, t] <- amating_f[i,t] * amating_m[1:nm,t] * (1 - arepartner[i,t]) +#* (1 - apairs[i+1,1:nm+1,t]) + 
+                             arepartner[i,t] * apairs[i+1,1:nm+1,t]
+    }
+      
+    # Exclude impossible partnerships based on repartner status 
+    for(j in 1:nm){
+      psi_raw_male[j,1:nf,t] <- apairs[1:nf + 1,j+1, t] * arepartner[1:nf,t]
+      psi_male[j,1:nf,t] <- (1-sum(psi_raw_male[j,1:nf,t]))*(1 - psi_raw_male[j,1:nf,t]) + sum(psi_raw_male[j,1:nf,t])*psi_raw_male[j,1:nf,t]
+    }
+      
+    psi_raw[1:nf, 1:nm, t] <- psi_female[1:nf, 1:nm, t] * t(psi_male[1:nm, 1:nf, t])
+    
+    # Attempts at partnerships forming
+    # Monogamous pairings only 
+    for(i in 1:nf){
       
       # Normalizing constant (with +1 adjustment for case of sum = zero)
       psi_norm[i,t] <- sum(psi_raw[i, 1:nm ,t]) + equals(sum(psi_raw[i, 1:nm ,t]), 0)
       
       # Normalize Multivariate Logit (SOFTMAX) Function 
       psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/psi_norm[i,t]
-    }
-    
-    # Attempts at partnerships forming
-    # Monogamous pairings only 
-    for(i in 1:nf){
       
       # Normalize with respect to males who found pairs
       for(j in 1:nm){
         psi_cond_raw[i,j,t] <- psi[i,j,t]*(1 - sum(apairs[1:i, j+1, t+1]))
       }
+      
       psi_norm_raw[i,t] <- sum(psi_cond_raw[i, 1:nm ,t]) + equals(sum(psi_cond_raw[i, 1:nm ,t]), 0)
       psi_cond[i,1:nm,t] <- psi_cond_raw[i,1:nm,t]/psi_norm_raw[i,t]
       
       # Assign pairs using normalized probability density 
       for(j in 1:nm){
-        psi_cond_norm[i,j,t] <- 1 #sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0)
+        psi_cond_norm[i,j,t] <- sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0)
         apairs[i+1,j+1,t+1] ~ dbern((psi_cond[i,j,t]/psi_cond_norm[i,j,t]) * (1 - sum(apairs[i+1, 1:j, t+1])))
       }
     }
