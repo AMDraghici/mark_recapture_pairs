@@ -70,42 +70,29 @@ model{
     # Exclude impossible partnerships based on repartner status 
     for(j in 1:nm){
       psi_raw_male[j,1:nf,t] <- apairs[1:nf + 1,j+1, t] * arepartner[1:nf,t]
-      psi_male[j,1:nf,t] <- (1-sum(psi_raw_male[j,1:nf,t]))*(1 - psi_raw_male[j,1:nf,t]) + sum(psi_raw_male[j,1:nf,t])*psi_raw_male[j,1:nf,t]
+      psi_male[j,1:nf,t] <- (1-sum(psi_raw_male[j,1:nf,t]))*(1 - psi_raw_male[j,1:nf,t]) + psi_raw_male[j,1:nf,t] 
     }
       
-    psi_raw[1:nf, 1:nm, t] <- psi_female[1:nf, 1:nm, t] * t(psi_male[1:nm, 1:nf, t])
+    psi[1:nf, 1:nm, t] <- psi_female[1:nf, 1:nm, t] * t(psi_male[1:nm, 1:nf, t])
     
     # Attempts at partnerships forming
     # Monogamous pairings only 
     for(i in 1:nf){
-      
-      # Normalizing constant (with +1 adjustment for case of sum = zero)
-      psi_norm[i,t] <- sum(psi_raw[i, 1:nm ,t]) + equals(sum(psi_raw[i, 1:nm ,t]), 0)
-      
-      # Normalize Multivariate Logit (SOFTMAX) Function 
-      psi[i,1:nm,t] <- psi_raw[i,1:nm,t]/psi_norm[i,t]
-      
+
       # Normalize with respect to males who found pairs
       for(j in 1:nm){
         psi_cond_raw[i,j,t] <- psi[i,j,t]*(1 - sum(apairs[1:i, j+1, t+1]))
       }
+      psi_cond[i,1:nm,t] <-  psi_cond_raw[i,1:nm,t]/(sum(psi_cond_raw[i, 1:nm ,t]) + equals(sum(psi_cond_raw[i, 1:nm ,t]), 0))
       
-      psi_norm_raw[i,t] <- sum(psi_cond_raw[i, 1:nm ,t]) + equals(sum(psi_cond_raw[i, 1:nm ,t]), 0)
-      psi_cond[i,1:nm,t] <- psi_cond_raw[i,1:nm,t]/psi_norm_raw[i,t]
-      
-      # Assign pairs using normalized probability density 
+      # Assign pairs using normalized probability density
       for(j in 1:nm){
-        psi_cond_norm[i,j,t] <- sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0)
-        apairs[i+1,j+1,t+1] ~ dbern((psi_cond[i,j,t]/psi_cond_norm[i,j,t]) * (1 - sum(apairs[i+1, 1:j, t+1])))
+        apairs[i+1,j+1,t+1] ~ dbern((psi_cond[i,j,t]/(sum(psi_cond[i,j:nm,t]) + equals(sum(psi_cond[i,j:nm,t]),0))) * (1 - sum(apairs[i+1, 1:j, t+1])))
       }
     }
     
-    # If no pairs assigned then assign single to boundaries 
-    for(i in 1:nf){ # Females
-      single_female[i, t] <- 1 - sum(apairs[i+1,1:nm+1,t+1]) # if no pairs then classify as single
-    }
-    
-    for(j in 1:nm){ # Males
+    # If no pairs for male designate as single
+    for(j in 1:nm){
       single_male[j, t] <- 1 - sum(apairs[1:nf+1,j+1,t+1]) # if no pairs then classify as single
     }
     

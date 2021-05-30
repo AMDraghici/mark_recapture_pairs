@@ -19,7 +19,7 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 # SIM DATA
 
-k = 4
+k = 5
 n = 50
 
 param_list <- list(
@@ -40,7 +40,7 @@ param_list <- list(
 )
 
 # # Pull individual dataset
-set.seed(100)
+set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 # 
@@ -76,11 +76,11 @@ cjs_data <- format_to_cjs(jags_data)
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 1e3, 
+par_settings <- list('n.iter' = 1e2, 
                      'n.thin' = 1,
-                     'n.burn' = 1e3,
+                     'n.burn' = 1e2,
                      'n.chains' = 2,
-                     'n.adapt' = 1e3)
+                     'n.adapt' = 1e2)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
@@ -95,10 +95,10 @@ jags_samples2 <- run_jags_parallel(jags_data,
                                   outname = "TESTING_MODEL2")
 
 
-gather_posterior_summary(jags_samples2) %>% 
-  add_true_values(param_list) %>% 
-  plot_caterpillar(params = jags_params) +
-  geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
+gather_posterior_summary(jags_samples2) #%>% 
+  # add_true_values(param_list) %>% 
+  # plot_caterpillar(params = jags_params) +
+  # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 
 # To do
 # Update Model Code
