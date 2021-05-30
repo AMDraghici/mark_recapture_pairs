@@ -32,10 +32,10 @@ logit <- function(p){
 }
 
 # #Inverse Logistic Function
-# inv.logit <- function(x){
-#   out <- (1+exp(-x))^(-1)
-#   return(out)
-# }
+inv.logit <- function(x){
+  out <- (1+exp(-x))^(-1)
+  return(out)
+}
 
 
 #Softmax Function
@@ -167,9 +167,10 @@ recapture <- function(current_state, j, p.m, p.f, rho){
 
 mate <- function(previous_state, j, delta){
   
-  # Chose to mate at time t? Previous state is 0/1 here
+  # Chose to mate at time t? Previous state represents survival at t-1 and is either 0 or 1 
+  # Vectorized and can represent many animals
   obs <- rbinom(length(previous_state), 1, delta[j]*previous_state)
-  
+  #Return Vector (or scalar) mating status 
   return(obs)
 }
 
@@ -181,10 +182,12 @@ mate <- function(previous_state, j, delta){
 construct_sexes <- function(n, prop.female = 0.5, random = F){
   # Percent split 
   prop.male <- 1 - prop.female
-  #Compute Genders by random sample or fixed count
+  #Compute Genders by random sample or fixed count with prob_female = prop.female
   if(random == T){
+    # Randomly sample gender with 
     sex <- sort(ifelse(rbinom(n,1,prop.female)==1,"F","M"))
-  } else {
+  } else { 
+    # Exactly 100 - prop.female*100% of population is male and prop.female*100% is female
     sex <- sort(c(rep("F",n * prop.female), rep("M", n * prop.male)))
   }
   
@@ -195,8 +198,8 @@ construct_sexes <- function(n, prop.female = 0.5, random = F){
 construct_init_entry <- function(n, k, random = F, inits = NULL, sort_init = F){
   
   # Select initial entry randomly?
-  if(random == T){
-    initial_entry = as.integer(sample(c(1:round(k/2)),size=n,replace=T))
+  if(random == T & is.null(inits)){
+    initial_entry <- as.integer(sample(c(1:round(k/2)),size=n,replace=T))
   } else {
     # If not do we have pre-specified values?
     if(!is.null(inits)){
@@ -207,6 +210,8 @@ construct_init_entry <- function(n, k, random = F, inits = NULL, sort_init = F){
       initial_entry <- initial_entry[1:n]
     }
   }
+  # Arrange by who enters first if desired 
+  # No impact on simulation but makes data look cleaner
   if(sort_init == T) initial_entry <- sort(initial_entry)
   
   # Return initial entries
@@ -289,6 +294,17 @@ construct_pairs <- function(sex,k){
   # List of objects
   pairs_list <- list(pairs_f = pairs_f, pairs_m = pairs_m, pairs = pairs)
   return(pairs_list)
+}
+
+# Event that previous pair reforms 
+construct_repartner <- function(sex, k){
+  # Number of females and males 
+  nf <- length(sex[sex == "F"]) 
+  nm <- length(sex[sex == "M"]) 
+  
+  repartner <- matrix(NA, nrow = nf, ncol = k)
+  repartner[,1] <- 0 
+  return(repartner)
 }
 
 # Construct pair coefficients
@@ -422,7 +438,7 @@ initialize_mating_choice <- function(n, k, initial_entry, delta, mating_f, matin
 }
 
 
-initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recruit, initial_entry, sex){
+initialize_partner_status <- function(n, coef_list, pairs, mating, recruit, initial_entry, sex){
   
   # When did the first animal get spotted
   i <- min(initial_entry) 
@@ -430,10 +446,11 @@ initialize_partner_status <- function(n, coef_list, betas, pairs, mating, recrui
   nf <- length(sex[sex == "F"]) # Number of females
   nm <- length(sex[sex == "M"]) # Number of males
   
-  psi_t <- compute_partner_probs(sex, i, coef_list, betas)
+  psi_t <- compute_partner_probs(sex, i, coef_list, c(1,1))
   
-  # Bias selection towards mates at the start 
-  psi_t[1:nf,1:nm] <- psi_t[1:nf,1:nm] + 100 
+  # Bias selection towards mates at the start
+  # Small hack but should work out to setting prob of single = 0 unless no mates are available
+  psi_t[1:nf,1:nm] <- psi_t[1:nf,1:nm] + 1e6 
   
   # Flat probability of partnerships
   prob_mate <- psi_t * mating[,,i] * recruit[,,i]
@@ -726,21 +743,57 @@ compute_mating <- function(sex, time, delta, recruit, recruit_f, recruit_m,
   return(mating_list)
 }
 
+# Does pair ij from t-1 reform with probability inv.logit(beta0 + beta1*history[i,j])
+compute_re_partner <- function(repartner, sex, coef_list, betas, pairs, mating, time){
+  nf <- length(sex[sex == "F"]) # Number of females
+  nm <- length(sex[sex == "M"]) # Number of males
+  
+  # Compute probability of reforming pairs
+  for(i in 1:nf){
+    previous_partner_i <- which(pairs[i,,time-1]==1) # Previous mate 
+    history_ij <- coef_list[[2]][i,previous_partner_i,time] # number of times this pair formed
+    prob <- inv.logit(c(1.0,history_ij) %*% unlist(betas)) # probability of reforming
+    prob <- prob * mating[i,previous_partner_i,time] # both have to be willing to mate to repair
+    prob <- prob * (1-pairs[i,,time-1][nm+1]) # if previously single then set to zero (st prob of new mate isnt biased downward)
+    repartner[i,time] <- rbinom(1,1,prob = prob) #  simulate re-pair status
+  }
+  return(repartner)
+}
+
+
 # compute partnerships at t
-compute_partnerships <- function(sex, coef_list, betas, pairs, mating, recruit, time){
+
+compute_partnerships <- function(sex, coef_list, pairs, mating, time, repartner){
   
   nf <- length(sex[sex == "F"]) # Number of females
   nm <- length(sex[sex == "M"]) # Number of males
   
   # Raw probability of mating (without conditions)
-  psi_t <- compute_partner_probs(sex, time, coef_list, betas)
+  psi_t <- compute_partner_probs(sex, time, coef_list, c(1,0))
   
   # Probability of partnerships with mating and recruitment included (surv is baked into mating)
-  prob_mate <- psi_t * mating[,,time] * recruit[,,time]
+  prob_mate <- psi_t * mating[,,time]
+  
+  # Make chance of not forming a pair if you're choosing to mate ~ 0
+  prob_mate[nf+1,] <- .Machine$double.eps
+  prob_mate[,nm+1] <- .Machine$double.eps
+  
+  # Incorporate repartnership probs
+  for(j in 1:nf){
+    prob_mate[j, ] <- prob_mate[j,] * (1 - repartner[j,time]) + pairs[j,,time-1] * repartner[j,time]
+  }
+  
+  for(i in 1:nm){
+    if(any(prob_mate[,i]==1)){
+      impossible_pair_index <- !(1:(nm+1)) %in% which(prob_mate[,i]==1)
+      prob_mate[impossible_pair_index,i] <- 0
+    }
+  }
   
   for(j in 1:nf){
     # Probability of partnerships forming for j -> 1:n
-    probj <- prob_mate[j,]
+    # If repartner = 1 then a pair reforms 
+    probj <- prob_mate[j,]/sum(prob_mate[j,]) 
     
     # Any pairs that have formed cannot form again
     if(j == 2){
@@ -759,6 +812,39 @@ compute_partnerships <- function(sex, coef_list, betas, pairs, mating, recruit, 
   # Return updated pairs matrix
   return(pairs)
 }
+
+# compute_partnerships <- function(sex, coef_list, betas, pairs, mating, recruit, time){
+#   
+#   nf <- length(sex[sex == "F"]) # Number of females
+#   nm <- length(sex[sex == "M"]) # Number of males
+#   
+#   # Raw probability of mating (without conditions)
+#   psi_t <- compute_partner_probs(sex, time, coef_list, betas)
+#   
+#   # Probability of partnerships with mating and recruitment included (surv is baked into mating)
+#   prob_mate <- psi_t * mating[,,time] * recruit[,,time]
+#   
+#   for(j in 1:nf){
+#     # Probability of partnerships forming for j -> 1:n
+#     probj <- prob_mate[j,]
+#     
+#     # Any pairs that have formed cannot form again
+#     if(j == 2){
+#       probj <- probj*c((1-pairs[1,1:nm,time]),1) #Remove pair j=1 from the prob (colsum only works on matrices)
+#     } else if(j > 2){
+#       probj <- probj*c((1-colSums(pairs[1:(j-1),1:nm,time])),1) #remove all preformed pairs
+#     }
+#     
+#     # Draw partnership
+#     pairs[j,,time] <- t(rmultinom(1,1,probj)) # assign a partner 
+#   }
+#   
+#   # Assign unmated males to singles row
+#   pairs[nf+1,,time] <- c(1-colSums(pairs[1:nf,1:nm,time]),1)
+#   
+#   # Return updated pairs matrix
+#   return(pairs)
+# }
 
 # Compute survival state at t
 compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, time, phi.m, phi.f, gam){
@@ -949,7 +1035,7 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
 
 
 
-compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
+compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -959,9 +1045,10 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
   # Produce inferred survival states
   apairs_f <- matrix(NA, nrow = nrow(pairs_f), ncol = ncol(pairs_f))
   apairs_m <- matrix(NA, nrow = nrow(pairs_m), ncol = ncol(pairs_m))
-  apairs <- array(NA, dim =c(nf+1,nm+1,k))
+  apairs <- array(NA, dim =c(nf+1,nm+1,k+1))
   amating_f <- matrix(NA, nrow = nf+1, ncol = k)
   amating_m <- matrix(NA, nrow = nm+1, ncol = k) 
+  arepartner <- matrix(NA, nrow = nf, ncol = k)
   
   # States based on observations
   pair_state <- c(NA, NA, NA, 1)
@@ -970,12 +1057,22 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
   for(i in 1:nf){
     for(time in 1:k){
       
+      if(time >=2){
+        x_ijt_minus_1 <- x_ijt 
+      } else{
+        x_ijt_minus_1 <- 4
+      }
+      
       # Joint Recapture of pair i and pf[i,t] at time t
       x_ijt <- rpair[i, pairs_f[i,time] , time]
       
       # Uncouple Pair Index
       apairs_f[i, time] <- pair_state[x_ijt] * pairs_f[i, time]
       amating_f[i, time] <- pair_state[x_ijt]
+      
+      # Observed Repartnership
+      arepartner[i,time] <- pair_state[x_ijt] * pair_state[x_ijt_minus_1] * repartner[i, time]
+      
       if(!is.na(pair_state[x_ijt]))  amating_m[ apairs_f[i, time], time] <- pair_state[x_ijt]
     }
   }
@@ -1005,9 +1102,9 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
     
     for(time in time_index){
       # Assign states 
-      apairs[i+1,,time] <- 0
-      apairs[,apairs_f[i, time]+1, time] <- 0
-      apairs[i+1,apairs_f[i, time]+1, time] <- 1
+      apairs[i+1,,time+1] <- 0
+      apairs[,apairs_f[i, time]+1, time+1] <- 0
+      apairs[i+1,apairs_f[i, time]+1, time+1] <- 1
       
     }
   }
@@ -1018,13 +1115,16 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex){
   
   apairs[1:(nf+1),1,] <- 0
   apairs[1,1:(nm+1),] <- 0
+  apairs[,,1] <- 0 
+  arepartner[,1] <- 0 
     
   # Store results in a list
   pairs_list <- list(apairs_m = apairs_m,
                      apairs_f = apairs_f,
                      apairs = apairs,
                      amating_f = amating_f,
-                     amating_m = amating_m)
+                     amating_m = amating_m,
+                     arepartner = arepartner)
   
   # Return List
   return(pairs_list)
@@ -1067,6 +1167,7 @@ simulate_cr_data <- function(n,
   mating_f <- mating_list[["mating_f"]] 
   mating_m <- mating_list[["mating_m"]]  
   mating <- mating_list[["mating"]]
+  repartner <- construct_repartner(sex, k)
   pairs_list <- construct_pairs(sex, k)
   pairs_f <- pairs_list[["pairs_f"]]
   pairs_m <- pairs_list[["pairs_m"]]
@@ -1078,7 +1179,6 @@ simulate_cr_data <- function(n,
   spair <- survival_list[["spair"]]
   rpair <- construct_recapture(sex,k)
   
-  
   # Initialize Data 
   initial_time <- min(initial_entry)
   recruit_list <- initialize_recruit(sex, k, initial_entry, recruit_f, recruit_m, recruit)
@@ -1089,7 +1189,7 @@ simulate_cr_data <- function(n,
   mating_f <- mating_list_init[["mating_f"]] 
   mating_m <- mating_list_init[["mating_m"]]  
   mating <- mating_list_init[["mating"]]
-  pairs <- initialize_partner_status(n, coef_list, betas, pairs, mating, recruit, initial_entry, sex)
+  pairs <- initialize_partner_status(n, coef_list, pairs, mating, recruit, initial_entry, sex)
   coef_list <- update_history(coef_list, pairs, initial_time + 1, sex)
   pairs_ind_list <- propogate_partner_state(pairs, sex, pairs_f, pairs_m, initial_time)
   pairs_f <- pairs_ind_list[["pairs_f"]]
@@ -1112,8 +1212,11 @@ simulate_cr_data <- function(n,
     mating_m <- mating_list_t[["mating_m"]]  
     mating <- mating_list_t[["mating"]]
     
+    # Will previous pairs from time t-1 reform? 
+    repartner <- compute_re_partner(repartner, sex, coef_list, betas, pairs, mating, time)
+    
     # Compute partnership probability at t based on surv at t-1
-    pairs <- compute_partnerships(sex, coef_list, betas, pairs, mating, recruit, time)
+    pairs <- compute_partnerships(sex, coef_list, pairs, mating, time, repartner)
     # Update partner histories going into next survival check (at time k we don't need this)
     if(time < k){
       coef_list <- update_history(coef_list, pairs, time + 1, sex)
@@ -1146,11 +1249,12 @@ simulate_cr_data <- function(n,
   am <- asurv_list[["am"]]
   
   # Hidden Partnerships and mate choice
-  apairs_list <- compute_hidden_pairs(pairs_f, pairs_m, rpair, k, sex)
+  apairs_list <- compute_hidden_pairs(pairs_f, pairs_m, rpair, k, sex, repartner)
   apairs  <- apairs_list[["apairs"]]
   amating_f <- apairs_list[["amating_f"]]
   amating_m <- apairs_list[["amating_m"]]
-
+  arepartner <- apairs_list[["arepartner"]]
+  
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     
@@ -1174,11 +1278,13 @@ simulate_cr_data <- function(n,
     sf = sf, # true survival of females
     sm = sm, # true survival of males
     spair = spair, # true survival of partnerships
+    repartner = repartner, # whether partner from time t-1 was repicked (female x time)
     
     # Observed /Inferred states (Missing Values are possible)
     af = af,  # Female Survival with missing values
     am = am,  # Male Survival with missing values
     apairs  = apairs, # Joint Pairs Matrices (array across time)
+    arepartner = arepartner, # repartner with inferred states 
     amating_f = amating_f, # Mating Status Females at T
     amating_m = amating_m,  # Mating Status Males at T
     recap_f = recap_f, # Observed Recapture of Females
