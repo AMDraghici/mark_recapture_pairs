@@ -20,7 +20,7 @@ out_dir <- getwd() %+% "/Output/"
 # SIM DATA
 
 k = 5
-n = 50
+n = 10
 
 param_list <- list(
   n = n, 
@@ -43,6 +43,11 @@ param_list <- list(
 set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
+
+
+jags_data$psi <- jags_data$apairs
+jags_data$psi[is.na(jags_data$psi)] <- 1
+jags_data$psi
 # 
 # 
 # # Multiple Datasets using parallel
