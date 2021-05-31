@@ -51,8 +51,8 @@ model{
     
     # Choose to re-form pairs 
     for(i in 1:nf){
-      logit(prob_repartner[i,t]) <- beta0 + beta1*histories[i, pairs_f[i,t] , t]
-      arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[pairs_f[i,t],t])
+      prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t])
+      arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
     }
     
     # 4. Mate Selection -------------------------------------------------------------------------------------------------------------------
@@ -63,7 +63,10 @@ model{
     # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
       # Flat likelihood of mating conditional on decision to mate
-      psi_raw[i, 1:nm, t] <- psi[i,1:nm,t] * amating_f[i,t] * amating_m[1:nm,t]
+      for(j in 1:nm){
+        psi_raw[i, j, t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1 - arepartner[i,t]) +
+          arepartner[i,t]*equals(apairs_f[i,t],j)
+      }
     }
     
     # Attempts at partnerships forming
@@ -93,8 +96,8 @@ model{
       
       # Probability of female surviving given partnership and partner recapture status
       phi.totalF[i, t] <- single_female[i,t] * PhiF + # female was single
-        (1 - single_female[i,t]) * (am[pairs_f[i,t+1],t+1] * (Phifm/PhiM) + # Male mated and female surived
-                                    (1 - am[pairs_f[i,t+1],t+1]) * (Phim0/(1-PhiM))) # Male mated and female perished
+        (1 - single_female[i,t]) * (am[apairs_f[i,t+1],t+1] * (Phifm/PhiM) + # Male mated and female surived
+                                    (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # Male mated and female perished
       
       # Draw Survival Event 
       af[i, t+1] ~ dbern(phi.totalF[j,t] * af[i,t])    
@@ -114,8 +117,8 @@ model{
       
       # Probability of female being captured given partnership and partner recapture status
       p.totalF[i, t] <- single_female[i,t] * PM + # Female was single
-        (1 - single_female[i,t]) * (recap_m[pairs_f[i,t+1],t] * (Pfm/PM) + # Male mated and female captured
-                                    (1 - recap_m[pairs_f[i,t+1],t]) * (Pm0/(1-PM))) # Male mated and female not captured
+        (1 - single_female[i,t]) * (recap_m[apairs_f[i,t+1],t] * (Pfm/PM) + # Male mated and female captured
+                                    (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Male mated and female not captured
       
       # Draw Recapture Probability 
       recap_f[i, t] ~ dbern(p.totalF[i,t]*af[i,t+1])    
