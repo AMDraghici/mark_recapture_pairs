@@ -44,10 +44,13 @@ set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 
+# 
+# jags_data$psi <- jags_data$apairs
+# jags_data$psi[is.na(jags_data$psi)] <- 1
+# jags_data$psi <- jags_data$psi[2:6,2:6,]
+# 
+# jags_data$apairs_f <- cbind(rep(6,k),jags_data$apairs_f)
 
-jags_data$psi <- jags_data$apairs
-jags_data$psi[is.na(jags_data$psi)] <- 1
-jags_data$psi
 # 
 # 
 # # Multiple Datasets using parallel

@@ -69,9 +69,13 @@ model{
       }
     }
     
+    
+    #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR MALE SELECTION HERE  !!!!!!!!!!!!!!!!!!!!!!!
+    
     # Attempts at partnerships forming
     # Monogamous pairings only 
     for(i in 1:nf){
+     #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR ALREADY CHOSEN PARTNERS HERE!!!!!!!!!!!!!!!!
       apairs_f[i,t+1] ~ dcat(c(psi_raw[i,1:nm,t],equals(sum(psi_raw[i,1:nm,t]),0)))
       single_female[i,t] = equals(apairs_f[i,t+1],nm+1)
     }
@@ -100,7 +104,7 @@ model{
                                     (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # Male mated and female perished
       
       # Draw Survival Event 
-      af[i, t+1] ~ dbern(phi.totalF[j,t] * af[i,t])    
+      af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t])    
     }
     
     # 6. Joint Recapture --------------------------------------------------------------------------------------------------------------------

@@ -1254,6 +1254,8 @@ simulate_cr_data <- function(n,
   amating_f <- apairs_list[["amating_f"]]
   amating_m <- apairs_list[["amating_m"]]
   arepartner <- apairs_list[["arepartner"]]
+  apairs_f <- apairs_list[["apairs_f"]]
+  apairs_m <- apairs_list[["apairs_m"]]
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
@@ -1284,6 +1286,8 @@ simulate_cr_data <- function(n,
     af = af,  # Female Survival with missing values
     am = am,  # Male Survival with missing values
     apairs  = apairs, # Joint Pairs Matrices (array across time)
+    apairs_f = apairs_f,
+    apairs_m = apairs_m,
     arepartner = arepartner, # repartner with inferred states 
     amating_f = amating_f, # Mating Status Females at T
     amating_m = amating_m,  # Mating Status Males at T
