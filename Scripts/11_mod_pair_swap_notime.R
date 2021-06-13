@@ -51,14 +51,12 @@ model{
     
     # Choose to re-form pairs 
     for(i in 1:nf){
-      prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t])
-      arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
+      prob_repartner[i,t] <- ilogit(beta1*histories[i, apairs_f[i,t] , t])
+      arepartner[i,t] ~ dbern((1-equals(t,1)) * prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
     }
     
     # 4. Mate Selection -------------------------------------------------------------------------------------------------------------------
-    # JAGs does not play well with multinomial trials
-    # Solution - series of conditional binomial trials with constraints for singles
-    # Probabilities have to be unconditioned after sampling
+    # Use Categorical Distribution to classify mates
     
     # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
@@ -77,13 +75,13 @@ model{
     for(i in 1:nf){
      #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR ALREADY CHOSEN PARTNERS HERE!!!!!!!!!!!!!!!!
       apairs_f[i,t+1] ~ dcat(c(psi_raw[i,1:nm,t],equals(sum(psi_raw[i,1:nm,t]),0)))
-      single_female[i,t] = equals(apairs_f[i,t+1],nm+1)
+      single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
     }
     
     # Update Total History for Next Time Step
-    for(i in 1:nf){
-      for(j in 1:nm){
-        histories[i, j, t+1] <- equals(apairs_f[i,t+1],j)
+    for(i in  1:nf){
+      for(j in  1:(nm+1)){
+        histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t+1],j)*(1-equals(apairs_f[i,t+1],(nm+1)))
       }
     }
     
@@ -144,7 +142,6 @@ model{
   # Pairs reforming
   ##beta0 ~ dnorm(0, 1/4)
   beta1 ~ dnorm(0, 1/4)
-  beta0 ~ dnorm(0, 1/4)
   
   # Survival Terms
   

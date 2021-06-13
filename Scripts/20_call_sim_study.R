@@ -4,6 +4,7 @@ library(tidyverse)
 library(readxl)
 library(lubridate)
 
+setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
 dat_dir <- getwd() %+% "/Data/FW__Harlequin_Ducks/"
@@ -19,8 +20,8 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 # SIM DATA
 
-k = 5
-n = 10
+k = 8
+n = 50
 
 param_list <- list(
   n = n, 
@@ -45,11 +46,11 @@ jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 
 # 
-# jags_data$psi <- jags_data$apairs
-# jags_data$psi[is.na(jags_data$psi)] <- 1
-# jags_data$psi <- jags_data$psi[2:6,2:6,]
-# 
-# jags_data$apairs_f <- cbind(rep(6,k),jags_data$apairs_f)
+jags_data$psi <- jags_data$apairs
+jags_data$psi[is.na(jags_data$psi)] <- 1
+jags_data$psi <- jags_data$psi[1:jags_data$nf+1,1:jags_data$nm+1,]
+jags_data$psi <- jags_data$psi[,,1:jags_data$k+1]
+jags_data$apairs_f <- cbind(rep((jags_data$nf+1),k),jags_data$apairs_f)
 
 # 
 # 
@@ -84,15 +85,15 @@ cjs_data <- format_to_cjs(jags_data)
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 1e2, 
-                     'n.thin' = 1,
-                     'n.burn' = 1e2,
-                     'n.chains' = 2,
-                     'n.adapt' = 1e2)
+par_settings <- list('n.iter' = 1e4, 
+                     'n.thin' = 10,
+                     'n.burn' = 1e3,
+                     'n.chains' = 4,
+                     'n.adapt' = 1e3)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
-jags_model <- script_dir %+% "/10_mod_pair_swap_notime.R"
+jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 
 
 jags_samples2 <- run_jags_parallel(jags_data, 
