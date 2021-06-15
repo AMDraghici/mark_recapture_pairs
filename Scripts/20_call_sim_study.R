@@ -20,8 +20,8 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 # SIM DATA
 
-k = 8
-n = 50
+k = 5
+n = 20
 
 param_list <- list(
   n = n, 
@@ -30,7 +30,7 @@ param_list <- list(
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0.4, k),
+  gam = rep(0.6, k),
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
   rho = rep(0.70, k),
@@ -50,7 +50,16 @@ jags_data$psi <- jags_data$apairs
 jags_data$psi[is.na(jags_data$psi)] <- 1
 jags_data$psi <- jags_data$psi[1:jags_data$nf+1,1:jags_data$nm+1,]
 jags_data$psi <- jags_data$psi[,,1:jags_data$k+1]
-jags_data$apairs_f <- cbind(rep((jags_data$nf+1),k),jags_data$apairs_f)
+
+psi <- array(NA,dim = c(jags_data$nf,jags_data$nm+1,jags_data$k))
+
+for(i in 1:jags_data$k){
+  psi[,,i] <- cbind(jags_data$psi[,,i],rep(0,jags_data$nm))
+}
+
+jags_data$psi <- psi
+
+jags_data$apairs_f <- cbind(rep((jags_data$nf+1),nrow(jags_data$apairs_f)),jags_data$apairs_f)
 
 # 
 # 

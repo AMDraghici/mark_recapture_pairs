@@ -51,8 +51,8 @@ model{
     
     # Choose to re-form pairs 
     for(i in 1:nf){
-      prob_repartner[i,t] <- ilogit(beta1*histories[i, apairs_f[i,t] , t])
-      arepartner[i,t] ~ dbern((1-equals(t,1)) * prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
+      prob_repartner[i,t] <- ilogit(beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
+      arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
     }
     
     # 4. Mate Selection -------------------------------------------------------------------------------------------------------------------
@@ -67,14 +67,32 @@ model{
       }
     }
     
+    #  Exclude Males who are now unavailable
+    for(j in 1:nm){
+      
+      # Check if male j has a partner 
+      for(i in 1:nf){
+        male_taken_ijt[i,j,t] <- equals(apairs_f[i,t],j) * arepartner[i,t]
+      }
+      # If there is a one then they do have a partner that they are repairing with 
+      male_taken_jt[j,t] <- sum(male_taken_ijt[1:nf,j,t])
+      
+      # Add Exclusion
+      for(i in 1:nf){
+        # Remove all possible pairings with females who aren't repairing at t+1 for repairing males
+        # (repairing females already have the correct exclusion applied)
+        psi_cond[i,j,t] <- psi_raw[i, j, t] * (arepartner[i,t] + (1- arepartner[i,t])*(1-male_taken_jt[j,t]))
+      }
+    }
     
-    #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR MALE SELECTION HERE  !!!!!!!!!!!!!!!!!!!!!!!
+    
+   
     
     # Attempts at partnerships forming
     # Monogamous pairings only 
     for(i in 1:nf){
      #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR ALREADY CHOSEN PARTNERS HERE!!!!!!!!!!!!!!!!
-      apairs_f[i,t+1] ~ dcat(c(psi_raw[i,1:nm,t],equals(sum(psi_raw[i,1:nm,t]),0)))
+      apairs_f[i,t+1] ~ dcat(c(psi_cond[i,1:nm,t],equals(sum(psi_raw[i,1:nm,t]),0)))
       single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
     }
     
