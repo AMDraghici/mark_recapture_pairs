@@ -85,21 +85,18 @@ model{
       }
     }
     
-    
-   
-    
     # Attempts at partnerships forming
     # Monogamous pairings only 
     for(i in 1:nf){
      #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR ALREADY CHOSEN PARTNERS HERE!!!!!!!!!!!!!!!!
-      apairs_f[i,t+1] ~ dcat(c(psi_cond[i,1:nm,t],equals(sum(psi_raw[i,1:nm,t]),0)))
+      apairs_f[i,t+1] ~ dcat(c(psi_cond[i,1:nm,t],equals(sum(psi_cond[i,1:nm,t]),0)))
       single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
     }
     
     # Update Total History for Next Time Step
     for(i in  1:nf){
       for(j in  1:(nm+1)){
-        histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t+1],j)*(1-equals(apairs_f[i,t+1],(nm+1)))
+        histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t+1],j)*(1-single_female[i,t])
       }
     }
     
@@ -136,7 +133,7 @@ model{
     for(i in 1:nf){
       
       # Probability of female being captured given partnership and partner recapture status
-      p.totalF[i, t] <- single_female[i,t] * PM + # Female was single
+      p.totalF[i, t] <- single_female[i,t] * PF + # Female was single
         (1 - single_female[i,t]) * (recap_m[apairs_f[i,t+1],t] * (Pfm/PM) + # Male mated and female captured
                                     (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Male mated and female not captured
       
@@ -155,7 +152,7 @@ model{
   }
   
   # Attempt to Mate 
-  delta ~ dbeta(1,1)
+  delta ~ dbeta(3,2)
   
   # Pairs reforming
   ##beta0 ~ dnorm(0, 1/4)
@@ -194,8 +191,8 @@ model{
   odds.PhiF <- PhiF/(1 - PhiF)
   
   ##Survival Rates M/F
-  PhiF ~ dbeta(2,2)
-  PhiM ~ dbeta(2,2)
+  PhiF ~ dbeta(3,3)
+  PhiM ~ dbeta(3,3)
   
   # Recapture Terms
   ### Derived Parameters ####
@@ -231,6 +228,6 @@ model{
   ### Prior Parameters ####
   
   # Recapture Rates M/F
-  PF ~ dbeta(2,2)
-  PM ~ dbeta(2,2)
+  PF ~ dbeta(3,3)
+  PM ~ dbeta(3,3)
 }
