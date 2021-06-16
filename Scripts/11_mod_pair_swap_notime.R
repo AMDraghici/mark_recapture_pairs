@@ -26,7 +26,7 @@ model{
   }
   
   # Initialize History Array (All Zero at time 1)
-  for(i in 1:(nf+1)){
+  for(i in 1:(nf)){
     for(j in 1:(nm+1)){
       histories[i, j, 1] <- 0
     }
@@ -63,7 +63,7 @@ model{
       # Flat likelihood of mating conditional on decision to mate
       for(j in 1:nm){
         psi_raw[i, j, t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1 - arepartner[i,t]) +
-          arepartner[i,t]*equals(apairs_f[i,t],j)
+          arepartner[i,t] * equals(apairs_f[i,t],j)
       }
     }
     
