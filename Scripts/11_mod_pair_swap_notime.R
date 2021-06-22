@@ -70,12 +70,8 @@ model{
     #  Exclude Males who are now unavailable
     for(j in 1:nm){
       
-      # Check if male j has a partner 
-      for(i in 1:nf){
-        male_taken_ijt[i,j,t] <- equals(apairs_f[i,t],j) * arepartner[i,t]
-      }
-      # If there is a one then they do have a partner that they are repairing with 
-      male_taken_jt[j,t] <- sum(male_taken_ijt[1:nf,j,t])
+      # Is male j available at time t 
+      male_taken_jt[j,t] <- sum(equals(apairs_f[1:nf,t],j)*arepartner[1:nf,t])
       
       # Add Exclusion
       for(i in 1:nf){
@@ -85,11 +81,26 @@ model{
       }
     }
     
+    # Initialize choice selection
+    psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
+    apairs_f[1,t+1] ~ dcat(psi_cond2[1, 1:(nm+1), t])
+    single_female[1,t] <- equals(apairs_f[1,t+1],nm+1)
+    
     # Attempts at partnerships forming
     # Monogamous pairings only 
-    for(i in 1:nf){
-     #  !!!!!!!!!!!!!!!!!!!!!!! NEED TO ADD FILTER FOR ALREADY CHOSEN PARTNERS HERE!!!!!!!!!!!!!!!!
-      apairs_f[i,t+1] ~ dcat(c(psi_cond[i,1:nm,t],equals(sum(psi_cond[i,1:nm,t]),0)))
+    for(i in 2:nf){
+     
+      # Remove Formed Pairs
+      for(j in 1:nm){
+        psi_cond2[i,j,t] <- psi_cond[i,j,t]*(1-sum(equals(apairs_f[1:(i-1),t+1],j)))
+      }
+      
+      psi_cond2[i,(nm+1),t] <- equals(sum(psi_cond2[i,1:nm,t]),0)
+      
+      # Find mate for i
+      apairs_f[i,t+1] ~ dcat(psi_cond2[i, 1:(nm+1), t])
+      
+      # Designate as single if no males available or if choosing not to mate
       single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
     }
     

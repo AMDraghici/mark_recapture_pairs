@@ -21,7 +21,7 @@ out_dir <- getwd() %+% "/Output/"
 # SIM DATA
 
 k = 5
-n = 20
+n = 50
 
 param_list <- list(
   n = n, 
