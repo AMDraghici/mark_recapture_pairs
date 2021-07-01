@@ -1118,13 +1118,32 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   apairs[,,1] <- 0 
   arepartner[,1] <- 0 
     
+  # add dummy index (used to make JAGS/NIMBLE code cleaner)
+  apairs_f <- cbind(rep((nf+1),nrow(apairs_f)),apairs_f)
+  apairs_m <- cbind(rep((nm+1),nrow(apairs_m)),apairs_m)
+  
+  
+  # Build index of possible pairings 
+  # Used for homogenous pair assignment mechanism
+  psi <- apairs
+  psi[is.na(psi)] <- 1
+  psi <- psi[1:nf+1,1:nm+1,]
+  psi <- psi[,,1:k+1]
+  
+  psi_array <- array(NA,dim = c(nf,nm+1,k))
+  
+  for(t in 1:k){
+    psi_array[,,t] <- cbind(psi[,,t],rep(0,nm))
+  }
+  
   # Store results in a list
   pairs_list <- list(apairs_m = apairs_m,
                      apairs_f = apairs_f,
                      apairs = apairs,
                      amating_f = amating_f,
                      amating_m = amating_m,
-                     arepartner = arepartner)
+                     arepartner = arepartner,
+                     psi = psi_array)
   
   # Return List
   return(pairs_list)
@@ -1256,6 +1275,7 @@ simulate_cr_data <- function(n,
   arepartner <- apairs_list[["arepartner"]]
   apairs_f <- apairs_list[["apairs_f"]]
   apairs_m <- apairs_list[["apairs_m"]]
+  psi <- apairs_list[["psi"]]
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
@@ -1281,6 +1301,7 @@ simulate_cr_data <- function(n,
     sm = sm, # true survival of males
     spair = spair, # true survival of partnerships
     repartner = repartner, # whether partner from time t-1 was repicked (female x time)
+    psi = psi, # Pairs that may exist (not excluded due to already formed pairs)
     
     # Observed /Inferred states (Missing Values are possible)
     af = af,  # Female Survival with missing values

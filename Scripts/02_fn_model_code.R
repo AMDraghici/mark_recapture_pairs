@@ -137,7 +137,7 @@ run_jags_parallel <- function(jags_data,
     
     #Save JAGS Samples
     outfile_samples <- out_dir %+% outfile_name %+% ".rds"
-    saveRDS(jags_samples,outfile_samples)
+    #saveRDS(jags_samples,outfile_samples)
     
     #Save Jags Initial Values
     #outfile_inits <- out_dir %+% outinit_name %+% ".rds"

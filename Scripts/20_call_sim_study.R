@@ -4,7 +4,7 @@ library(tidyverse)
 library(readxl)
 library(lubridate)
 
-setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
+#setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
 dat_dir <- getwd() %+% "/Data/FW__Harlequin_Ducks/"
@@ -20,8 +20,8 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 # SIM DATA
 
-k = 5
-n = 50
+k = 4
+n = 10
 
 param_list <- list(
   n = n, 
@@ -34,34 +34,34 @@ param_list <- list(
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
   rho = rep(0.70, k),
-  betas = list(beta0 = 0.0, beta1 = 3),
+  betas = list(beta0 = 0.0, beta1 = -3),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n)
 )
 
 # # Pull individual dataset
-set.seed(42)
+set.seed(100)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 
 # 
-jags_data$psi <- jags_data$apairs
-jags_data$psi[is.na(jags_data$psi)] <- 1
-jags_data$psi <- jags_data$psi[1:jags_data$nf+1,1:jags_data$nm+1,]
-jags_data$psi <- jags_data$psi[,,1:jags_data$k+1]
-
-psi <- array(NA,dim = c(jags_data$nf,jags_data$nm+1,jags_data$k))
-
-for(i in 1:jags_data$k){
-  psi[,,i] <- cbind(jags_data$psi[,,i],rep(0,jags_data$nm))
-}
-
-jags_data$psi <- psi
-
-jags_data$apairs_f <- cbind(rep((jags_data$nf+1),nrow(jags_data$apairs_f)),jags_data$apairs_f)
-
+# jags_data$psi <- jags_data$apairs
+# jags_data$psi[is.na(jags_data$psi)] <- 1
+# jags_data$psi <- jags_data$psi[1:jags_data$nf+1,1:jags_data$nm+1,]
+# jags_data$psi <- jags_data$psi[,,1:jags_data$k+1]
 # 
+# psi <- array(NA,dim = c(jags_data$nf,jags_data$nm+1,jags_data$k))
+# 
+# for(i in 1:jags_data$k){
+#   psi[,,i] <- cbind(jags_data$psi[,,i],rep(0,jags_data$nm))
+# }
+# 
+# jags_data$psi <- psi
+# 
+# jags_data$apairs_f <- cbind(rep((jags_data$nf+1),nrow(jags_data$apairs_f)),jags_data$apairs_f)
+# 
+# # 
 # 
 # # Multiple Datasets using parallel
 # sim_cr_dat(parameter_list = param_list, iterations =  2)
@@ -97,7 +97,7 @@ jags_data$apairs_f <- cbind(rep((jags_data$nf+1),nrow(jags_data$apairs_f)),jags_
 par_settings <- list('n.iter' = 1e4, 
                      'n.thin' = 10,
                      'n.burn' = 1e3,
-                     'n.chains' = 4,
+                     'n.chains' = 2,
                      'n.adapt' = 1e3)
 
 
