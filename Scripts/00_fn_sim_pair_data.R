@@ -754,7 +754,7 @@ compute_re_partner <- function(repartner, sex, coef_list, betas, pairs, mating, 
     history_ij <- coef_list[[2]][i,previous_partner_i,time] # number of times this pair formed
     prob <- inv.logit(c(1.0,history_ij) %*% unlist(betas)) # probability of reforming
     prob <- prob * mating[i,previous_partner_i,time] # both have to be willing to mate to repair
-    prob <- prob * (1-pairs[i,,time-1][nm+1]) # if previously single then set to zero (st prob of new mate isnt biased downward)
+    prob <- prob * (1-pairs[i,nm+1,time-1]) # if previously single then set to zero (st prob of new mate isnt biased downward)
     repartner[i,time] <- rbinom(1,1,prob = prob) #  simulate re-pair status
   }
   return(repartner)
@@ -774,13 +774,12 @@ compute_partnerships <- function(sex, coef_list, pairs, mating, time, repartner)
   # Probability of partnerships with mating and recruitment included (surv is baked into mating)
   prob_mate <- psi_t * mating[,,time]
   
-  # Make chance of not forming a pair if you're choosing to mate ~ 0
-  prob_mate[nf+1,] <- .Machine$double.eps
-  prob_mate[,nm+1] <- .Machine$double.eps
-  
   # Incorporate repartnership probs
   for(j in 1:nf){
-    prob_mate[j, ] <- prob_mate[j,] * (1 - repartner[j,time]) + pairs[j,,time-1] * repartner[j,time]
+    prob_mate[j, ] <- prob_mate[j,] *(1-pairs[j,,time-1])* (1 - repartner[j,time]) + pairs[j,,time-1] * repartner[j,time]
+      #prob_mate[j,] * (1 - repartner[j,time]) + pairs[j,,time-1] * repartner[j,time]
+      # prob_mate[j,] *(1-pairs[j,,time-1])* (1 - repartner[j,time]) + pairs[j,,time-1] * repartner[j,time]
+    rm(j)
   }
   
   for(i in 1:nm){
@@ -788,7 +787,12 @@ compute_partnerships <- function(sex, coef_list, pairs, mating, time, repartner)
       impossible_pair_index <- !(1:(nm+1)) %in% which(prob_mate[,i]==1)
       prob_mate[impossible_pair_index,i] <- 0
     }
+    rm(i)
   }
+  
+  # Make chance of not forming a pair if you're choosing to mate ~ 0
+  prob_mate[nf+1,] <- .Machine$double.eps
+  prob_mate[,nm+1] <- .Machine$double.eps
   
   for(j in 1:nf){
     # Probability of partnerships forming for j -> 1:n
@@ -799,7 +803,7 @@ compute_partnerships <- function(sex, coef_list, pairs, mating, time, repartner)
     if(j == 2){
       probj <- probj*c((1-pairs[1,1:nm,time]),1) #Remove pair j=1 from the prob (colsum only works on matrices)
     } else if(j > 2){
-      probj <- probj*c((1-colSums(pairs[1:(j-1),1:nm,time])),1) #remove all preformed pairs
+      probj <- probj*c((1-colSums(pairs[1:(j-1),1:nm,time])),1) #remove all pre-formed pairs
     }
     
     # Draw partnership
@@ -1109,6 +1113,23 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
     }
   }
   
+  # If previous partner is with another mate (that was observed) then arepartner must be zero
+  for(time in 2:k){
+    for(i in 1:nf){
+      
+      mask1 <- is.na(arepartner[i,time]) #is this case unknown
+      mask2 <- !is.na(apairs_f[i,time-1]) # do we know their last partner
+      mask3 <- ifelse(mask2,any(apairs_f[i,time-1] == c(nm+1,apairs_f[-i,time]), na.rm = T),FALSE) # if partner has a new mate or if past state was single
+      
+      # ...Then repartner is known zero
+      if(mask1 & mask2 & mask3){
+        arepartner[i,time] <- 0
+      } else {
+        next
+      }
+    }
+  }
+  
   # Dummy states always available
   amating_f[(nf+1),1:k] <- 1
   amating_m[(nm+1),1:k] <- 1
@@ -1175,7 +1196,6 @@ simulate_cr_data <- function(n,
   }
   
   # Generate SKeleton Data Structures
-  #browser()
   sex <- construct_sexes(n, prop.female, rand_sex)
   initial_entry <- construct_init_entry(n, k, rand_init,init) 
   recruit_list <- construct_recruit(n, k, sex)
@@ -1221,7 +1241,7 @@ simulate_cr_data <- function(n,
   
   # Simulate Fates
   for(time in (initial_time+1):k){
-    
+    print(time)
     # Compute mating status at t 
     mating_list_t <- compute_mating(sex, time, delta, 
                                     recruit, recruit_f, recruit_m, 
@@ -1325,7 +1345,7 @@ sim_dat <- function(parameter_list){
   model_data <- do.call(simulate_cr_data, parameter_list)
 }
 
-# 7. Format Data for Different Purposes -------------------------------------------------------------------------------
+# 8. Format Data for Alternate Models -------------------------------------------------------------------------------
 
 
 format_to_cjs <- function(model_data){

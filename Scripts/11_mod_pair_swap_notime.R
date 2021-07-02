@@ -61,8 +61,10 @@ model{
     # Build Homogeneous Partnership probabilities 
     for(i in 1:nf){
       # Flat likelihood of mating conditional on decision to mate
+      # If repairing then force partner to be only choice
+      # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
-        psi_raw[i, j, t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1 - arepartner[i,t]) +
+        psi_raw[i, j, t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1 - equals(apairs_f[i,t],j)) * (1 - arepartner[i,t]) +
           arepartner[i,t] * equals(apairs_f[i,t],j)
       }
     }
@@ -95,6 +97,7 @@ model{
         psi_cond2[i,j,t] <- psi_cond[i,j,t]*(1-sum(equals(apairs_f[1:(i-1),t+1],j)))
       }
       
+      #Add case in which no pairs are available 
       psi_cond2[i,(nm+1),t] <- equals(sum(psi_cond2[i,1:nm,t]),0)
       
       # Find mate for i
@@ -116,7 +119,7 @@ model{
     
     # Marginal Survival Event for Males in the Population (P[Y^M_T])
     for(j in 1:nm){
-      am[j,t+1] ~ dbern(PhiM * am[j,t])
+      am[j,t+1] ~ dbern(PhiM * am[j,t] * recruit_m[j,t])
     }
     
     # Marginal Recapture Event for Males in the Population (P[X^M_T|X^F_T])
@@ -128,7 +131,7 @@ model{
                                     (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # Male mated and female perished
       
       # Draw Survival Event 
-      af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t])    
+      af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t] * recruit_f[i,t])    
     }
     
     # 6. Joint Recapture --------------------------------------------------------------------------------------------------------------------
@@ -136,7 +139,7 @@ model{
     
     # Marginal Recapture Event for Males in the Population (P[X^M_T])
     for(j in 1:nm){
-      recap_m[j,t] ~ dbern(PM * am[j,t+1])
+      recap_m[j,t] ~ dbern(PM * am[j,t+1] * recruit_m[j,t])
     }
     
     
@@ -149,7 +152,7 @@ model{
                                     (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Male mated and female not captured
       
       # Draw Recapture Probability 
-      recap_f[i, t] ~ dbern(p.totalF[i,t]*af[i,t+1])    
+      recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t+1] * recruit_f[i,t])    
     }
     
   }

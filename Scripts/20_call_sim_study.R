@@ -20,27 +20,27 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 # SIM DATA
 
-k = 4
-n = 10
+k = 10
+n = 30
 
 param_list <- list(
   n = n, 
   k = k, 
   prop.female = 0.5,
-  delta = rep(0.9, k),
+  delta = rep(0.9, k), # MATING PROCESS ISN't PRODUCING ENOUGH POSITIVE CASES CHECK GENERATION PROCESS
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
   gam = rep(0.6, k),
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
   rho = rep(0.70, k),
-  betas = list(beta0 = 0.0, beta1 = -3),
+  betas = list(beta0 = 0.0, beta1 = 3),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,n)
+  init = rep(1,n) # ONLY WORKS WHEN INITIAL STATES ARE TIME 1 ATM (NEED TO BROADEN THIS AND CHECK MODEL)
 )
 
-# # Pull individual dataset
+# Pull individual dataset
 set.seed(100)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
@@ -140,3 +140,7 @@ gather_posterior_summary(jags_samples2) #%>%
 # Maybe do the chat (or  log-likelihood) thing from chapter 1 to suggest correlation exists (do it after running hduck)
 # Pull together results
 # Write 
+
+
+
+# REPARTNER PROCESS and AREPARTNER PROCESS NEED TO BE FIXED
