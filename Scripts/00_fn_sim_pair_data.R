@@ -1154,7 +1154,7 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   psi_array <- array(NA,dim = c(nf,nm+1,k))
   
   for(t in 1:k){
-    psi_array[,,t] <- cbind(psi[,,t],rep(0,nm))
+    psi_array[,,t] <- cbind(psi[,,t],rep(0,nf))
   }
   
   # Store results in a list

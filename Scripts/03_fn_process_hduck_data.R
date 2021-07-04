@@ -1,18 +1,18 @@
 
 gather_hq_data <- function(dat_dir, 
-                            book1 = "Harlequin_Capture_Records_29Aug2012.xls", 
-                            book2 = "HARD_Obs_10May95_31Aug2012.xls"){
+                            book1 = "Harlequin_Capture_Records_24Aug2020.xls", 
+                            book2 = "HARD_Obs_10May95_08Sep20.xls"){
   #Storage
   dat1 <- list()
   dat2 <- list()
   
-  # 8 sheets in book1
-  for(i in 1:8){
+  # 9 sheets in book1
+  for(i in 1:9){
     dat1[[i]] <-  read_excel(dat_dir %+% book1, sheet = i)
   }
  
   # 5 sheets in book2
-  for(j in 1:5){
+  for(j in 1:7){
     dat2[[j]] <- read_excel(dat_dir %+% book2, sheet = j)
   }
   
@@ -21,7 +21,7 @@ gather_hq_data <- function(dat_dir,
 }
 
 process_bandlist <- function(hq_data){
-  BandList <- hq_data[["book1"]][[1]]  %>%
+  BandList <- hq_data[["book1"]][[2]]  %>%
     rename(year_class = `Year Class`,
            first_plastic = `1st Plastic`,
            second_plastic=`2nd Plastic`,
@@ -36,8 +36,8 @@ process_capture_records <- function(hq_data){
   BandList <- process_bandlist(hq_data)
   
   # Grab Capture Records/Covariates/Assign partners and build history using Animal ID only
-  CaptureRecords <- hq_data[["book1"]][[2]] %>%  
-    mutate(Capture.Date = as.Date(`Capture Date`,origin = "1899-12-30"),
+  CaptureRecords <- hq_data[["book1"]][[3]] %>%  
+    mutate(Capture.Date = as.Date(`Banding Date`,origin = "1899-12-30"),
            year = year(Capture.Date),
            month = month(Capture.Date),
            day = mday(Capture.Date)) %>% 
@@ -49,10 +49,14 @@ process_capture_records <- function(hq_data){
            "pair_status" = "Pairstat",
            "partner_id" = "Mateleg",
            "initial_entry" = "Type",
-           "first_plastic" = `1stPlastic`,
+           "first_plastic" = `1st Plastic`,
            "age" = "Age",
            "year_class" = `Year Class`,
-           "mother_id"  = MotherID) %>%
+           "mother_id"  = MotherID,
+           "bird_wt" = `Bird Weight`,
+           "wing_crd" = `Wing Chord`,
+           "tarsus_len" = `Tarsus Length`,
+           "culmen_len" = `Culmen Length`) %>%
     arrange(animal_id,capture_date,initial_entry)  %>%
     left_join(na.omit(select(BandList,ID,first_plastic)),by=c("partner_id" = "first_plastic")) %>% 
     left_join(na.omit(select(BandList,ID,second_plastic)),by=c("partner_id" = "second_plastic")) %>% 
@@ -67,8 +71,8 @@ process_capture_records <- function(hq_data){
     ) %>% 
     select(-ID.x,-ID.y,-ID.x.x,-ID.y.y) %>% 
     select(capture_date,year,month,day,animal_id,sex,partner_id,
-           pair_status,initial_entry, age, mother_id, time, Weight,             
-           Wing,Tarsus, Culmen, Area) %>% 
+           pair_status,initial_entry, age, mother_id, time, bird_wt,             
+           wing_crd,tarsus_len, culmen_len, Area) %>% 
     filter(!is.na(capture_date)) %>%
     left_join(na.omit(select(BandList,ID,first_plastic)),by=c("mother_id" = "first_plastic")) %>% 
     left_join(na.omit(select(BandList,ID,second_plastic)),by=c("mother_id" = "second_plastic")) %>% 
@@ -130,13 +134,31 @@ build_cr_df <- function(hq_data){
     select(animal_id,time,initial_entry,
            sex,mated,partner_id, 
            age, mother_id, Area,
-           Weight, Wing, Tarsus, Culmen,
+           bird_wt, wing_crd, tarsus_len, culmen_len,
            recapture_individual,surv_individual_confounded) %>% 
     distinct()
   
   # Drop duplicate captures for females
-  cap.data <- cap.data %>% group_by(animal_id, time) %>% slice(1) %>% ungroup() %>% as.data.frame()
+  #cap.data <- cap.data %>% group_by(animal_id, time) %>% slice(1) %>% ungroup() %>% as.data.frame()
+  cap.data <- cap.data %>% group_by(animal_id, time) %>% summarize(
+    animal_id = unique(animal_id),
+    time = unique(time),
+    initial_entry = unique(initial_entry),
+    sex = unique(sex),
+    mated = max(mated,na.rm=T),
+    partner_id = max(partner_id, na.rm =T),
+    age =  max(age,na.rm=T),
+    mother_id = max(mother_id, na.rm =T),
+    Area = max(Area, na.rm = T),
+    bird_wt = max(bird_wt, na.rm = T),
+    wing_crd = max(wing_crd, na.rm=T),
+    tarsus_len = max(tarsus_len, na.rm =T),
+    culmen_len = max(culmen_len, na.rm=T),
+    recapture_individual = max(recapture_individual, na.rm=T),
+    surv_individual_confounded = max(surv_individual_confounded, na.rm=T)
+  ) %>% ungroup() %>% as.data.frame()
   
+  cap.data[cap.data == -Inf] <- NA
   return(cap.data)
 } 
 
@@ -284,7 +306,13 @@ populate_mating <- function(cap.data, nf, nm, k){
 populate_pairs <- function(cap.data, nf, nm, k){
   
   #Pairs matrix
-  apairs <- array(NA, dim = c(nf, nm, k))
+  apairs <- array(NA, dim = c(nf+1, nm+1, k+1))
+  
+  # Dummy Index
+  apairs[1:(nf+1),1,] <- 0
+  apairs[1,1:(nm+1),] <- 0
+  apairs[,,1] <- 0 
+  
   
   # Females and partners
   female_mates <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
@@ -298,10 +326,10 @@ populate_pairs <- function(cap.data, nf, nm, k){
       if(is.na(female_partner_id)) next #skip if no partner
       for(j in 1:nm){
         # Zero out other pair formation
-        apairs[female_id, , t] <- 0
-        apairs[,female_partner_id,t] <- 0
+        apairs[female_id+1, , t+1] <- 0
+        apairs[,female_partner_id+1,t+1] <- 0
         # Add formed pair 
-        apairs[female_id, female_partner_id, t] <- 1
+        apairs[female_id+1, female_partner_id+1, t+1] <- 1
       }
     }
   }
@@ -312,7 +340,7 @@ populate_pairs <- function(cap.data, nf, nm, k){
   for(l in 1:nrow(impossible_pairs)){
     male_id <- impossible_pairs$jags_id[l]
     mother_id <- impossible_pairs$jags_mother_id[l]
-    apairs[mother_id,male_id,] <- 0
+    apairs[mother_id+1,male_id+1,] <- 0
   }
   
   # Return pairs list
@@ -394,6 +422,84 @@ populate_recap <- function(cap.data, nf, nm, k){
   return(list(recap_f = recap_f, recap_m = recap_m))
 }
 
+
+populate_apairs_f <- function(apairs,nf,nm,k){
+  # Build data object and set dummy variable (represents single)
+  apairs_f <- matrix(NA,nrow = nf,ncol=k+1)
+  apairs_f[,1] <- nm + 1
+  
+  for(t in 1:k){
+    for(i in 1:nf){k
+      
+      pair_ijt <- apairs[i+1,2:(nm+1),t+1]
+      isPaired <- any(pair_ijt == 1,na.rm=T)
+      
+      if(isPaired){
+        partner_id <- which(pair_ijt == 1)
+        if(length(partner_id) > 1) stop("Bug found at time" %+% t %+% " and female" %+% i)
+        apairs_f[i,t] <- partner_id
+      } else{
+        next
+      }
+      
+    }
+  }
+  
+  return(apairs_f)
+}
+
+populate_arepartner <- function(apairs_f, nf, nm, k){
+  
+  # Dummy matrix
+  arepartner <- matrix(NA,nrow = nf, ncol = k)
+
+  
+  # Assign based on apairs_f going forward
+  for(t in 1:k){
+      arepartner[,t] <- 1*(apairs_f[,t] == apairs_f[,t+1])
+  }
+  
+  # Set known initial case to 0
+  arepartner[,1] <- 0
+  
+  
+  # If previous partner is with another mate (that was observed) then arepartner must be zero
+  for(time in 2:k){
+    for(i in 1:nf){
+      
+      mask1 <- is.na(arepartner[i,time]) #is this case unknown
+      mask2 <- !is.na(apairs_f[i,time]) # do we know their last partner
+      mask3 <- ifelse(mask2,any(apairs_f[i,time] == c(nm+1,apairs_f[-i,time+1]), na.rm = T),FALSE) # if partner has a new mate or if past state was single
+      
+      # ...Then repartner is known zero
+      if(mask1 & mask2 & mask3){
+        arepartner[i,time] <- 0
+      } else {
+        next
+      }
+    }
+  }
+  
+  return(arepartner)
+}
+
+populate_psi <- function(apairs, nf, nm, k){
+  # Build index of possible pairings 
+  # Used for homogenous pair assignment mechanism
+  psi <- apairs
+  psi[is.na(psi)] <- 1
+  psi <- psi[1:nf+1,1:nm+1,]
+  psi <- psi[,,1:k+1]
+  
+  psi_array <- array(NA,dim = c(nf,nm+1,k))
+  
+  for(t in 1:k){
+    psi_array[,,t] <- cbind(psi[,,t],rep(0,nf))
+  }
+  return(psi_array)
+}
+
+
 # Prepare data for jags
 build_jags_data <- function(cap.data){
   
@@ -425,6 +531,16 @@ build_jags_data <- function(cap.data){
   recap_f <- recap_list[["recap_f"]]
   recap_m <- recap_list[["recap_m"]]
   
+  # Construct partner index by female
+  apairs_f <- populate_apairs_f(apairs,nf,nm,k)
+  
+  # Construct partially repartnership matrix
+  arepartner <- populate_arepartner(apairs_f, nf, nm, k)
+  
+  # Grab Possible Pairings indexed by f/m/time
+  psi <- populate_psi(apairs, nf, nm, k)
+  
+  
   # Store results in list 
   jags_data <- list(nf = nf, 
                     nm = nm,
@@ -433,7 +549,9 @@ build_jags_data <- function(cap.data){
                     recruit_m = recruit_m,
                     amating_f = amating_f,
                     amating_m = amating_m,
-                    apairs = apairs, 
+                    apairs_f = apairs_f,
+                    arepartner = arepartner,
+                    psi = psi, 
                     af = af,
                     am = am, 
                     recap_f = recap_f,
@@ -466,3 +584,15 @@ build_jags_data <- function(cap.data){
 # Run small simulation study to show that mod2 is identifiable 
 # Figure out conditional states for pair density 
 # Do we need a penalty function of some sort? 
+
+
+
+# PAIR INCONSISTENCY TABLE
+#      k    pc   pc2    del
+# 1    4    9    8.5    0.5
+# 2    7   15    14.0   1.0
+# 3    8    6    5.5    0.5
+# 4    9   12    13.0  -1.0
+# 5   18    4    5.0   -1.0
+# 6   20    4    4.5   -0.5
+# 7   24    7    8.0   -1.0
