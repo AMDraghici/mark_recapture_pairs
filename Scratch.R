@@ -155,10 +155,18 @@ for(i in 1:length(cap_index)){
 
 yband.data <- do.call(rbind,data_list)
 
+mother_index <- yband.data %>% 
+  select(BANDID, mother_id) %>% 
+  distinct() %>%
+  filter(mother_id > 0)
+
 cap.data3 <- cap.data2 %>% select(-YBand,-YBANDID) %>% 
-  mutate(mother_id = 0) %>% 
   filter(!(JoinID %in% cap_index)) %>% 
-  rbind(yband.data)
+  left_join(mother_index, by = "BANDID") %>% 
+  rbind(yband.data) %>% 
+  mutate(mother_id = ifelse(is.na(mother_id),0,mother_id))
+  
+
 
 
 
