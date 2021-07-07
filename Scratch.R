@@ -117,14 +117,9 @@ cap.data2 <- BandDf %>%
          -ID.x.x,
          -ID.y.y) %>% 
   filter(!(BANDID == 0 & YBANDID == 0)) %>% 
-  mutate(PartnerID = NA,
-         Mated = ifelse(PrStatus %in% c("1","2","3"),1, 
+  mutate(Mated = ifelse(PrStatus %in% c("1","2","3"),1, 
                         ifelse(PrStatus == "0",0,NA))) %>% 
-  select(-NumSurvey)
-
-capture_counts <- cap.data2 %>% group_by(JoinID) %>% summarize(n = n()) %>% ungroup()
-
-
+  select(-NumSurvey, -CodeSex, -PrStatus) 
 
 # Add Mother ID
 
@@ -139,14 +134,11 @@ for(i in 1:length(cap_index)){
     mutate(mother_id = mother_id,
            BANDID = YBANDID,
            Mated = 0,
-           PartnerID = 0,
-           PrStatus = 0,
            Band = YBand,
            Sex = NA)
   temp_mom <- temp %>% slice(1) %>% 
     mutate(YBand  = NA,
            YBANDID = NA,
-           PartnerID = NA,
            Mated = 1,
            mother_id = 0)
   
@@ -166,54 +158,80 @@ cap.data3 <- cap.data2 %>% select(-YBand,-YBANDID) %>%
   rbind(yband.data) %>% 
   mutate(mother_id = ifelse(is.na(mother_id),0,mother_id))
   
+#Adhoc Fixes
+cap.data3 <- cap.data3 %>% 
+  mutate(BANDID = ifelse(Band == "Yg36",483,BANDID)) %>% 
+  filter(BANDID > 0)
 
 
+# Add partners
+known_pairs <- hq_data$book2[[7]] %>% 
+  select(1:3) %>% 
+  rename(Male = `Male Band`,
+         Female = `Female Band`) %>% 
+  filter(tolower(trimws(Male)) != "ub",
+         tolower(trimws(Male)) != "u",
+         tolower(trimws(Female)) != "ub",
+         tolower(trimws(Female)) != "u") %>% 
+  left_join(na.omit(select(BandList,ID,first_plastic)),by=c("Male" = "first_plastic")) %>% 
+  left_join(na.omit(select(BandList,ID,second_plastic)),by=c("Male" = "second_plastic")) %>% 
+  left_join(na.omit(select(BandList,ID,third_plastic)),by=c("Male" = "third_plastic")) %>% 
+  left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("Male" = "fourth_plastic")) %>% 
+  mutate(Male = pmax(ifelse(is.na(ID.x),0,ID.x),
+                        ifelse(is.na(ID.y),0,ID.y),
+                        ifelse(is.na(ID.x.x),0,ID.x.x),
+                        ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+  select(-ID.x,
+         -ID.y,
+         -ID.x.x,
+         -ID.y.y) %>% 
+  left_join(na.omit(select(BandList,ID,first_plastic)),by=c("Female" = "first_plastic")) %>% 
+  left_join(na.omit(select(BandList,ID,second_plastic)),by=c("Female" = "second_plastic")) %>% 
+  left_join(na.omit(select(BandList,ID,third_plastic)),by=c("Female" = "third_plastic")) %>% 
+  left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("Female" = "fourth_plastic")) %>% 
+  mutate(Female = pmax(ifelse(is.na(ID.x),0,ID.x),
+                     ifelse(is.na(ID.y),0,ID.y),
+                     ifelse(is.na(ID.x.x),0,ID.x.x),
+                     ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+  select(-ID.x,
+         -ID.y,
+         -ID.x.x,
+         -ID.y.y) %>% 
+  filter(Male > 0 & Female > 0)
 
 
-cap.data3 <- cap.data2 %>% 
-  left_join(capture_counts, by = "JoinID") 
+known_pairs_m <- known_pairs %>% 
+  mutate(Sex = "M") %>% rename(BANDID = "Male", PartnerID = "Female") %>% 
+  select(Year,Sex, BANDID, PartnerID)
+known_pairs_f <- known_pairs %>% 
+  mutate(Sex = "F") %>% rename(BANDID = "Female", PartnerID = "Male") %>% 
+  select(Year, Sex, BANDID, PartnerID)
 
 
-# Pivot out the youth data and keep the mom id then rejoin
-# Drop all unecessary rows (keep unknown partnerships tho)
-# Add animal_id, time, partner_id, mated column
-# Map to cap.data
+pair_data <- rbind(known_pairs_m,known_pairs_f)
+
+cap.data4 <- cap.data3 %>% 
+  left_join(pair_data, by = c("Year","Sex","BANDID")) %>% 
+  select(-JoinID) %>% 
+  distinct()
+
+# Remove Duplicate information
+cap.data5 <- cap.data4 %>% 
+  group_by(Year, BANDID)  %>% 
+  arrange(desc(Mated), desc(PartnerID),desc(mother_id),desc(Sex),desc(Area)) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
+  rename(
+    "year" = "Year",
+    "animal_id" = "BANDID",
+    "sex" = "Sex",
+    "mated" = "Mated",
+    "partner_id" = "PartnerID"
+  ) %>% 
+  select(year,animal_id,sex,partner_id,mated,mother_id, Area)
+
+# Map to cap.data 
 # Make sure JAGS IDs get added after
 # Make inclusion of this data optional
 # Check special cases (like known deaths and stuff)
 # WHen adding update the recapture and surival columns
-# Check if theres hard coding in the rest of the processes
-# You can probably use Area to filter impossible pairs
-
-cap_index <- unique(cap.data3$JoinID)
-
-for(i in 1:length(cap_index)){
-  cap_id <- cap_index[i]
-  temp <- cap.data3 %>% filter(JoinID == cap_id)
-  len <- temp$n
-  
-  
-  if(len == 1){
-    next
-  } else if(len == 2) {
-    
-    temp_m <- temp %>% filter(Sex == "M") 
-    temp_f <- temp %>% filter(Sex == "F")
-    
-  } else if(len == 3) {
-    
-  } else if(len == 4) {  
-    
-  } else if(len == 5) {
-    
-  } else if(len == 6) {
-    
-  } else if(len == 7) {
-    
-  } else if(len == 8) {
-    
-  }
-  
-}
-
-cap.data2 %>% group_by(JoinID) %>% summarize(n = n()) %>% ungroup() %>% arrange(n) %>% filter(n > 1)
