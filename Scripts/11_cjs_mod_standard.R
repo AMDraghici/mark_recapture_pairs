@@ -17,10 +17,10 @@ model{
   # Priors--------------------------------------------------------------------------------------------
   
   # Survival by sex
-  phiF ~ dbeta(3,3)
-  phiM ~ dbeta(3,3)
+  phiF ~ dbeta(1,1)
+  phiM ~ dbeta(1,1)
   
   # Recapture by sex
-  pF ~ dbeta(3,3)
-  pM ~ dbeta(3,3)
+  pF ~ dbeta(1,1)
+  pM ~ dbeta(1,1)
 }

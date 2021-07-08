@@ -20,9 +20,11 @@ cap2 <- hq_data$book2[[4]]%>%
 BandDf <- cap2 %>% 
   select(
     JoinID,
+    Date,
     Year,
     CodeSex,
     Area,
+    `Obs Type`,
     Band1, Band2, Band3,Band4, Band5,
     Band6, Band7, Band8,Band9,Band10
   ) %>% 
@@ -36,9 +38,11 @@ BandDf <- cap2 %>%
 SexDf <- cap2 %>% 
   select(
     JoinID,
+    Date,
     Year,
     CodeSex,
     Area,
+    `Obs Type`,
     Sex1,Sex2,Sex3,Sex4,Sex5,
     Sex6,Sex7,Sex8,Sex9,Sex10
   ) %>% 
@@ -53,9 +57,11 @@ SexDf <- cap2 %>%
 PrDf <- cap2 %>% 
   select(
     JoinID,
+    Date,
     Year,
     CodeSex,
     Area,
+    `Obs Type`,
     PrStatus1,PrStatus2,PrStatus3,PrStatus4,
     PrStatus5,PrStatus6,PrStatus7,PrStatus8,
     PrStatus9,PrStatus10,
@@ -70,9 +76,11 @@ PrDf <- cap2 %>%
 YBandDf <- cap2 %>% 
   select(
     JoinID,
+    Date,
     Year,
     CodeSex,
     Area,
+    `Obs Type`,
     `YBand1`,`YBand2`,`YBand3`,`YBand4`,`YBand5`,
     `YBand6`,`YBand7`,`YBand8`,`YBand9`,`YBand10`
   ) %>% 
@@ -86,9 +94,9 @@ YBandDf <- cap2 %>%
 
 
 cap.data2 <- BandDf %>% 
-  inner_join(SexDf, by = c("JoinID", "Year", "CodeSex",  "Area", "NumSurvey")) %>% 
-  inner_join(PrDf, by = c("JoinID", "Year", "CodeSex", "Area", "NumSurvey")) %>% 
-  inner_join(YBandDf, by = c("JoinID", "Year", "CodeSex", "Area","NumSurvey")) %>% 
+  inner_join(SexDf, by = c("JoinID", "Date", "Year", "CodeSex",  "Area","Obs Type" ,"NumSurvey")) %>% 
+  inner_join(PrDf, by = c("JoinID", "Date", "Year", "CodeSex",  "Area","Obs Type" ,"NumSurvey")) %>% 
+  inner_join(YBandDf, by = c("JoinID", "Date", "Year", "CodeSex",  "Area","Obs Type" ,"NumSurvey")) %>% 
   mutate(AllNA = 1*(is.na(Band) & is.na(Sex) & is.na(PrStatus) & is.na(YBand))) %>% 
   filter(AllNA == 0) %>% 
   select(-AllNA) %>% 
@@ -118,8 +126,10 @@ cap.data2 <- BandDf %>%
          -ID.y.y) %>% 
   filter(!(BANDID == 0 & YBANDID == 0)) %>% 
   mutate(Mated = ifelse(PrStatus %in% c("1","2","3"),1, 
-                        ifelse(PrStatus == "0",0,NA))) %>% 
-  select(-NumSurvey, -CodeSex, -PrStatus) 
+                        ifelse(PrStatus == "0",0,NA)),
+         age = "AHY") %>% 
+  select(-NumSurvey, -CodeSex, -PrStatus) %>% 
+  rename(initial_entry = "Obs Type")
 
 # Add Mother ID
 
@@ -135,7 +145,8 @@ for(i in 1:length(cap_index)){
            BANDID = YBANDID,
            Mated = 0,
            Band = YBand,
-           Sex = NA)
+           Sex = NA,
+           age = "HY")
   temp_mom <- temp %>% slice(1) %>% 
     mutate(YBand  = NA,
            YBANDID = NA,
@@ -221,17 +232,23 @@ cap.data5 <- cap.data4 %>%
   arrange(desc(Mated), desc(PartnerID),desc(mother_id),desc(Sex),desc(Area)) %>% 
   slice(1) %>% 
   ungroup() %>% 
+  mutate(capture_date   = as.Date(Date,origin = "1899-12-30"),
+         year = year(capture_date),
+         month = month(capture_date),
+         day = day(capture_date ),
+         pair_status = ifelse(Mated == 1, "P", ifelse(Mated == 0, "N", "U")),
+         initial_entry = ifelse(initial_entry == "C","C","RC"),
+         bird_wt = NA,
+         wing_crd = NA,
+         tarsus_len = NA,
+         culmen_len = NA) %>% 
+  left_join(year.dat, by = "year") %>% 
   rename(
-    "year" = "Year",
     "animal_id" = "BANDID",
     "sex" = "Sex",
     "mated" = "Mated",
     "partner_id" = "PartnerID"
   ) %>% 
-  select(year,animal_id,sex,partner_id,mated,mother_id, Area)
-
-# Map to cap.data 
-# Make sure JAGS IDs get added after
-# Make inclusion of this data optional
-# Check special cases (like known deaths and stuff)
-# WHen adding update the recapture and surival columns
+  select(capture_date,  year, month, day, animal_id, sex,  
+         partner_id, pair_status, initial_entry, age, mother_id, time,
+         bird_wt, wing_crd, tarsus_len, culmen_len, Area)
