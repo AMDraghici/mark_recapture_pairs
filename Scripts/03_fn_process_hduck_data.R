@@ -519,8 +519,8 @@ assign_ids_bysex <- function(cap.data){
 populate_recruit <- function(cap.data, nf, nm, k){
   
   # Recruitment matrices
-  recruit_f <- matrix(NA, nrow = nf+1, ncol = k)
-  recruit_m <- matrix(NA, nrow = nm+1, ncol = k)
+  recruit_f <- matrix(NA, nrow = nf, ncol = k)
+  recruit_m <- matrix(NA, nrow = nm, ncol = k)
   
   # Extract initial entry by id 
   female_init <- cap.data %>% select(sex, jags_id, initial_entry) %>% filter(sex == "F") %>% arrange(jags_id) %>% distinct()
@@ -621,8 +621,8 @@ populate_pairs <- function(cap.data, nf, nm, k){
 populate_surv <- function(cap.data, nf, nm, k){
 
   #Conditional Paired Survival matrices
-  af <- matrix(NA, nrow = nf+1, ncol = k)
-  am <- matrix(NA, nrow = nm+1, ncol = k)
+  af <- matrix(NA, nrow = nf, ncol = k)
+  am <- matrix(NA, nrow = nm, ncol = k)
   
   # Survival data.frames
   surv_f <- cap.data %>%
@@ -631,24 +631,41 @@ populate_surv <- function(cap.data, nf, nm, k){
     arrange(jags_id) %>% 
     distinct()
   
+  last_alive_f <- surv_f %>% 
+    group_by(jags_id) %>% 
+    summarize(last_alive = max(which(surv_individual_confounded == 1))) %>% 
+    ungroup()
+  
   surv_m <- cap.data %>% 
     select(sex, jags_id, time, surv_individual_confounded) %>%
     filter(sex == "M") %>% 
     arrange(jags_id) %>%
     distinct()
   
+  last_alive_m <- surv_m %>% 
+    group_by(jags_id) %>% 
+    summarize(last_alive = max(which(surv_individual_confounded == 1))) %>% 
+    ungroup()
+  
   # Populate survival matrices for females
   for(i in 1:nrow(surv_f)){
     id <- surv_f$jags_id[i]
     t <- surv_f$time[i]
-    af[id, t] <- surv_f$surv_individual_confounded[i]
+    last <- last_alive_f %>% filter(jags_id == id) %>% pull(last_alive)
+    
+    if(t <= last){
+      af[id, t] <- 1
+    }
   }
   
   # Populate survival matrices for males
   for(i in 1:nrow(surv_m)){
     id <- surv_m$jags_id[i]
     t <- surv_m$time[i]
-    am[id, t] <- surv_m$surv_individual_confounded[i]
+    last <- last_alive_m %>% filter(jags_id == id) %>% pull(last_alive)
+    if(t <= last){
+      am[id, t] <- 1
+    }
   }
   # Return surv data
   return(list(af = af, am = am))
@@ -658,8 +675,8 @@ populate_surv <- function(cap.data, nf, nm, k){
 populate_recap <- function(cap.data, nf, nm, k){
   
   # Assign memory 
-  recap_f <- matrix(NA, nrow = nf+1, ncol = k)
-  recap_m <- matrix(NA, nrow = nm+1, ncol = k)
+  recap_f <- matrix(NA, nrow = nf, ncol = k)
+  recap_m <- matrix(NA, nrow = nm, ncol = k)
   
   # Recapture data.frames
   recapture_f <- cap.data %>%
@@ -699,7 +716,7 @@ populate_apairs_f <- function(apairs,nf,nm,k){
   apairs_f[,1] <- nm + 1
   
   for(t in 1:k){
-    for(i in 1:nf){k
+    for(i in 1:nf){
       
       pair_ijt <- apairs[i+1,2:(nm+1),t+1]
       isPaired <- any(pair_ijt == 1,na.rm=T)
@@ -822,8 +839,8 @@ build_jags_data <- function(cap.data){
                     apairs_f = apairs_f,
                     arepartner = arepartner,
                     psi = psi, 
-                    af = af,
-                    am = am, 
+                    af = cbind(rep(1,nrow(af)),af),
+                    am = cbind(rep(1,nrow(am)),am),
                     recap_f = recap_f,
                     recap_m = recap_m)
   
