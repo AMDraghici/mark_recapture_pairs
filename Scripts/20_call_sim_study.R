@@ -7,7 +7,7 @@ library(lubridate)
 #setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
-dat_dir <- getwd() %+% "/Data/FW__Harlequin_Ducks/"
+dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "02_fn_model_code.R")
@@ -16,9 +16,10 @@ out_dir <- getwd() %+% "/Output/"
 
 #HDUCK Data
 
-cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-cap.data <- cap.data %>% filter(initial_entry < 28)
-jags_data <- build_jags_data(cap.data)
+# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+# cap.data <- cap.data #%>% filter(initial_entry < 28)
+# jags_data <- build_jags_data(cap.data)
+# cjs_data <- format_to_cjs(jags_data)
 
 # Still need to remove some impossible cases
 # - If initial is after current remove from psi matrix (set 1 to 0)
@@ -30,8 +31,8 @@ jags_data <- build_jags_data(cap.data)
 
 #SIM DATA
 
-k = 5
-n = 10
+k = 20
+n = 500
 
 param_list <- list(
   n = n, 
@@ -40,10 +41,10 @@ param_list <- list(
   delta = rep(0.9, k), 
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0.6, k),
+  gam = rep(0, k),
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
-  rho = rep(0.6, k),
+  rho = rep(0, k),
   betas = list(beta0 = 0.0, beta1 = 0.5),
   rand_sex = F,
   rand_init = F,
@@ -55,7 +56,7 @@ set.seed(100)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 
-# 
+
 # jags_data$psi <- jags_data$apairs
 # jags_data$psi[is.na(jags_data$psi)] <- 1
 # jags_data$psi <- jags_data$psi[1:jags_data$nf+1,1:jags_data$nm+1,]
