@@ -578,13 +578,14 @@ propogate_recap_individual <- function(sex, k, rpair){
   }
   
   # Only update males (not dummy states)
-  for(i in 1:nm){
+  for(j in 1:nm){
     for(time in 1:k){
-      male_observation <- recap_marginal_male[max(rpair[,i,time])]
-      recap_m[i,time] <- male_observation
+      male_observation <- recap_marginal_male[max(rpair[,j,time])]
+      recap_m[j,time] <- male_observation
     }
     
   }
+  
   
   # Group and return results 
   ind_recap_list <- list(recap_f = recap_f, recap_m = recap_m)
@@ -879,7 +880,11 @@ compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit
     phiM[time-1] <- phi.m[time-1]*(init_m_i != time) + 1*(init_m_i == time)   
     
     # Compute joint survival at time t
-    spair[i,partner_i, time] <- survival(previous_state_i,time-1,phiM, phiF, gam)
+    spair[i,partner_i, time] <- survival(previous_state = previous_state_i,
+                                         j = time-1,
+                                         phi.m = phiM, 
+                                         phi.f = phiF, 
+                                         gam = gam)
   }
   
   # Survival for single males
@@ -902,7 +907,12 @@ compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit
     phiM[time-1] <- phi.m[time-1]*(init_m_j != time) + 1*(init_m_j == time)   
     
     # Compute joint survival at time t
-    spair[nrow(pairs_f)+1, j, time] <- survival(previous_state_j,time-1,phiM, rep(0,length(phi.f)), gam)
+    spair[nrow(pairs_f)+1, j, time] <- survival(previous_state = 
+                                                previous_state_j,
+                                                j = time-1,
+                                                phi.m = phiM,
+                                                phi.f = rep(0,length(phi.f)),
+                                                gam = gam)
   }
   
   #Remaining entries are "dead"
@@ -914,7 +924,7 @@ compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit
 
 
 # Compute recapture state at t
-compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho){
+compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho, recruit_f, recruit_m){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -924,14 +934,28 @@ compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.
   for(i in 1:nf){
     j <- pairs_f[i, time]
     current_state <- spair[i,j, time]
-    rpair[i,j, time] <- recapture(current_state, time, p.m, p.f, rho)
+    i_first <- min(which(recruit_f[i,] == 1))
+    j_first <- min(which(recruit_m[j,] == 1))
+    if(i_first == time) pF <- rep(1, length(p.f)) else pF <- p.f
+    if(j_first == time) pM <- rep(1, length(p.m)) else pM <- p.m
+    rpair[i,j, time] <- recapture(current_state = current_state, 
+                                  j = time, 
+                                  p.m = pM, 
+                                  p.f = pF, 
+                                  rho = rho)
   }
   
   single_males <- which(spair[nf+1,1:nm,time] != 1)
   
   for(j in single_males){
     current_state <- spair[nf+1,j, time]
-    rpair[nf+1, j, time] <- recapture(current_state, time, p.m, p.f, rho)
+    j_first <- min(which(recruit_m[j,] == 1))
+    if(j_first == time) pM <- rep(1, length(p.m)) else pM <- p.m
+    rpair[nf+1, j, time] <- recapture(current_state = current_state,
+                                      j = time,
+                                      p.m = pM,
+                                      p.f = p.f,
+                                      rho = rho)
   }
   
   # Turn rest to unobserved 
@@ -1237,11 +1261,10 @@ simulate_cr_data <- function(n,
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   spair <- propogate_surv_pairs(sex, sf, sm, spair, initial_time, pairs_f, pairs_m)
-  rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, initial_time, p.m, p.f, rho)
+  rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, initial_time, p.m, p.f, rho, recruit_f, recruit_m)
   
   # Simulate Fates
   for(time in (initial_time+1):k){
-    print(time)
     # Compute mating status at t 
     mating_list_t <- compute_mating(sex, time, delta, 
                                     recruit, recruit_f, recruit_m, 
@@ -1272,7 +1295,7 @@ simulate_cr_data <- function(n,
     sm <- sind_list_t[["sm"]]
     
     # Compute recapture probability at t based on survival at t
-    rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho)
+    rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho, recruit_f, recruit_m)
   }
   
   # Grab individual recaptures
