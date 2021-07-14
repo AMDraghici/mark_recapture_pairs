@@ -14,8 +14,8 @@ model{
   # Priors--------------------------------------------------------------------------------------------
   
   for(i in 1:n){
-    p[i] <- equals(female[i], 1)* pF + equals(female[i], 0)* pM
-    phi[i] <-  equals(female[i], 1) * phiF + equals(female[i], 0)* phiM
+    p[i] <- female[i] * pF + (1-female[i]) * pM
+    phi[i] <- female[i] * phiF + (1-female[i])* phiM
   }
   
   
