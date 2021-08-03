@@ -220,7 +220,7 @@ construct_init_entry <- function(n, k, random = F, inits = NULL, sort_init = F){
 }
 
 # Build recruitment matrix
-construct_recruit <- function(n, k, sex){
+construct_recruit <- function(n, k, sex){ n
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 

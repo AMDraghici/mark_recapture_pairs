@@ -31,8 +31,8 @@ out_dir <- getwd() %+% "/Output/"
 
 #SIM DATA
 
-k = 20
-n = 500
+k = 4
+n = 100
 
 param_list <- list(
   n = n, 
@@ -41,18 +41,18 @@ param_list <- list(
   delta = rep(0.9, k), 
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0, k),
+  gam = rep(0.6, k),
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
-  rho = rep(0, k),
-  betas = list(beta0 = 0.0, beta1 = 0.5),
+  rho = rep(0.6, k),
+  betas = list(beta0 = 0.0, beta1 = 3),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n) 
 )
 
 # Pull individual dataset
-set.seed(100)
+#set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
 cjs_data <- format_to_cjs(jags_data)
 
@@ -81,27 +81,27 @@ cjs_data <- format_to_cjs(jags_data)
 # jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 # 
 # ## MCMC parameters  
-par_settings <- list('n.iter' = 1e4, 
-                     'n.thin' = 10,
-                     'n.burn' = 1e3,
-                     'n.chains' = 2,
-                     'n.adapt' = 1e3)
+# par_settings <- list('n.iter' = 1e4, 
+#                      'n.thin' = 10,
+#                      'n.burn' = 1e3,
+#                      'n.chains' = 2,
+#                     'n.adapt' = 1e3)
 
 # Vaillancourt 
 # ## Jags parameters and model script
 # 
-# Run standard Model
-
-jags_params <- c("pF", "pM", "phiF", "phiM")
-jags_model <- script_dir %+% "/11_cjs_mod_standard.R"
-
-
-jags_samples <- run_jags_parallel(cjs_data,
-                                  jags_model,
-                                  jags_params,
-                                  par_settings,
-                                  out_dir,
-                                  outname = "T1_CJS_STD")
+# # Run standard Model
+# 
+# jags_params <- c("pF", "pM", "phiF", "phiM")
+# jags_model <- script_dir %+% "/11_cjs_mod_standard.R"
+# 
+# 
+# jags_samples <- run_jags_parallel(cjs_data,
+#                                   jags_model,
+#                                   jags_params,
+#                                   par_settings,
+#                                   out_dir,
+#                                   outname = "T1_CJS_STD")
 
 
 # TEST DATA WITH PROGRAM MARK TO SEE RESULTS 
@@ -127,7 +127,7 @@ jags_samples2 <- run_jags_parallel(jags_data,
                                   outname = "TESTING_MODEL2")
 
 
-gather_posterior_summary(jags_samples) #%>% 
+gather_posterior_summary(jags_samples2) #%>% 
   # add_true_values(param_list) %>% 
   # plot_caterpillar(params = jags_params) +
   # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
@@ -165,3 +165,5 @@ gather_posterior_summary(jags_samples) #%>%
 # TO DO
 # 1. NEED CODE REVIEW FROM SIMON AFTER I DOCUMENT ALL THE STEPS
 # 2. DO THE HDUCK CONVERSION 
+
+#k=10,n=100, beta = 3, 12k iter + 2 cores = 70 hours

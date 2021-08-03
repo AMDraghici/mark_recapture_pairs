@@ -72,7 +72,7 @@ nimble_cjs <- nimbleCode({
     #  Exclude Males who are now unavailable
     for(j in 1:nm){
       
-      # Is male j available at time t
+      # Is male j available at time t (****based on repartner structure***)
       male_taken_jt[j,t] <- sum(equals(apairs_f[1:nf,t],j)*arepartner[1:nf,t])
       
       # Add Exclusion
