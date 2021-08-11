@@ -332,7 +332,36 @@ generate_init <- function(jags_data){
     
 
   }
-
+  
+  # Update Initial Values to follow JAGS structure -----------------------------------------------------------------
+  
+  # Fn to Replace known values with NA and NA values with initial values
+  build_NA_mat <- function(mat, jags_mat){
+    mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
+    mat_final[is.na(jags_mat)] <- mat[is.na(jags_mat)]
+    return(mat_final)
+  }
+  
+  
+  # Female Survival
+  af <- build_NA_mat(af, jags_data$af)
+  
+  # Female Mating Status
+  amating_f <- build_NA_mat(amating_f, jags_data$amating_f)
+  
+  # Male Survival
+  am <- build_NA_mat(am, jags_data$am)
+  
+  # Male Mating Status
+  amating_m <- build_NA_mat(amating_m, jags_data$amating_m)
+                       
+  # Pair index (female perspective)
+  apairs_f <- build_NA_mat(apairs_f, jags_data$apairs_f)
+  
+  # Repartner index (female perspective)
+  arepartner <- build_NA_mat(arepartner, jags_data$arepartner)
+  
+  
   # Return Results ------------------------------------------------------------------
   
   # Store in object
@@ -347,11 +376,11 @@ generate_init <- function(jags_data){
     delta = delta,
     beta0 = beta0,
     beta1 = beta1,
-    amating_f = amating_f, 
+    amating_f = amating_f,
     amating_m = amating_m,
     arepartner = arepartner,
-    apairs_f =  apairs_f, 
-    af = af, 
+    apairs_f =  apairs_f,
+    af = af,
     am = am
   )
   
