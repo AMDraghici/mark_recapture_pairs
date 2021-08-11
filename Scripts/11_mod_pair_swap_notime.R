@@ -51,7 +51,7 @@ model{
     
     # Choose to re-form pairs 
     for(i in 1:nf){
-      prob_repartner[i,t] <- ilogit(beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
+      prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
       arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
     }
     
@@ -169,8 +169,8 @@ model{
   delta ~ dbeta(3,2)
   
   # Pairs reforming
-  ##beta0 ~ dnorm(0, 1/4)
-  beta1 ~ dnorm(0, 1/4)
+  beta0 ~ dnorm(0, 2)
+  beta1 ~ dnorm(0, 1)
   
   # Survival Terms
   

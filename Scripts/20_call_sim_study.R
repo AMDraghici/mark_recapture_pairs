@@ -45,7 +45,7 @@ param_list <- list(
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
   rho = rep(0.6, k),
-  betas = list(beta0 = 0.0, beta1 = 3),
+  betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
   init = rep(1,n) 
@@ -133,6 +133,9 @@ gather_posterior_summary(jags_samples2) #%>%
   # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 
 # To do
+
+## ADD RECRUITMENT LOGIC FOR SIMULATION STUDY
+
 # Update Model Code
 # - Check that the pair-swap sampling makes sense 
 # - Once pair-swap is reasonable, add histories and repartner logic 
