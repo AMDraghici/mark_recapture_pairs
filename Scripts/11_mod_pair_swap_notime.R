@@ -1,5 +1,68 @@
 #### Multiple-Partners Joint-Fates Extended CJS Model 
 
+# Data Dictionary --------------------------------------------------------------------------------------------------------------------------
+# 
+#  1. INDEXING
+#  
+#   - nf (integer): Number of females in the sample population
+#   - nm (integer): Number of males in the sample population 
+#   - k  (integer): Number of equidistant sampling occasions throughout the study 
+#   
+#  2. OBSERVED DATA
+#  
+#   - recap_f (binary - matrix: nrow = nf , ncol = k): 
+#         Recapture histories for females in the sample (1 = seen, 0 = unobserved)
+#   - recap_m (binary - matrix: nrow = nm , ncol = k):
+#         Recapture histories for males in the sample (1 = seen, 0 = unobserved)
+#  
+#  3. PARTIALLY OBSERVED DATA
+#  
+#  
+#   - amating_f (binary - matrix nrow = nf , ncol = k): 
+#         Decision to mate for females in the sample from 1:k (1 = mating at k, 0 = not mating at k)
+#   - amating_m (binary - matrix nrow = nf , ncol = k): 
+#         Decision to mate for males in the sample from 1:k (1 = mating at k, 0 = not mating at k)
+# 
+#   - apairs_f (integer - matrix, nrow = nf, ncol = K + 1): 
+#         Partnership records. Rows = Females, Cols = Time, Entries = ID of Male at time k. 
+#         If female choses not to mate at time k then a dummy entry of (nm + 1) is assigned
+#         First column is a dummy entry of nm + 1 for all females and is used for indexing purposes in JAGS
+#
+#   - af (binary - matrix nrow = nf, ncol = K + 1): 
+#           Survival history females (1 for alive, 0 for dead)
+#           First column is a dummy entry with values 1 throughout and is used for indexing purposes in JAGS
+#   - am (binary - matrix nrow = nm, ncol = K + 1): 
+#           Survival history males (1 for alive, 0 for dead)
+#           First column is a dummy entry with values 1 throughout and is used for indexing purposes in JAGS
+#
+#   - arepartner (binary - matrix nrow = nf, ncol = k)
+#           Repeat Partnership history. Rows = Females, Cols = Time
+#           1 = Female at time k formed a pair with partner from time k - 1 
+#           0 = otherwise 
+#           Allows us to estimate fidelity for partners
+#           Conditional on decision to mate and survival to avoid biasing the estimates
+#
+#   - recruit_f (binary - matrix, nrow = nf, ncol = k)
+#           Recruitment into population status for females. 1 if currently in population 0 o/w
+#           Value at k must be equal to 1 for all animals 
+#
+#   - recruit_m (binary - matrix, nrow = nm, ncol = k)
+#           Recruitment into population status for males. 1 if currently in population 0 o/w
+#           Value at k must be equal to 1 for all animals
+#
+#
+#  4. MISCELLANEOUS DATA CONSTRUCTS from Pre-processing
+#
+#   - PSI (binary, array, nrow = nf, ncol = nm + 1, slices = k)
+#       At each time point there is a matrix indicating possible pairings
+#       A possible pairing is denoted by a 1 and an impossible pairing by a zero 
+#       psi[10,10,2] = 1 indicates that male 10 and female 10 COULD form a pair at time 2
+#       This is used to impose restrictions on the random partner sampling step to ensure..
+#       ...that impossible pairs do not form as pairs are defined as one male and one female.
+#       Final column is a dummy column for indexing purposes
+#       
+#--------------------------------------------------------------------------------------------------------------------------------------------
+
 model{
   
   #1. Data Augmentation----------------------------------------------------------------------------------------------------------------------
