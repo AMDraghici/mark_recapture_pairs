@@ -167,6 +167,25 @@ generate_init <- function(jags_data){
   
   # package up the mating stuff into a few functions its a little unweildy 
   
+  # Recruitment 
+  # Female Recruitment
+  for(i in 1:nf){
+    recruit_f[i,1] <- ifelse(is.na(recruit_f[i,1]), rbinom(1, 1, eps[1]),recruit_f[i,1])
+    for(t in 2:(k-1)){
+      recruit_f[i,t] <- ifelse(is.na(recruit_f[i,t]), rbinom(1, 1, (recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])),recruit_f[i,t])
+    } 
+  }
+  
+  # Male Recruitment
+  for(j in 1:nm){
+    recruit_m[j,1] <- ifelse(is.na(recruit_m[j,1]), rbinom(1, 1, eps[1]), recruit_m[j,1])
+    for(t in 2:(k-1)){
+      recruit_m[j,t] <- ifelse(is.na(recruit_m[j,t]), rbinom(1, 1, (recruit_m[j,t-1] + (1-recruit_m[j,t-1]) * eps[t])), recruit_m[j,t])
+    } 
+  }
+  
+  
+  
   # Time 1 initialization (all alive at t=1)
   t <- 1
   
@@ -233,6 +252,7 @@ generate_init <- function(jags_data){
   
   # Time 2 through k initialization
   for(t in 2:k){
+
     # Female Mating Choice at time t
     for(i in 1:nf){
       amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta), amating_f[i,t]) 
@@ -245,6 +265,7 @@ generate_init <- function(jags_data){
     
     # Choose to re-form pairs
     for(i in 1:nf){
+      
       prob_repartner[i,t] <- inv.logit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
       arepartner[i,t] <- ifelse(is.na(arepartner[i,t]), 
                                 rbinom(1,1,prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t]),
@@ -342,6 +363,11 @@ generate_init <- function(jags_data){
     return(mat_final)
   }
   
+  #Female Recruitment
+  recruit_f <- build_NA_mat(recruit_f, jags_data$recruit_f)
+  # Male Recruitment
+  recruit_m <- build_NA_mat(recruit_m, jags_data$recruit_m)
+  
   
   # Female Survival
   af <- build_NA_mat(af, jags_data$af)
@@ -376,6 +402,8 @@ generate_init <- function(jags_data){
     delta = delta,
     beta0 = beta0,
     beta1 = beta1,
+    recruit_m = recruit_m,
+    recruit_f = recruit_f,
     amating_f = amating_f,
     amating_m = amating_m,
     arepartner = arepartner,

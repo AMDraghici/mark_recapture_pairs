@@ -27,18 +27,19 @@ out_dir <- getwd() %+% "/Output/"
 # - some pairs need to be manually updated due to inconsistency wrt mate band and animal id in capture record
 # - whats a logical "dead" age 
 # - some known fate information in the dataset to consider as well (in columns)
+# Inconsistency with psi and apairs_f during data processing - need to go back and check why
 
 
 #SIM DATA
 
-k = 4
-n = 100
+k = 28
+n = 625
 
 param_list <- list(
-  n = n, 
-  k = k, 
+  n = n,
+  k = k,
   prop.female = 0.5,
-  delta = rep(0.9, k), 
+  delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
   gam = rep(0.6, k),
@@ -48,33 +49,15 @@ param_list <- list(
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,n) 
+  init = rep(1,n)
 )
 
-# Pull individual dataset
-#set.seed(42)
+# # # Pull individual dataset
+# # #set.seed(42)
 jags_data <- do.call(simulate_cr_data, param_list)
-cjs_data <- format_to_cjs(jags_data)
+# cjs_data <- format_to_cjs(jags_data)
 
-
-# jags_data$psi <- jags_data$apairs
-# jags_data$psi[is.na(jags_data$psi)] <- 1
-# jags_data$psi <- jags_data$psi[1:jags_data$nf+1,1:jags_data$nm+1,]
-# jags_data$psi <- jags_data$psi[,,1:jags_data$k+1]
-# 
-# psi <- array(NA,dim = c(jags_data$nf,jags_data$nm+1,jags_data$k))
-# 
-# for(i in 1:jags_data$k){
-#   psi[,,i] <- cbind(jags_data$psi[,,i],rep(0,jags_data$nm))
-# }
-# 
-# jags_data$psi <- psi
-# 
-# jags_data$apairs_f <- cbind(rep((jags_data$nf+1),nrow(jags_data$apairs_f)),jags_data$apairs_f)
-# 
-# # 
-# 
-# # Multiple Datasets using parallel
+# Multiple Datasets using parallel
 # sim_cr_dat(parameter_list = param_list, iterations =  2)
 
 # # Run JAGS
@@ -108,11 +91,11 @@ cjs_data <- format_to_cjs(jags_data)
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 1e4, 
-                     'n.thin' = 10,
-                     'n.burn' = 1e3,
-                     'n.chains' = 2,
-                     'n.adapt' = 1e3)
+par_settings <- list('n.iter' = 10, 
+                     'n.thin' = 1,
+                     'n.burn' = 10,
+                     'n.chains' = 3,
+                     'n.adapt' = 10)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
@@ -137,10 +120,10 @@ gather_posterior_summary(jags_samples2) #%>%
 ## ADD RECRUITMENT LOGIC FOR SIMULATION STUDY
 
 # Update Model Code
-# - Check that the pair-swap sampling makes sense 
-# - Once pair-swap is reasonable, add histories and repartner logic 
-# - Then make sure Hduck data is generated correctly 
-# - If simulation is reasonable look at
+# - Check that the pair-swap sampling makes sense (DONE)
+# - Once pair-swap is reasonable, add histories and repartner logic (DONE) 
+# - Then make sure Hduck data is generated correctly (DONE)
+# - If simulation is reasonable look at 
 # - Data Augementation -> need enough spots for all birds (double check when doing model code) +
 #  - -> sometimes birds observed with unseen mate (MEET w/ Simon to Discuss)
 # - Speedup by optimizing code

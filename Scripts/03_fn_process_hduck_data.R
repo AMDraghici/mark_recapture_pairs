@@ -787,6 +787,7 @@ populate_psi <- function(apairs, nf, nm, k){
 }
 
 
+
 # Prepare data for jags
 build_jags_data <- function(cap.data){
   
@@ -827,22 +828,29 @@ build_jags_data <- function(cap.data){
   # Grab Possible Pairings indexed by f/m/time
   psi <- populate_psi(apairs, nf, nm, k)
   
+  add_dummy_row <- function(mat, x = 1){
+    return(rbind(mat,rep(x,ncol(mat))))
+  }
+  add_dummy_col <- function(mat, x = 1){
+    return(cbind(rep(x,nrow(mat)),mat))
+  }
   
   # Store results in list 
   jags_data <- list(nf = nf, 
                     nm = nm,
                     k = k,
-                    recruit_f = recruit_f,
-                    recruit_m = recruit_m,
-                    amating_f = amating_f,
-                    amating_m = amating_m,
+                    recruit_f = add_dummy_row(recruit_f),
+                    recruit_m = add_dummy_row(recruit_m),
+                    amating_f = add_dummy_row(amating_f),
+                    amating_m = add_dummy_row(amating_m),
                     apairs_f = apairs_f,
                     arepartner = arepartner,
+                    apairs = apairs,
                     psi = psi, 
-                    af = cbind(rep(1,nrow(af)),af),
-                    am = cbind(rep(1,nrow(am)),am),
-                    recap_f = recap_f,
-                    recap_m = recap_m)
+                    af = add_dummy_row(add_dummy_col(af)),
+                    am = add_dummy_row(add_dummy_col(am)),
+                    recap_f = add_dummy_row(recap_f, 0),
+                    recap_m = add_dummy_row(recap_m,0))
   
   # Return model data
   return(jags_data)
