@@ -10,30 +10,34 @@
 #   
 #  2. OBSERVED DATA
 #  
-#   - recap_f (binary - matrix: nrow = nf , ncol = k): 
+#   - recap_f (binary - matrix: nrow = nf+1 , ncol = k): 
 #         Recapture histories for females in the sample (1 = seen, 0 = unobserved)
-#   - recap_m (binary - matrix: nrow = nm , ncol = k):
+#         Final row is a dummy entry and are used for indexing purposes in JAGS
+#   - recap_m (binary - matrix: nrow = nm+1 , ncol = k):
 #         Recapture histories for males in the sample (1 = seen, 0 = unobserved)
-#  
+#         Final row is a dummy entry and are used for indexing purposes in JAGS
+#
+#
 #  3. PARTIALLY OBSERVED DATA
 #  
 #  
-#   - amating_f (binary - matrix nrow = nf , ncol = k): 
+#   - amating_f (binary - matrix nrow = nf +1 , ncol = k): 
 #         Decision to mate for females in the sample from 1:k (1 = mating at k, 0 = not mating at k)
-#   - amating_m (binary - matrix nrow = nf , ncol = k): 
+#         Final row is a dummy entry and are used for indexing purposes in JAGS
+#   - amating_m (binary - matrix nrow = nm +1 , ncol = k): 
 #         Decision to mate for males in the sample from 1:k (1 = mating at k, 0 = not mating at k)
-# 
+#         Final row is a dummy entry and are used for indexing purposes in JAGS
 #   - apairs_f (integer - matrix, nrow = nf, ncol = K + 1): 
 #         Partnership records. Rows = Females, Cols = Time, Entries = ID of Male at time k. 
 #         If female choses not to mate at time k then a dummy entry of (nm + 1) is assigned
 #         First column is a dummy entry of nm + 1 for all females and is used for indexing purposes in JAGS
 #
-#   - af (binary - matrix nrow = nf, ncol = K + 1): 
+#   - af (binary - matrix nrow = nf+1, ncol = K + 1): 
 #           Survival history females (1 for alive, 0 for dead)
-#           First column is a dummy entry with values 1 throughout and is used for indexing purposes in JAGS
-#   - am (binary - matrix nrow = nm, ncol = K + 1): 
+#                First column and final row are dummy entries and are used for indexing purposes in JAGS
+#   - am (binary - matrix nrow = nm+1, ncol = K + 1): 
 #           Survival history males (1 for alive, 0 for dead)
-#           First column is a dummy entry with values 1 throughout and is used for indexing purposes in JAGS
+#                First column and final row are dummy entries and are used for indexing purposes in JAGS
 #
 #   - arepartner (binary - matrix nrow = nf, ncol = k)
 #           Repeat Partnership history. Rows = Females, Cols = Time
@@ -42,14 +46,14 @@
 #           Allows us to estimate fidelity for partners
 #           Conditional on decision to mate and survival to avoid biasing the estimates
 #
-#   - recruit_f (binary - matrix, nrow = nf, ncol = k)
+#   - recruit_f (binary - matrix, nrow = nf+1, ncol = k)
 #           Recruitment into population status for females. 1 if currently in population 0 o/w
 #           Value at k must be equal to 1 for all animals 
-#
-#   - recruit_m (binary - matrix, nrow = nm, ncol = k)
+#         Final row is a dummy entry and are used for indexing purposes in JAGS
+#   - recruit_m (binary - matrix, nrow = nm+1, ncol = k)
 #           Recruitment into population status for males. 1 if currently in population 0 o/w
 #           Value at k must be equal to 1 for all animals
-#
+#         Final row is a dummy entry and are used for indexing purposes in JAGS
 #
 #  4. MISCELLANEOUS DATA CONSTRUCTS from Pre-processing
 #
