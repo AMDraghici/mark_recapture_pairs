@@ -252,7 +252,7 @@ generate_init <- function(jags_data){
   
   # Time 2 through k initialization
   for(t in 2:k){
-
+    
     # Female Mating Choice at time t
     for(i in 1:nf){
       amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta), amating_f[i,t]) 
@@ -272,7 +272,6 @@ generate_init <- function(jags_data){
                                 arepartner[i,t])
     }
     
-    
     for(i in 1:nf){
       # Flat likelihood of mating conditional on decision to mate
       # If repairing then force partner to be only choice
@@ -288,7 +287,7 @@ generate_init <- function(jags_data){
       
       # Is male j available at time t (****based on repartner structure***)
       male_taken_jt[j,t] <- sum(equals(apairs_f[1:nf,t],j)*arepartner[1:nf,t])
-      
+
       # Add Exclusion
       for(i in 1:nf){
         # Remove all possible pairings with females who aren't repairing at t+1 for repairing males
@@ -297,6 +296,9 @@ generate_init <- function(jags_data){
       }
     }
     
+    # some error handling 
+    if(!all(sort(which(male_taken_jt[,t] == 1)) == sort(apairs_f[which(arepartner[,t] == 1),t]))) stop("Male taken not working at time:" %+% t)
+
     # Initialize choice selection
     psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
     # Find mate for 1
@@ -305,15 +307,24 @@ generate_init <- function(jags_data){
     }
     
     single_female[1,t] <- equals(apairs_f[1,t+1],nm+1)
+    
     # Mate Selection
     for(i in 2:nf){
       # Remove Formed Pairs
       for(j in 1:nm){
-        psi_cond2[i,j,t] <- psi_cond[i,j,t]*(1-sum(equals(apairs_f[1:(i-1),t+1],j)))
+        
+        taken <- (1-sum(equals(apairs_f[1:(i-1),t+1],j)))
+        
+        if(taken < 0|taken > 1) stop("psi error")
+        # something about how psi is indexing is off
+        
+        psi_cond2[i,j,t] <- psi_cond[i,j,t]*taken
       }
       
       #Add case in which no pairs are available
       psi_cond2[i,(nm+1),t] <- equals(sum(psi_cond2[i,1:nm,t]),0)
+      
+      
       
       # Find mate for i
       if(is.na(apairs_f[i,t+1])){
@@ -322,11 +333,15 @@ generate_init <- function(jags_data){
       single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
     }
     
+    # some error handling 
+    if(any(sort(table(apairs_f[,t]))[-length(table(apairs_f[,t]))] > 1)) stop("Illegal apairing_f at " %+% t)
+    
     for(i in  1:nf){
       for(j in  1:(nm+1)){
         histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t+1],j)*(1-single_female[i,t])
       }
     }
+    
     
     # Marginal Survival Event for Males in the Population (P[Y^M_T])---------------------------------------------
     for(j in 1:nm){

@@ -16,10 +16,10 @@ out_dir <- getwd() %+% "/Output/"
 
 #HDUCK Data
 
-# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-# cap.data <- cap.data #%>% filter(initial_entry < 28)
-# jags_data <- build_jags_data(cap.data)
-# cjs_data <- format_to_cjs(jags_data)
+cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+cap.data <- cap.data #%>% filter(initial_entry < 28)
+jags_data <- build_jags_data(cap.data)
+cjs_data <- format_to_cjs(jags_data)
 
 # Still need to remove some impossible cases
 # - If initial is after current remove from psi matrix (set 1 to 0)
@@ -30,10 +30,19 @@ out_dir <- getwd() %+% "/Output/"
 # Inconsistency with psi and apairs_f during data processing - need to go back and check why
 
 
+for(i in 1:length(jags_data)){
+  print(names(jags_data[i]))
+  if(is.null(dim(jags_data[[i]]))){
+    print(jags_data[[i]])
+  } else {
+    print(dim(jags_data[[i]]))
+  }
+}
+
 #SIM DATA
 
-k = 28
-n = 625
+k = 5
+n = 10
 
 param_list <- list(
   n = n,

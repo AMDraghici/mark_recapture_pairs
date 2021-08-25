@@ -724,7 +724,7 @@ populate_apairs_f <- function(apairs,nf,nm,k){
       if(isPaired){
         partner_id <- which(pair_ijt == 1)
         if(length(partner_id) > 1) stop("Bug found at time" %+% t %+% " and female" %+% i)
-        apairs_f[i,t] <- partner_id
+        apairs_f[i,t+1] <- partner_id
       } else{
         next
       }
