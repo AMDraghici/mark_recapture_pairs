@@ -115,11 +115,11 @@ jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 
 
 jags_samples2 <- run_jags_parallel(jags_data, 
-                                  jags_model,
-                                  jags_params, 
-                                  par_settings,
-                                  out_dir,
-                                  outname = "TESTING_MODEL2")
+                                   jags_model,
+                                   jags_params, 
+                                   par_settings,
+                                   out_dir,
+                                   outname = "TESTING_MODEL2")
 
 
 # x <- run_jags(jags_data,
@@ -128,9 +128,9 @@ jags_samples2 <- run_jags_parallel(jags_data,
 #          par_settings)
 
 gather_posterior_summary(jags_samples2) #%>% 
-  # add_true_values(param_list) %>% 
-  # plot_caterpillar(params = jags_params) +
-  # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
+# add_true_values(param_list) %>% 
+# plot_caterpillar(params = jags_params) +
+# geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 
 # To do
 
@@ -170,3 +170,44 @@ gather_posterior_summary(jags_samples2) #%>%
 # 2. DO THE HDUCK CONVERSION 
 
 #k=10,n=100, beta = 3, 12k iter + 2 cores = 70 hours
+
+
+#SIM DATA
+
+k = 5
+n = 100
+
+param_list <- list(
+  n = n,
+  k = k,
+  prop.female = 0.5,
+  delta = rep(0.9, k),
+  phi.f = rep(0.8, k),
+  phi.m = rep(0.8, k),
+  gam = rep(0.6, k),
+  p.f = rep(0.75, k),
+  p.m = rep(0.75, k),
+  rho = rep(0.6, k),
+  betas = list(beta0 = 1.0, beta1 = 1.5),
+  rand_sex = F,
+  rand_init = F,
+  init = rep(1,n)
+)
+
+par_settings <- list('n.iter' = 10000, 
+                     'n.thin' = 10,
+                     'n.burn' = 1000,
+                     'n.chains' = 1,
+                     'n.adapt' = 1000)
+
+jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
+jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
+jags_data <- sim_dat(param_list)
+jags_data_list <- replicate_shuffled_data(jags_data, 20)
+x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
+                                  jags_model  = jags_model, 
+                                  jags_params = jags_params, 
+                                  par_settings = par_settings,
+                                  out_dir = out_dir,
+                                  save = T,
+                                  ncores = 7)

@@ -572,7 +572,7 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
                                          out_dir,            # Store in same directory if save = T 
                                          save=TRUE,          # Save results? 
                                          outname = NULL,     # Base name for files
-                                         n.cores  = detectCores() - 1 # number of cores
+                                         ncores  = detectCores() - 1 # number of cores
                                          ){ 
 
   
@@ -626,6 +626,25 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
   
   # Close Cluster
   stopCluster(cl)
+  
+  ## Save output    
+  if(save==TRUE){
+    cat("Saving samples and initial values to output directory...\n")
+    #Time stamp
+    tstamp <- strftime(Sys.time(),format="%Y-%m-%d_%H:%M")
+    
+    #If no name is given just use the timestamp
+    if(is.null(outname)){
+      outfile_name <- "/jags_samples_list" %+% tstamp
+    } else {
+      outfile_name <- "/jags_samples_list" %+% outname
+    }
+    
+    #Save JAGS Samples and initial values
+    outfile_samples <- out_dir %+% outfile_name %+% ".rds"
+    saveRDS(jags_results_list,outfile_samples)
+    
+  }
   
   # Return list of outputs 
   return(jags_results_list)
