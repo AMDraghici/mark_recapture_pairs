@@ -432,7 +432,7 @@ generate_init <- function(jags_data){
 }
 
 
-#Process Jags in Parallel
+#Process Jags in Parallel (multiple chains same data)
 run_jags_parallel <- function(jags_data, 
                               jags_model, 
                               jags_params, 
@@ -455,7 +455,7 @@ run_jags_parallel <- function(jags_data,
   for(i in 1:par_settings$n.chains){
     jags_init[[i]] <- generate_init(jags_data)
   }
-
+  
   #Start timer
   timer <- proc.time()
   
@@ -509,23 +509,126 @@ run_jags_parallel <- function(jags_data,
     #If no name is given just use the timestamp
     if(is.null(outname)){
       outfile_name <- "/jags_samples_" %+% tstamp
-      #outinit_name <- "/jags_inits_" %+% tstamp
+      outinit_name <- "/jags_inits_" %+% tstamp
     } else {
       outfile_name <- "/jags_samples_" %+% outname
-      #outinit_name <- "/jags_inits_" %+% outname
+      outinit_name <- "/jags_inits_" %+% outname
     }
     
     #Save JAGS Samples
     outfile_samples <- out_dir %+% outfile_name %+% ".rds"
-    #saveRDS(jags_samples,outfile_samples)
+    saveRDS(jags_samples,outfile_samples)
     
     #Save Jags Initial Values
-    #outfile_inits <- out_dir %+% outinit_name %+% ".rds"
-    #saveRDS(jags_init,outfile_inits)
+    outfile_inits <- out_dir %+% outinit_name %+% ".rds"
+    saveRDS(jags_init,outfile_inits)
   }
   
   #Return MCMC Results
   return(jags_samples)
+}
+
+# Run single chain of jags without parallel and return results + initial values
+run_jags <- function(jags_data,
+                     jags_model,
+                     jags_params, 
+                     par_settings){
+  
+  
+  # Generate initial values
+  jags_inits <- generate_init(jags_data)
+  
+  # Construct Model Object
+  jags_model_graph <- jags.model(file = jags_model, 
+                                 data = jags_data,
+                                 inits = jags_inits,
+                                 n.chains = 1, 
+                                 n.adapt = par_settings$n.adapt)
+  
+  # Burn - in process 
+  update(jags_model_graph, par_settings$n.burn)
+  
+  # Sample from the model 
+  jags_samples <- coda.samples(model = jags_model_graph, 
+                               variable.names = jags_params, 
+                               n.iter = par_settings$n.iter, 
+                               thin = par_settings$n.thin)
+  
+  # Return inits and samples
+  return(list(
+    jags_inits = jags_inits,
+    jags_samples = jags_samples
+  ))
+  
+  
+}
+
+
+# Run jags in parallel with each chain representing a different dataset
+run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets to run model over 
+                                         jags_model,         # Same model to be used for all runs
+                                         jags_params,        # Same parameters to be saved for all runs
+                                         par_settings,       # Same parameter settings for all runs 
+                                         out_dir,            # Store in same directory if save = T 
+                                         save=TRUE,          # Save results? 
+                                         outname = NULL,     # Base name for files
+                                         n.cores  = detectCores() - 1 # number of cores
+                                         ){ 
+
+  
+  
+  #Assign Core count (will not use more than the system has minus one)
+  cat("Initializing cluster for data modelling with JAGS...\n")
+  numcores <- ncores
+  
+  #Set up Cluster
+  cl <- makeCluster(numcores)
+  
+  # Upload Functions, Variables, and Load Libraries
+  cat("Pushing objects to children...\n")
+  
+  #Get Script Path
+  path2scripts <- getwd() %+% "/Scripts"
+  
+  #Export Variables to clusters
+  export <- list(
+    "jags_data_list", "jags_model","jags_params", "par_settings", "path2scripts"
+  )
+  
+  clusterExport(cl, export, envir = environment())
+  clusterEvalQ(cl, source(paste0(path2scripts,"/02_fn_model_code.R")))
+  clusterEvalQ(cl, {
+    library(boot)
+    library(rjags)
+  })
+  
+  # Set Random Seeds
+  clusterSetRNGStream(cl)
+  
+  # Dummy Function
+  f <- function(x,
+                jags_data_list,
+                jags_model, 
+                jags_params,
+                par_settings) {
+    return(run_jags(jags_data_list[[x]],
+                    jags_model,
+                    jags_params, 
+                    par_settings))
+  }
+  
+  #Simulate Data
+  cat("Running Models...\n")
+  
+  jags_results_list <- parLapply(cl, 1:length(jags_data_list), f, jags_data_list, jags_model, jags_params, par_settings)
+  
+  cat("Model Fitting Complete complete...\n")
+  
+  # Close Cluster
+  stopCluster(cl)
+  
+  # Return list of outputs 
+  return(jags_results_list)
 }
 
 
@@ -595,8 +698,6 @@ plot_caterpillar <- function(post_stats,
 }
 
 # Simulation Study Functions-----------------------------------------------------------------------------------------------------------------
-
-# Code to run list of jags_data (list) objects through jags
 
 # 1. Shuffle female order experiment 
 

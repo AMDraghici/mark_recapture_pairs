@@ -3,6 +3,7 @@ library(dclone)
 library(tidyverse)
 library(readxl)
 library(lubridate)
+library(rjags)
 
 #setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
@@ -14,12 +15,12 @@ source(script_dir %+% "02_fn_model_code.R")
 source(script_dir %+% "03_fn_process_hduck_data.R")
 out_dir <- getwd() %+% "/Output/"
 
-#HDUCK Data
-
-cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-cap.data <- cap.data #%>% filter(initial_entry < 28)
-jags_data <- build_jags_data(cap.data)
-cjs_data <- format_to_cjs(jags_data)
+# #HDUCK Data
+# 
+# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+# cap.data <- cap.data #%>% filter(initial_entry < 28)
+# jags_data <- build_jags_data(cap.data)
+# cjs_data <- format_to_cjs(jags_data)
 
 # Still need to remove some impossible cases
 # - If initial is after current remove from psi matrix (set 1 to 0)
@@ -41,8 +42,8 @@ for(i in 1:length(jags_data)){
 
 #SIM DATA
 
-k = 10
-n = 300
+k = 3
+n = 6
 
 param_list <- list(
   n = n,
@@ -68,7 +69,7 @@ cjs_data <- format_to_cjs(jags_data)
 
 # Multiple Datasets using parallel
 data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
-shuffled_list <- replicate_shuffled_data(jags_data, 100)
+shuffled_list <- replicate_shuffled_data(jags_data, 4)
 
 
 # # Run JAGS
@@ -102,11 +103,11 @@ shuffled_list <- replicate_shuffled_data(jags_data, 100)
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 10, 
-                     'n.thin' = 1,
-                     'n.burn' = 10,
-                     'n.chains' = 3,
-                     'n.adapt' = 10)
+par_settings <- list('n.iter' = 10000, 
+                     'n.thin' = 10,
+                     'n.burn' = 1000,
+                     'n.chains' = 1,
+                     'n.adapt' = 1000)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
@@ -120,6 +121,11 @@ jags_samples2 <- run_jags_parallel(jags_data,
                                   out_dir,
                                   outname = "TESTING_MODEL2")
 
+
+# x <- run_jags(jags_data,
+#          jags_model,
+#          jags_params, 
+#          par_settings)
 
 gather_posterior_summary(jags_samples2) #%>% 
   # add_true_values(param_list) %>% 
