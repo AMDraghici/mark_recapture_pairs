@@ -2,7 +2,7 @@
 #    Code runs using embarrassing parallel and should work on both Linux/Windows/MAC
 
 #Generate Data
-sim_cr_dat <- function(parameter_list,iterations, ncores = detectCores() - 1){
+sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
   
   #Assign Core count (will not use more than the system has minus one)
   cat("Initializing cluster for data generation...\n")
@@ -23,7 +23,7 @@ sim_cr_dat <- function(parameter_list,iterations, ncores = detectCores() - 1){
   )
   
   clusterExport(cl, export, envir = environment())
-  clusterEvalQ(cl, source(paste0(path2scripts,"/00_fn_sim_pair_data_rework.R")))
+  clusterEvalQ(cl, source(paste0(path2scripts,"/00_fn_sim_pair_data.R")))
   
   # Set Random Seeds
   clusterSetRNGStream(cl)
@@ -594,4 +594,49 @@ plot_caterpillar <- function(post_stats,
   return(p1)
 }
 
+# Simulation Study Functions-----------------------------------------------------------------------------------------------------------------
 
+# Code to run list of jags_data (list) objects through jags
+
+# 1. Shuffle female order experiment 
+
+shuffle_data <- function(jags_data){
+  
+  # Objects that need to be reordered/used in reordering
+  recruit_f <- jags_data$recruit_f
+  amating_f <- jags_data$amating_f
+  apairs_f <- jags_data$apairs_f
+  arepartner <- jags_data$arepartner
+  psi <- jags_data$psi
+  af <- jags_data$af
+  recap_f <- jags_data$recap_f
+  nf <- jags_data$nf 
+  
+  # Sample new order for females (final index is a dummy spot and is unchanged)
+  new_index <- c(sample(1:nf, size = nf, replace = FALSE),nf+1)
+  
+  #  Reorder objects and Return shuffled data set
+  jags_shuffled <- list(
+    nf                =   jags_data$nf,
+    nm                =   jags_data$nm,
+    k                 =   jags_data$k, 
+    recruit_m         =   jags_data$recruit_m,
+    amating_m         =   jags_data$amating_m,
+    am                =   jags_data$am, 
+    recap_m           =   jags_data$recap_m,
+    recruit_f         =   recruit_f[new_index,],
+    amating_f         =   amating_f[new_index,],
+    apairs_f          =   apairs_f[new_index[-(nf+1)],], 
+    arepartner        =   arepartner[new_index[-(nf+1)],], 
+    psi               =   psi[new_index[-(nf+1)],,],
+    af                =   af[new_index,], 
+    recap_f           =   recap_f[new_index,]
+  )
+  
+  return(jags_shuffled)
+}
+
+replicate_shuffled_data <- function(jags_data, nsamples){
+  jags_data_list <- lapply(1:nsamples, function(x) shuffle_data(jags_data))
+  return(jags_data_list)
+}

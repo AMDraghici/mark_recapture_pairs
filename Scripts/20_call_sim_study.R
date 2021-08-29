@@ -41,8 +41,8 @@ for(i in 1:length(jags_data)){
 
 #SIM DATA
 
-k = 5
-n = 10
+k = 10
+n = 300
 
 param_list <- list(
   n = n,
@@ -63,11 +63,13 @@ param_list <- list(
 
 # # # Pull individual dataset
 # # #set.seed(42)
-jags_data <- do.call(simulate_cr_data, param_list)
-# cjs_data <- format_to_cjs(jags_data)
+jags_data <- sim_dat(param_list)
+cjs_data <- format_to_cjs(jags_data)
 
 # Multiple Datasets using parallel
-# sim_cr_dat(parameter_list = param_list, iterations =  2)
+data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
+shuffled_list <- replicate_shuffled_data(jags_data, 100)
+
 
 # # Run JAGS
 # jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
