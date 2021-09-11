@@ -175,7 +175,7 @@ gather_posterior_summary(jags_samples2) #%>%
 #SIM DATA
 
 k = 5
-n = 100
+n = 50
 
 param_list <- list(
   n = n,
@@ -194,20 +194,64 @@ param_list <- list(
   init = rep(1,n)
 )
 
-par_settings <- list('n.iter' = 10000, 
-                     'n.thin' = 10,
-                     'n.burn' = 1000,
+par_settings <- list('n.iter' = 10, 
+                     'n.thin' = 1,
+                     'n.burn' = 10,
                      'n.chains' = 1,
-                     'n.adapt' = 1000)
+                     'n.adapt' = 10)
 
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
+jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")# "psi_raw", "psi_cond", "psi_cond2", "male_taken_jt")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 jags_data <- sim_dat(param_list)
-jags_data_list <- replicate_shuffled_data(jags_data, 20)
+jags_data_list <- replicate_shuffled_data(jags_data, 100)
 x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
-                                  jags_model  = jags_model, 
-                                  jags_params = jags_params, 
+                                  jags_model  = jags_model,
+                                  jags_params = jags_params,
                                   par_settings = par_settings,
                                   out_dir = out_dir,
                                   save = T,
-                                  ncores = 7)
+                                  ncores = 8)
+
+
+# x <- list()
+# for(i in 1:20){
+#   x[[i]] <- run_jags(jags_data = jags_data, #jags_data_list[[i]],
+#                      jags_model  = jags_model, 
+#                      jags_params = jags_params, 
+#                      par_settings = par_settings,
+#                      debug = T)
+#   
+# }
+# 
+# 
+# jags_data <-  readRDS(getwd() %+% "/jags_data_out_debug.rds") #jags_data_list[[i]]
+# jags_init_out <- readRDS(getwd() %+% "/jags_init_out_debug.rds")
+# saveRDS(jags_init_out,getwd() %+% "/jags_init_out_debug.rds")
+# jags_init <- jags_init_out$jags_inits
+# jags_debug <- jags_init_out$jags_debug
+# 
+# 
+# x <- run_jags(jags_data = jags_data,
+#               jags_model  = jags_model, 
+#               jags_params = jags_params, 
+#               par_settings = par_settings,
+#               debug = T)
+# 
+# # apairs_f[10,6]
+# # Cannot normalize density 
+# 
+# 
+# for(i in 1:5){
+#   print("Time i: "  %+% i %+% "--------------------------------------")
+#   for(j in 1:25){
+#     print("Female j: "  %+% j)
+#     print(which(jags_debug$psi_cond2[j,,i]==1))
+#   }
+# }
+# 
+# 
+# 
+# 
+# dim(jags_data$psi)
+# 
+# jags_data$psi[,nm+2,] <- jags_data$psi[,nm+1,]

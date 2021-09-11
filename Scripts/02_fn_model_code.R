@@ -37,7 +37,7 @@ sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
   cat("Generating data...\n")
   
   cr_dat_list <- parLapply(cl, 1:iterations, f, parameter_list)
-
+  
   cat("Data generation complete...\n")
   
   # Close Cluster
@@ -53,7 +53,7 @@ sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
 
 # Build initial values for jags to use
 
-generate_init <- function(jags_data){
+generate_init <- function(jags_data, debug = F){
   
   #Unpack Variables -----------------------------------------------------------------
   # Indexes
@@ -102,7 +102,7 @@ generate_init <- function(jags_data){
   ##Correlation using four parameter beta (with FH bounds)
   rho_raw <- rbeta(1,3,3)
   rho <- (ru - rl)*rho_raw + rl 
-
+  
   ###Binomial SD for recapture
   sig.PF <- sqrt(PF*(1-PF))
   sig.PM <- sqrt(PM*(1-PM))
@@ -112,7 +112,7 @@ generate_init <- function(jags_data){
   P00 <- 1 - PF - PM + Pfm
   Pf0 <- PF - Pfm
   Pm0 <- PM - Pfm
-
+  
   # Survival Prob and Correlation -------------------------------------------------
   PhiF <- rbeta(1,2,2)
   PhiM <- rbeta(1,2,2)
@@ -142,7 +142,7 @@ generate_init <- function(jags_data){
   Phi00 <- 1 - PhiF - PhiM + Phifm
   Phif0 <- PhiF - Phifm
   Phim0 <- PhiM - Phifm
-
+  
   
   # Simple Processes --------------------------------------------------------------
   # Recruitment 
@@ -159,7 +159,7 @@ generate_init <- function(jags_data){
   beta1 <- rnorm(1, 0, 1/4)
   
   # Missing Data Simulation --------------------------------------------------------
-
+  
   # amating f/m
   # arepartner f/m
   # af/am
@@ -287,7 +287,7 @@ generate_init <- function(jags_data){
       
       # Is male j available at time t (****based on repartner structure***)
       male_taken_jt[j,t] <- sum(equals(apairs_f[1:nf,t],j)*arepartner[1:nf,t])
-
+      
       # Add Exclusion
       for(i in 1:nf){
         # Remove all possible pairings with females who aren't repairing at t+1 for repairing males
@@ -298,7 +298,7 @@ generate_init <- function(jags_data){
     
     # some error handling 
     if(!all(sort(which(male_taken_jt[,t] == 1)) == sort(apairs_f[which(arepartner[,t] == 1),t]))) stop("Male taken not working at time:" %+% t)
-
+    
     # Initialize choice selection
     psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
     # Find mate for 1
@@ -362,11 +362,11 @@ generate_init <- function(jags_data){
       if(is.na(af[i,t+1])){
         af[i, t+1] <- rbinom(1,1, phi.totalF[i,t] * af[i,t] * recruit_f[i,t])
       }
-
+      
     }
     
     
-
+    
   }
   
   # Update Initial Values to follow JAGS structure -----------------------------------------------------------------
@@ -395,7 +395,7 @@ generate_init <- function(jags_data){
   
   # Male Mating Status
   amating_m <- build_NA_mat(amating_m, jags_data$amating_m)
-                       
+  
   # Pair index (female perspective)
   apairs_f <- build_NA_mat(apairs_f, jags_data$apairs_f)
   
@@ -427,8 +427,30 @@ generate_init <- function(jags_data){
     am = am
   )
   
+  # Data objects to ensure pairs are monogamous and inform latent states
+  # Only returned to help error checking initialization 
+  jags_debug <- list(
+    histories = histories,
+    single_female = single_female,
+    phi.totalF = phi.totalF,
+    male_taken_jt = male_taken_jt, 
+    prob_repartner = prob_repartner, 
+    psi_raw = psi_raw,
+    psi_cond = psi_cond,
+    psi_cond2 = psi_cond2
+  )
+  
+  
+  if(debug){
+    # Note the extra list structure if doing debugging
+    jags_init_out <- list(jags_inits = jags_inits,
+                          jags_debug = jags_debug)
+  } else {
+    jags_init_out <- jags_inits
+  }
+  
   # Return Initial Values for a single chain
-  return(jags_inits)
+  return(jags_init_out)
 }
 
 
@@ -450,7 +472,7 @@ run_jags_parallel <- function(jags_data,
   
   #Create Initial Values for each chain using custom initial function
   jags_init <- list()
-
+  
   #First chain uses flat transition initialization then remaining are random
   for(i in 1:par_settings$n.chains){
     jags_init[[i]] <- generate_init(jags_data)
@@ -466,7 +488,7 @@ run_jags_parallel <- function(jags_data,
   cat("Setting up " %+% workers %+% " parallel workers ... \n")
   cl <- makePSOCKcluster(workers)
   tmp <- clusterEvalQ(cl, library(dclone))
-
+  
   cat("Initializing graph nodes and adapting chains with " %+% par_settings$n.adapt %+% " iterations ... \n")
   #Construct graph nodes and initialize in parallel
   parJagsModel(cl = cl, 
@@ -532,11 +554,29 @@ run_jags_parallel <- function(jags_data,
 run_jags <- function(jags_data,
                      jags_model,
                      jags_params, 
-                     par_settings){
+                     par_settings,
+                     debug = F){
   
   
   # Generate initial values
-  jags_inits <- generate_init(jags_data)
+
+  if(debug){
+    jags_init_out <- generate_init(jags_data, debug)
+    jags_inits <- jags_init_out[["jags_inits"]]
+    cat("Saving initial values for debugging....\n")
+    saveRDS(jags_init_out, getwd() %+% "/jags_init_out_debug.rds")
+    saveRDS(jags_data, getwd() %+% "/jags_data_out_debug.rds")
+  } else {
+    jags_inits <- generate_init(jags_data, debug = F)
+  }
+
+  #jags_inits <- readRDS(getwd() %+% "/jags_init_out_debug.rds")$jags_inits
+  
+  #jags_inits <- generate_init(jags_data)
+  #jags_inits <- readRDS("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/test_init.rds")
+  # saveRDS(jags_inits, 
+  #         "C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/test_init.rds")
+  # 
   
   # Construct Model Object
   jags_model_graph <- jags.model(file = jags_model, 
@@ -573,8 +613,8 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
                                          save=TRUE,          # Save results? 
                                          outname = NULL,     # Base name for files
                                          ncores  = detectCores() - 1 # number of cores
-                                         ){ 
-
+){ 
+  
   
   
   #Assign Core count (will not use more than the system has minus one)
@@ -614,7 +654,8 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
     return(run_jags(jags_data_list[[x]],
                     jags_model,
                     jags_params, 
-                    par_settings))
+                    par_settings,
+                    debug = F))
   }
   
   #Simulate Data
@@ -698,7 +739,7 @@ plot_caterpillar <- function(post_stats,
                              params = c("PhiF","PhiM", "PF","PM"), 
                              yrange = NULL, 
                              title = "Caterpillar Plot of Posterior Estimates"
-                             ){
+){
   p1 <- post_stats %>% 
     filter(Parameter_Name %in% params) %>% 
     mutate(Parameter = fct_reorder(Parameter,Mean)) %>% 

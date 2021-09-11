@@ -152,8 +152,8 @@ model{
     
     # Initialize choice selection
     psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
-    apairs_f[1,t+1] ~ dcat(psi_cond2[1, 1:(nm+1), t])
-    single_female[1,t] <- equals(apairs_f[1,t+1],nm+1)
+    apairs_f[1,t+1] ~ dcat(psi_cond2[1, 1:(nm+1), t] + 2e-16)
+    single_female[1,t] <- psi_cond2[1, (nm+1), t]
     
     # Attempts at partnerships forming
     # Monogamous pairings only 
@@ -167,11 +167,13 @@ model{
       #Add case in which no pairs are available 
       psi_cond2[i,(nm+1),t] <- equals(sum(psi_cond2[i,1:nm,t]),0)
       
-      # Find mate for i
-      apairs_f[i,t+1] ~ dcat(psi_cond2[i, 1:(nm+1), t])
+      # Find mate for i 
+      # Adding + 1e-15 is for numerical stability 
+      apairs_f[i,t+1] ~ dcat(psi_cond2[i, 1:(nm+1), t] + 2e-16)
       
       # Designate as single if no males available or if choosing not to mate
-      single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
+      # Psi_cond2 == 1 means that must be single
+      single_female[i,t] <- psi_cond2[i,(nm+1),t]
     }
     
     # Update Total History for Next Time Step
