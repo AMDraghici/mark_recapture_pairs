@@ -22,14 +22,6 @@ out_dir <- getwd() %+% "/Output/"
 # jags_data <- build_jags_data(cap.data)
 # cjs_data <- format_to_cjs(jags_data)
 
-# Still need to remove some impossible cases
-# - If initial is after current remove from psi matrix (set 1 to 0)
-# - should area be considered
-# - some pairs need to be manually updated due to inconsistency wrt mate band and animal id in capture record
-# - whats a logical "dead" age 
-# - some known fate information in the dataset to consider as well (in columns)
-# Inconsistency with psi and apairs_f during data processing - need to go back and check why
-
 
 for(i in 1:length(jags_data)){
   print(names(jags_data[i]))

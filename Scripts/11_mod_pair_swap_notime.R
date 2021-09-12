@@ -152,7 +152,7 @@ model{
     
     # Initialize choice selection
     psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
-    apairs_f[1,t+1] ~ dcat(psi_cond2[1, 1:(nm+1), t] + 2e-16)
+    apairs_f[1,t+1] ~ dcat(psi_cond2[1, 1:(nm+1), t] + 1e-36)
     single_female[1,t] <- psi_cond2[1, (nm+1), t]
     
     # Attempts at partnerships forming
@@ -169,7 +169,7 @@ model{
       
       # Find mate for i 
       # Adding + 1e-15 is for numerical stability 
-      apairs_f[i,t+1] ~ dcat(psi_cond2[i, 1:(nm+1), t] + 2e-16)
+      apairs_f[i,t+1] ~ dcat(psi_cond2[i, 1:(nm+1), t] + 1e-36)
       
       # Designate as single if no males available or if choosing not to mate
       # Psi_cond2 == 1 means that must be single

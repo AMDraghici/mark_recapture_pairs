@@ -48,11 +48,9 @@ sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
 }
 
 # 2. Fitting JAGS Model--------------------------------------------------------------------------------------------
-#    Code runs using embarrassing parallel and should work on both Linux/Windows/MAC
-
+# Code runs using embarrassing parallel and should work on both Linux/Windows/MAC
 
 # Build initial values for jags to use
-
 generate_init <- function(jags_data, debug = F){
   
   #Unpack Variables -----------------------------------------------------------------
@@ -143,7 +141,6 @@ generate_init <- function(jags_data, debug = F){
   Phif0 <- PhiF - Phifm
   Phim0 <- PhiM - Phifm
   
-  
   # Simple Processes --------------------------------------------------------------
   # Recruitment 
   eps <- rep(NA, k)
@@ -184,8 +181,6 @@ generate_init <- function(jags_data, debug = F){
     } 
   }
   
-  
-  
   # Time 1 initialization (all alive at t=1)
   t <- 1
   
@@ -225,7 +220,6 @@ generate_init <- function(jags_data, debug = F){
   }
   
   single_female[1,t] <- equals(apairs_f[1,t+1],nm+1)
-  
   
   # Mate Selection
   for(i in 2:nf){
@@ -324,8 +318,6 @@ generate_init <- function(jags_data, debug = F){
       #Add case in which no pairs are available
       psi_cond2[i,(nm+1),t] <- equals(sum(psi_cond2[i,1:nm,t]),0)
       
-      
-      
       # Find mate for i
       if(is.na(apairs_f[i,t+1])){
         apairs_f[i,t+1] <- rcat(psi_cond2[i, 1:(nm+1), t])
@@ -341,7 +333,6 @@ generate_init <- function(jags_data, debug = F){
         histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t+1],j)*(1-single_female[i,t])
       }
     }
-    
     
     # Marginal Survival Event for Males in the Population (P[Y^M_T])---------------------------------------------
     for(j in 1:nm){
@@ -362,11 +353,7 @@ generate_init <- function(jags_data, debug = F){
       if(is.na(af[i,t+1])){
         af[i, t+1] <- rbinom(1,1, phi.totalF[i,t] * af[i,t] * recruit_f[i,t])
       }
-      
     }
-    
-    
-    
   }
   
   # Update Initial Values to follow JAGS structure -----------------------------------------------------------------
@@ -380,9 +367,9 @@ generate_init <- function(jags_data, debug = F){
   
   #Female Recruitment
   recruit_f <- build_NA_mat(recruit_f, jags_data$recruit_f)
+  
   # Male Recruitment
   recruit_m <- build_NA_mat(recruit_m, jags_data$recruit_m)
-  
   
   # Female Survival
   af <- build_NA_mat(af, jags_data$af)
@@ -401,7 +388,6 @@ generate_init <- function(jags_data, debug = F){
   
   # Repartner index (female perspective)
   arepartner <- build_NA_mat(arepartner, jags_data$arepartner)
-  
   
   # Return Results ------------------------------------------------------------------
   
@@ -440,7 +426,6 @@ generate_init <- function(jags_data, debug = F){
     psi_cond2 = psi_cond2
   )
   
-  
   if(debug){
     # Note the extra list structure if doing debugging
     jags_init_out <- list(jags_inits = jags_inits,
@@ -452,7 +437,6 @@ generate_init <- function(jags_data, debug = F){
   # Return Initial Values for a single chain
   return(jags_init_out)
 }
-
 
 #Process Jags in Parallel (multiple chains same data)
 run_jags_parallel <- function(jags_data, 
@@ -513,7 +497,6 @@ run_jags_parallel <- function(jags_data,
                                  n.iter = par_settings$n.iter, 
                                  thin = par_settings$n.thin)
   
-  
   #Release clusters
   stopCluster(cl)
   
@@ -557,9 +540,7 @@ run_jags <- function(jags_data,
                      par_settings,
                      debug = F){
   
-  
   # Generate initial values
-
   if(debug){
     jags_init_out <- generate_init(jags_data, debug)
     jags_inits <- jags_init_out[["jags_inits"]]
@@ -569,14 +550,6 @@ run_jags <- function(jags_data,
   } else {
     jags_inits <- generate_init(jags_data, debug = F)
   }
-
-  #jags_inits <- readRDS(getwd() %+% "/jags_init_out_debug.rds")$jags_inits
-  
-  #jags_inits <- generate_init(jags_data)
-  #jags_inits <- readRDS("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/test_init.rds")
-  # saveRDS(jags_inits, 
-  #         "C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/test_init.rds")
-  # 
   
   # Construct Model Object
   jags_model_graph <- jags.model(file = jags_model, 
@@ -599,10 +572,7 @@ run_jags <- function(jags_data,
     jags_inits = jags_inits,
     jags_samples = jags_samples
   ))
-  
-  
 }
-
 
 # Run jags in parallel with each chain representing a different dataset
 run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets to run model over 
@@ -614,8 +584,6 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
                                          outname = NULL,     # Base name for files
                                          ncores  = detectCores() - 1 # number of cores
 ){ 
-  
-  
   
   #Assign Core count (will not use more than the system has minus one)
   cat("Initializing cluster for data modelling with JAGS...\n")
@@ -684,15 +652,153 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
     #Save JAGS Samples and initial values
     outfile_samples <- out_dir %+% outfile_name %+% ".rds"
     saveRDS(jags_results_list,outfile_samples)
-    
   }
   
   # Return list of outputs 
   return(jags_results_list)
 }
 
+# 3. Simulation Study Wrappers ---------------------------------------------------------------------------------------------------------------------
 
-# 3. Investigate Results for a Single Run (live data for example)-------------------------------------------------------------------
+#Grid Generator (for multiple grid simulation)
+generate_grid <- function(grid_base,to_vary){
+  
+  #Initialize Variables
+  parameter_grid <- list()
+  param_names <- names(to_vary)
+  grid_entries <- bind_rows(to_vary[1])
+  
+  #Unpack Grid Entries 
+  if(length(to_vary) > 1){
+    for(i in 2:length(param_names)){
+      param <- param_names[i]
+      param_entries <- bind_rows(to_vary[param])
+      grid_entries <- merge(grid_entries,param_entries,by=NULL)
+    }
+  }
+  
+  #Create Parameter Grid
+  for(j in 1:nrow(grid_entries)){
+    for(l in 1:length(param_names)){
+      param <- param_names[l]
+      dimension <- length(grid_base[param][[1]])
+      grid_base[[param]] <- rep(as.vector(t(grid_entries[j,][param])),dimension)
+    }
+    parameter_grid[[j]] <- grid_base
+  }
+  #Return Results
+  return(list(parameter_grid = parameter_grid,
+              grid_entries = grid_entries))
+}
+
+
+#Add covariance part for grid simulation within mathematical bounds
+add_cov_grid <- function(to_vary,parameter_list,param,by=0.5){
+  
+  #Covariance Bounds
+  grid_entries <- generate_grid(parameter_list,to_vary)[[2]]
+  #Add Parameters
+  if(param == "gamma"){
+    #Gamma Grid
+    gam_stats <- compute_jbin_param_cjs(grid_entries$phi.f,grid_entries$phi.m)
+    gam_bounds <- cbind(gam_stats[[5]],gam_stats[[6]])
+    gam_range <- cbind(max(gam_bounds[,1]),min(gam_bounds[,2]))
+    gam <- seq(gam_range[1],gam_range[2],by=by) %>% round(3)
+    to_vary[["gamma"]] <- gam
+  } else if(param== "rho"){
+    #Rho Grid
+    rho_stats <- compute_jbin_param_cjs(grid_entries$p.f,grid_entries$p.m)
+    rho_bounds <- cbind(rho_stats[[5]],rho_stats[[6]])
+    rho_range <- cbind(max(rho_bounds[,1]),min(rho_bounds[,2]))
+    vrho <- seq(rho_range[1],rho_range[2],by=by) %>% round(3)
+    to_vary[["rho"]] <- vrho
+  }
+  #Return Results
+  return(to_vary)
+}
+
+
+# Run Simulation Study 
+run_simulation <- function(grid_data, 
+                           jags_model, 
+                           jags_params,
+                           par_settings,
+                           out_dir,
+                           iterations, 
+                           ncores = detectCores() - 1){
+  
+  # Extract Grid Objects
+  parameter_grid <- grid_data[["parameter_grid"]]
+  grid_entries <- grid_data[["grid_entries"]]
+  
+  # Assign Batches based on each parameter setting
+  batches <- grid_entries %>% nrow()
+  cat("Initializing Simulation by assigning #" %+% batches %+% " batches" %+% "...\n")
+  
+  # Run simulation study in batches
+  for(j in 1:batches){
+    
+    cat("Executing Batch #" %+% j %+% " of " %+% batches %+% "...\n")
+    
+    #Report List Slice
+    cat("Generating data for Batch #" %+% j %+% "...\n")  
+    
+    # Generate Grid of Data
+    jags_data_list <-  sim_cr_dat(parameter_list = parameter_grid[[j]], 
+                                  iterations =  iterations,
+                                  ncores = ncores)
+    
+    # Identify batches when post-processing
+    outname <- "_batch_" %+% j %+% "_of_" %+% batches
+    
+    #Store Datasets
+    cat("Saving data from Batch #" %+% j %+% "....\n")
+    outdata_name <- out_dir %+%  "/jags_data_list" %+% outname %+% ".rds"
+    saveRDS(jags_data_list, outdata_name)
+    
+    #Model Data
+    cat("Running JAGS with " %+% ncores %+% " cores for Batch #" %+% j %+% "...\n")
+    
+    jags_results_list <- run_jags_simulation_parallel(jags_data_list = jags_data_list, 
+                                                      jags_model = jags_model, 
+                                                      jags_params = jags_params,
+                                                      par_settings = par_settings,
+                                                      out_dir = out_dir, 
+                                                      save = T,
+                                                      outname = outname,
+                                                      ncores = ncores)
+    
+    #Report Completion 
+    cat("Results stored for Batch #" %+% j %+% "....\n")
+    
+    # Create compact summary tables
+    cat("Constructing summary table for Batch #" %+% j %+% "....\n")
+    jags_summary_list <- lapply(1:iterations,
+                                function(x) gather_posterior_summary(jags_results_list[[x]]$jags_samples))
+    
+    
+    cat("Saving summary table for Batch #" %+% j %+% "....\n")
+    outsumm_name <- out_dir %+%  "/jags_summary_list" %+% outname %+% ".rds"
+    saveRDS(jags_summary_list, outsumm_name)
+    
+    
+    cat("Modelling batch #" %+% j %+% " of " %+% batches %+% " complete...\n")
+    cat("Freeing Memory....\n")
+    
+    # Drop data objects
+    rm(jags_data_list)
+    rm(jags_results_list)
+    rm(jags_summary_list)
+    
+    # Silent Garbage Collection (free mem)
+    invisible(gc())
+  }
+  
+  cat("Simulation complete...\n")
+}
+
+
+# 4. Investigate Results for a Single Run (live data for example)-------------------------------------------------------------------
 
 # Grab Summary statistics 
 gather_posterior_summary <- function(fit){
@@ -704,7 +810,7 @@ gather_posterior_summary <- function(fit){
   summ_stats <- as.data.frame(summ$statistics) %>% rownames_to_column(var = "Parameter")
   summ_quant <- as.data.frame(summ$quantiles) %>% rownames_to_column(var = "Parameter")
   post_stats <- inner_join(summ_stats, summ_quant, by = "Parameter") %>% 
-    mutate(Parameter_Name = gsub("[[]","",gsub("[[0-9]]+","",inner_join(summ_stats, summ_quant)$Parameter))) # add unique par name
+    mutate(Parameter_Name = gsub("[[]","",gsub("[[0-9]]+","",inner_join(summ_stats, summ_quant, by = "Parameter")$Parameter))) # add unique par name
   
   # Return Results
   return(post_stats)
@@ -760,8 +866,7 @@ plot_caterpillar <- function(post_stats,
 # Simulation Study Functions-----------------------------------------------------------------------------------------------------------------
 
 # 1. Shuffle female order experiment 
-
-shuffle_data <- function(jags_data){
+shuffle_f_data <- function(jags_data){
   
   # Objects that need to be reordered/used in reordering
   recruit_f <- jags_data$recruit_f
@@ -801,3 +906,4 @@ replicate_shuffled_data <- function(jags_data, nsamples){
   jags_data_list <- lapply(1:nsamples, function(x) shuffle_data(jags_data))
   return(jags_data_list)
 }
+

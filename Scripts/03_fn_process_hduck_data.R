@@ -1,7 +1,7 @@
-
+# Extract Data From Excel Spreadsheets
 gather_hq_data <- function(dat_dir, 
                             book1 = "Harlequin_Capture_Records_24Aug2020.xls", 
-                            book2 = "HARD_Obs_10May95_08Sep20.xls"){
+                            book2 = "HARD_Obs_20Aug94_08Sep20_revised.xls"){
   #Storage
   dat1 <- list()
   dat2 <- list()
@@ -20,6 +20,7 @@ gather_hq_data <- function(dat_dir,
   return(list(book1 = dat1, book2 = dat2))
 }
 
+# Clean up rolling bandlists into one duck ID
 process_bandlist <- function(hq_data){
   BandList <- hq_data[["book1"]][[2]]  %>%
     rename(year_class = `Year Class`,
@@ -30,6 +31,8 @@ process_bandlist <- function(hq_data){
   return(BandList)
 }
 
+# Function for observation data if desired for use in modelling
+# For now this is not being utilized however the function is still available 
 process_extensive_records <- function(hq_data, year.dat){
   #Grab Bandlist Information
   BandList <- process_bandlist(hq_data)
@@ -293,7 +296,7 @@ process_extensive_records <- function(hq_data, year.dat){
   return(cap.data5)
 }
 
-
+# Format capture records into long data format with all possible recapture years in data
 process_capture_records <- function(hq_data){
   
   # Grab Bandlist Information
@@ -359,12 +362,12 @@ build_cr_df <- function(hq_data){
   year.dat <- select(CaptureRecords, year, time) %>% 
     distinct() %>% 
     arrange(time)
-  
-  extended.cap <- process_extensive_records(hq_data, year.dat)
-  
-  
-  # Unite Capture Records
-  CaptureRecords <- rbind(CaptureRecords, extended.cap)
+  # 
+  # extended.cap <- process_extensive_records(hq_data, year.dat)
+  # 
+  # 
+  # # Unite Capture Records
+  # CaptureRecords <- rbind(CaptureRecords, extended.cap)
   
   #Capture-Recapture format
   cap.data <- merge(unique(CaptureRecords$animal_id),year.dat$time) %>% 
@@ -432,6 +435,7 @@ build_cr_df <- function(hq_data){
   return(cap.data)
 } 
 
+# Add implied survival states (must have been alive previously if alive now etc.)
 add_implied_states <- function(cap.data){
   
   # Animal IDs and amount of time 
@@ -491,6 +495,7 @@ add_implied_states <- function(cap.data){
   return(cap.data)
 }
 
+# Assign male id and female ids
 assign_ids_bysex <- function(cap.data){
   
   # Assign new ids to females and males
@@ -545,7 +550,7 @@ populate_recruit <- function(cap.data, nf, nm, k){
   
 }
 
-
+# Build JAGS data for desire to mate at t
 populate_mating <- function(cap.data, nf, nm, k){
   
   # Attempt to mate matrix
@@ -573,6 +578,7 @@ populate_mating <- function(cap.data, nf, nm, k){
   return(list(amating_f = amating_f, amating_m = amating_m))
 }
 
+# Assign known pairs and possible fates for JAGS 
 populate_pairs <- function(cap.data, nf, nm, k){
   
   #Pairs matrix
@@ -709,7 +715,7 @@ populate_recap <- function(cap.data, nf, nm, k){
   return(list(recap_f = recap_f, recap_m = recap_m))
 }
 
-
+# Assign compact known pairs by female by year using male ids 
 populate_apairs_f <- function(apairs,nf,nm,k){
   # Build data object and set dummy variable (represents single)
   apairs_f <- matrix(NA,nrow = nf,ncol=k+1)
@@ -735,6 +741,7 @@ populate_apairs_f <- function(apairs,nf,nm,k){
   return(apairs_f)
 }
 
+# Assign known re-partnerships by female by year
 populate_arepartner <- function(apairs_f, nf, nm, k){
   
   # Dummy matrix
@@ -770,6 +777,7 @@ populate_arepartner <- function(apairs_f, nf, nm, k){
   return(arepartner)
 }
 
+# Assign data object with possible pairings based on known fates and known survival apriori to sampling
 populate_psi <- function(apairs, nf, nm, k){
   # Build index of possible pairings 
   # Used for homogenous pair assignment mechanism
@@ -855,39 +863,3 @@ build_jags_data <- function(cap.data){
   # Return model data
   return(jags_data)
 }
-
-
-# NExt steps
-
-# (DONE) Add individual covariates (weight/size/etc)
-# (DONE) Add key identifiers for non-breeders (Age/Mother/Watershed Area)
-# (DONE) Address previous states for survival
-# (DONE) Map animal_ids to male_id and female_id ranging from 1:Nm and 1:Nf respectively 
-# (DONE) Build out model matrices (joint states and stuff)
-
-# Special mating cases
-# Check for special cases in joint matrix (deal with known mates but unknown partners)
-# ie. How to deal with those who are known to be mated (mother with YoY -- probably just data augment)
-# Deal with NA values in the single slots (go back and check what the model does with these)
-# Add Data augmentation (addresses one point above)
-
-# Update model to account for new information
-# Update data simulation to match what we see here
-# Build vanilla M/F JS model with recruitment 
-# Run both for many iterations and compare
-# Build out post-processesing functions + figures + tables
-# Run small simulation study to show that mod2 is identifiable 
-# Figure out conditional states for pair density 
-# Do we need a penalty function of some sort? 
-
-
-
-# PAIR INCONSISTENCY TABLE
-#      k    pc   pc2    del
-# 1    4    9    8.5    0.5
-# 2    7   15    14.0   1.0
-# 3    8    6    5.5    0.5
-# 4    9   12    13.0  -1.0
-# 5   18    4    5.0   -1.0
-# 6   20    4    4.5   -0.5
-# 7   24    7    8.0   -1.0

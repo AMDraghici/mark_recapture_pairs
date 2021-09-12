@@ -17,7 +17,7 @@ or <- function(p,q){
   return(out)
 }
 
-# odds ratio
+# odds product
 op <- function(p,q){
   odds_p <- odds(p)
   odds_q <- odds(q)
