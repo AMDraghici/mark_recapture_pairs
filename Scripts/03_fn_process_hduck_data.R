@@ -1,18 +1,18 @@
-
+# Extract Data From Excel Spreadsheets
 gather_hq_data <- function(dat_dir, 
-                            book1 = "Harlequin_Capture_Records_29Aug2012.xls", 
-                            book2 = "HARD_Obs_10May95_31Aug2012.xls"){
+                            book1 = "Harlequin_Capture_Records_24Aug2020.xls", 
+                            book2 = "HARD_Obs_20Aug94_08Sep20_revised.xls"){
   #Storage
   dat1 <- list()
   dat2 <- list()
   
-  # 8 sheets in book1
-  for(i in 1:8){
+  # 9 sheets in book1
+  for(i in 1:9){
     dat1[[i]] <-  read_excel(dat_dir %+% book1, sheet = i)
   }
  
   # 5 sheets in book2
-  for(j in 1:5){
+  for(j in 1:7){
     dat2[[j]] <- read_excel(dat_dir %+% book2, sheet = j)
   }
   
@@ -20,8 +20,9 @@ gather_hq_data <- function(dat_dir,
   return(list(book1 = dat1, book2 = dat2))
 }
 
+# Clean up rolling bandlists into one duck ID
 process_bandlist <- function(hq_data){
-  BandList <- hq_data[["book1"]][[1]]  %>%
+  BandList <- hq_data[["book1"]][[2]]  %>%
     rename(year_class = `Year Class`,
            first_plastic = `1st Plastic`,
            second_plastic=`2nd Plastic`,
@@ -30,14 +31,280 @@ process_bandlist <- function(hq_data){
   return(BandList)
 }
 
+# Function for observation data if desired for use in modelling
+# For now this is not being utilized however the function is still available 
+process_extensive_records <- function(hq_data, year.dat){
+  #Grab Bandlist Information
+  BandList <- process_bandlist(hq_data)
+  
+  # Clean Messy Data and Format to be added to capture record list
+  cap2 <- hq_data$book2[[4]]%>% 
+    rowid_to_column(var = "JoinID") %>% 
+    rename(CodeSex = `Sex Code`,
+           PrStatus4 = `PrStaus4`,
+           `YBand1` = `YBand 1`,
+           `YBand2` = `YBand 2`,
+           `YBand3` = `YBand 3`,
+           `YBand4` = `YBand 4`,
+           `YBand5` = `YBand 5`,
+           `YBand6` = `YBand 6`,
+           `YBand7` = `YBand 7`,
+           `YBand8` = `YBand 8`,
+           `YBand9` = `YBand 9`,
+           `YBand10` = `YBand 10`) %>% 
+    mutate(PrStatus7 = as.character(PrStatus7),
+           PrStatus8 = as.character(PrStatus8),
+           PrStatus9 = as.character(PrStatus9),
+           PrStatus10 = as.character(PrStatus10))
+  
+  BandDf <- cap2 %>% 
+    select(
+      JoinID,
+      Date,
+      Year,
+      CodeSex,
+      Area,
+      `Obs Type`,
+      Band1, Band2, Band3,Band4, Band5,
+      Band6, Band7, Band8,Band9,Band10
+    ) %>% 
+    pivot_longer(
+      cols = starts_with(c("Band")),
+      names_to = "NumSurvey",
+      names_prefix = "Band",
+      values_to = "Band"
+    ) 
+  
+  SexDf <- cap2 %>% 
+    select(
+      JoinID,
+      Date,
+      Year,
+      CodeSex,
+      Area,
+      `Obs Type`,
+      Sex1,Sex2,Sex3,Sex4,Sex5,
+      Sex6,Sex7,Sex8,Sex9,Sex10
+    ) %>% 
+    pivot_longer(
+      cols = starts_with(c("Sex")),
+      names_to = "NumSurvey",
+      names_prefix = "Sex",
+      values_to = "Sex"
+    )  
+  
+  
+  PrDf <- cap2 %>% 
+    select(
+      JoinID,
+      Date,
+      Year,
+      CodeSex,
+      Area,
+      `Obs Type`,
+      PrStatus1,PrStatus2,PrStatus3,PrStatus4,
+      PrStatus5,PrStatus6,PrStatus7,PrStatus8,
+      PrStatus9,PrStatus10,
+    ) %>% 
+    pivot_longer(
+      cols = starts_with(c("PrStatus")),
+      names_to = "NumSurvey",
+      names_prefix = "PrStatus",
+      values_to = "PrStatus"
+    )  
+  
+  YBandDf <- cap2 %>% 
+    select(
+      JoinID,
+      Date,
+      Year,
+      CodeSex,
+      Area,
+      `Obs Type`,
+      `YBand1`,`YBand2`,`YBand3`,`YBand4`,`YBand5`,
+      `YBand6`,`YBand7`,`YBand8`,`YBand9`,`YBand10`
+    ) %>% 
+    pivot_longer(
+      cols = starts_with(c("YBand")),
+      names_to = "NumSurvey",
+      names_prefix = "YBand",
+      values_to = "YBand"
+    ) 
+  
+  
+  
+  cap.data2 <- BandDf %>% 
+    inner_join(SexDf, by = c("JoinID", "Date", "Year", "CodeSex",  "Area","Obs Type" ,"NumSurvey")) %>% 
+    inner_join(PrDf, by = c("JoinID", "Date", "Year", "CodeSex",  "Area","Obs Type" ,"NumSurvey")) %>% 
+    inner_join(YBandDf, by = c("JoinID", "Date", "Year", "CodeSex",  "Area","Obs Type" ,"NumSurvey")) %>% 
+    mutate(AllNA = 1*(is.na(Band) & is.na(Sex) & is.na(PrStatus) & is.na(YBand))) %>% 
+    filter(AllNA == 0) %>% 
+    select(-AllNA) %>% 
+    left_join(na.omit(select(BandList,ID,first_plastic)),by=c("Band" = "first_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,second_plastic)),by=c("Band" = "second_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,third_plastic)),by=c("Band" = "third_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("Band" = "fourth_plastic")) %>% 
+    mutate(BANDID = pmax(ifelse(is.na(ID.x),0,ID.x),
+                         ifelse(is.na(ID.y),0,ID.y),
+                         ifelse(is.na(ID.x.x),0,ID.x.x),
+                         ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+    select(-ID.x,
+           -ID.y,
+           -ID.x.x,
+           -ID.y.y) %>% 
+    left_join(na.omit(select(BandList,ID,first_plastic)),by=c("YBand" = "first_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,second_plastic)),by=c("YBand" = "second_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,third_plastic)),by=c("YBand" = "third_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("YBand" = "fourth_plastic")) %>% 
+    mutate(YBANDID = pmax(ifelse(is.na(ID.x),0,ID.x),
+                          ifelse(is.na(ID.y),0,ID.y),
+                          ifelse(is.na(ID.x.x),0,ID.x.x),
+                          ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+    select(-ID.x,
+           -ID.y,
+           -ID.x.x,
+           -ID.y.y) %>% 
+    filter(!(BANDID == 0 & YBANDID == 0)) %>% 
+    mutate(Mated = ifelse(PrStatus %in% c("1","2","3"),1, 
+                          ifelse(PrStatus == "0",0,NA)),
+           age = "AHY") %>% 
+    select(-NumSurvey, -CodeSex, -PrStatus) %>% 
+    rename(initial_entry = "Obs Type")
+  
+  # Add Mother ID
+  
+  cap_index <- cap.data2 %>% filter(YBANDID > 0) %>% pull(JoinID) %>% unique()
+  data_list <- list()
+  
+  for(i in 1:length(cap_index)){
+    cap_id <- cap_index[i]
+    temp <- cap.data2 %>% filter(JoinID == cap_id) 
+    mother_id <- temp$BANDID[1]
+    temp_y <- temp %>% 
+      mutate(mother_id = mother_id,
+             BANDID = YBANDID,
+             Mated = 0,
+             Band = YBand,
+             Sex = NA,
+             age = "HY")
+    temp_mom <- temp %>% slice(1) %>% 
+      mutate(YBand  = NA,
+             YBANDID = NA,
+             Mated = 1,
+             mother_id = 0)
+    
+    data_list[[i]] <- rbind(temp_mom, temp_y) %>% select(-YBand,-YBANDID)
+  }
+  
+  yband.data <- do.call(rbind,data_list)
+  
+  mother_index <- yband.data %>% 
+    select(BANDID, mother_id) %>% 
+    distinct() %>%
+    filter(mother_id > 0)
+  
+  cap.data3 <- cap.data2 %>% select(-YBand,-YBANDID) %>% 
+    filter(!(JoinID %in% cap_index)) %>% 
+    left_join(mother_index, by = "BANDID") %>% 
+    rbind(yband.data) %>% 
+    mutate(mother_id = ifelse(is.na(mother_id),0,mother_id))
+  
+  #Adhoc Fixes
+  cap.data3 <- cap.data3 %>% 
+    mutate(BANDID = ifelse(Band == "Yg36",483,BANDID)) %>% 
+    filter(BANDID > 0)
+  
+  
+  # Add partners
+  known_pairs <- hq_data$book2[[7]] %>% 
+    select(1:3) %>% 
+    rename(Male = `Male Band`,
+           Female = `Female Band`) %>% 
+    filter(tolower(trimws(Male)) != "ub",
+           tolower(trimws(Male)) != "u",
+           tolower(trimws(Female)) != "ub",
+           tolower(trimws(Female)) != "u") %>% 
+    left_join(na.omit(select(BandList,ID,first_plastic)),by=c("Male" = "first_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,second_plastic)),by=c("Male" = "second_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,third_plastic)),by=c("Male" = "third_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("Male" = "fourth_plastic")) %>% 
+    mutate(Male = pmax(ifelse(is.na(ID.x),0,ID.x),
+                       ifelse(is.na(ID.y),0,ID.y),
+                       ifelse(is.na(ID.x.x),0,ID.x.x),
+                       ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+    select(-ID.x,
+           -ID.y,
+           -ID.x.x,
+           -ID.y.y) %>% 
+    left_join(na.omit(select(BandList,ID,first_plastic)),by=c("Female" = "first_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,second_plastic)),by=c("Female" = "second_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,third_plastic)),by=c("Female" = "third_plastic")) %>% 
+    left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("Female" = "fourth_plastic")) %>% 
+    mutate(Female = pmax(ifelse(is.na(ID.x),0,ID.x),
+                         ifelse(is.na(ID.y),0,ID.y),
+                         ifelse(is.na(ID.x.x),0,ID.x.x),
+                         ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+    select(-ID.x,
+           -ID.y,
+           -ID.x.x,
+           -ID.y.y) %>% 
+    filter(Male > 0 & Female > 0)
+  
+  
+  known_pairs_m <- known_pairs %>% 
+    mutate(Sex = "M") %>% rename(BANDID = "Male", PartnerID = "Female") %>% 
+    select(Year,Sex, BANDID, PartnerID)
+  known_pairs_f <- known_pairs %>% 
+    mutate(Sex = "F") %>% rename(BANDID = "Female", PartnerID = "Male") %>% 
+    select(Year, Sex, BANDID, PartnerID)
+  
+  
+  pair_data <- rbind(known_pairs_m,known_pairs_f)
+  
+  cap.data4 <- cap.data3 %>% 
+    left_join(pair_data, by = c("Year","Sex","BANDID")) %>% 
+    select(-JoinID) %>% 
+    distinct()
+  
+  # Remove Duplicate information
+  cap.data5 <- cap.data4 %>% 
+    group_by(Year, BANDID)  %>% 
+    arrange(desc(Mated), desc(PartnerID),desc(mother_id),desc(Sex),desc(Area)) %>% 
+    slice(1) %>% 
+    ungroup() %>% 
+    mutate(capture_date   = as.Date(Date,origin = "1899-12-30"),
+           year = year(capture_date),
+           month = month(capture_date),
+           day = day(capture_date ),
+           pair_status = ifelse(Mated == 1, "P", ifelse(Mated == 0, "N", "U")),
+           initial_entry = ifelse(initial_entry == "C","C","RC"),
+           bird_wt = NA,
+           wing_crd = NA,
+           tarsus_len = NA,
+           culmen_len = NA) %>% 
+    left_join(year.dat, by = "year") %>% 
+    rename(
+      "animal_id" = "BANDID",
+      "sex" = "Sex",
+      "mated" = "Mated",
+      "partner_id" = "PartnerID"
+    ) %>% 
+    select(capture_date,  year, month, day, animal_id, sex,  
+           partner_id, pair_status, initial_entry, age, mother_id, time,
+           bird_wt, wing_crd, tarsus_len, culmen_len, Area)
+  
+  return(cap.data5)
+}
+
+# Format capture records into long data format with all possible recapture years in data
 process_capture_records <- function(hq_data){
   
   # Grab Bandlist Information
   BandList <- process_bandlist(hq_data)
   
   # Grab Capture Records/Covariates/Assign partners and build history using Animal ID only
-  CaptureRecords <- hq_data[["book1"]][[2]] %>%  
-    mutate(Capture.Date = as.Date(`Capture Date`,origin = "1899-12-30"),
+  CaptureRecords <- hq_data[["book1"]][[3]] %>%  
+    mutate(Capture.Date = as.Date(`Banding Date`,origin = "1899-12-30"),
            year = year(Capture.Date),
            month = month(Capture.Date),
            day = mday(Capture.Date)) %>% 
@@ -49,10 +316,14 @@ process_capture_records <- function(hq_data){
            "pair_status" = "Pairstat",
            "partner_id" = "Mateleg",
            "initial_entry" = "Type",
-           "first_plastic" = `1stPlastic`,
+           "first_plastic" = `1st Plastic`,
            "age" = "Age",
            "year_class" = `Year Class`,
-           "mother_id"  = MotherID) %>%
+           "mother_id"  = MotherID,
+           "bird_wt" = `Bird Weight`,
+           "wing_crd" = `Wing Chord`,
+           "tarsus_len" = `Tarsus Length`,
+           "culmen_len" = `Culmen Length`) %>%
     arrange(animal_id,capture_date,initial_entry)  %>%
     left_join(na.omit(select(BandList,ID,first_plastic)),by=c("partner_id" = "first_plastic")) %>% 
     left_join(na.omit(select(BandList,ID,second_plastic)),by=c("partner_id" = "second_plastic")) %>% 
@@ -67,8 +338,8 @@ process_capture_records <- function(hq_data){
     ) %>% 
     select(-ID.x,-ID.y,-ID.x.x,-ID.y.y) %>% 
     select(capture_date,year,month,day,animal_id,sex,partner_id,
-           pair_status,initial_entry, age, mother_id, time, Weight,             
-           Wing,Tarsus, Culmen, Area) %>% 
+           pair_status,initial_entry, age, mother_id, time, bird_wt,             
+           wing_crd,tarsus_len, culmen_len, Area) %>% 
     filter(!is.na(capture_date)) %>%
     left_join(na.omit(select(BandList,ID,first_plastic)),by=c("mother_id" = "first_plastic")) %>% 
     left_join(na.omit(select(BandList,ID,second_plastic)),by=c("mother_id" = "second_plastic")) %>% 
@@ -88,9 +359,15 @@ build_cr_df <- function(hq_data){
   CaptureRecords <- process_capture_records(hq_data)
   
   
-  year.dat <- select(CaptureRecords,year, time) %>% 
+  year.dat <- select(CaptureRecords, year, time) %>% 
     distinct() %>% 
     arrange(time)
+  # 
+  # extended.cap <- process_extensive_records(hq_data, year.dat)
+  # 
+  # 
+  # # Unite Capture Records
+  # CaptureRecords <- rbind(CaptureRecords, extended.cap)
   
   #Capture-Recapture format
   cap.data <- merge(unique(CaptureRecords$animal_id),year.dat$time) %>% 
@@ -130,16 +407,35 @@ build_cr_df <- function(hq_data){
     select(animal_id,time,initial_entry,
            sex,mated,partner_id, 
            age, mother_id, Area,
-           Weight, Wing, Tarsus, Culmen,
+           bird_wt, wing_crd, tarsus_len, culmen_len,
            recapture_individual,surv_individual_confounded) %>% 
     distinct()
   
   # Drop duplicate captures for females
-  cap.data <- cap.data %>% group_by(animal_id, time) %>% slice(1) %>% ungroup() %>% as.data.frame()
+  #cap.data <- cap.data %>% group_by(animal_id, time) %>% slice(1) %>% ungroup() %>% as.data.frame()
+  cap.data <- cap.data %>% group_by(animal_id, time) %>% summarize(
+    animal_id = unique(animal_id),
+    time = unique(time),
+    initial_entry = unique(initial_entry),
+    sex = unique(sex),
+    mated = max(mated,na.rm=T),
+    partner_id = max(partner_id, na.rm =T),
+    age =  max(age,na.rm=T),
+    mother_id = max(mother_id, na.rm =T),
+    Area = max(Area, na.rm = T),
+    bird_wt = max(bird_wt, na.rm = T),
+    wing_crd = max(wing_crd, na.rm=T),
+    tarsus_len = max(tarsus_len, na.rm =T),
+    culmen_len = max(culmen_len, na.rm=T),
+    recapture_individual = max(recapture_individual, na.rm=T),
+    surv_individual_confounded = max(surv_individual_confounded, na.rm=T)
+  ) %>% ungroup() %>% as.data.frame()
   
+  cap.data[cap.data == -Inf] <- NA
   return(cap.data)
 } 
 
+# Add implied survival states (must have been alive previously if alive now etc.)
 add_implied_states <- function(cap.data){
   
   # Animal IDs and amount of time 
@@ -199,6 +495,7 @@ add_implied_states <- function(cap.data){
   return(cap.data)
 }
 
+# Assign male id and female ids
 assign_ids_bysex <- function(cap.data){
   
   # Assign new ids to females and males
@@ -227,8 +524,8 @@ assign_ids_bysex <- function(cap.data){
 populate_recruit <- function(cap.data, nf, nm, k){
   
   # Recruitment matrices
-  recruit_f <- matrix(NA, nrow = nf+1, ncol = k)
-  recruit_m <- matrix(NA, nrow = nm+1, ncol = k)
+  recruit_f <- matrix(NA, nrow = nf, ncol = k)
+  recruit_m <- matrix(NA, nrow = nm, ncol = k)
   
   # Extract initial entry by id 
   female_init <- cap.data %>% select(sex, jags_id, initial_entry) %>% filter(sex == "F") %>% arrange(jags_id) %>% distinct()
@@ -253,7 +550,7 @@ populate_recruit <- function(cap.data, nf, nm, k){
   
 }
 
-
+# Build JAGS data for desire to mate at t
 populate_mating <- function(cap.data, nf, nm, k){
   
   # Attempt to mate matrix
@@ -281,10 +578,17 @@ populate_mating <- function(cap.data, nf, nm, k){
   return(list(amating_f = amating_f, amating_m = amating_m))
 }
 
+# Assign known pairs and possible fates for JAGS 
 populate_pairs <- function(cap.data, nf, nm, k){
   
   #Pairs matrix
-  apairs <- array(NA, dim = c(nf, nm, k))
+  apairs <- array(NA, dim = c(nf+1, nm+1, k+1))
+  
+  # Dummy Index
+  apairs[1:(nf+1),1,] <- 0
+  apairs[1,1:(nm+1),] <- 0
+  apairs[,,1] <- 0 
+  
   
   # Females and partners
   female_mates <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
@@ -298,10 +602,10 @@ populate_pairs <- function(cap.data, nf, nm, k){
       if(is.na(female_partner_id)) next #skip if no partner
       for(j in 1:nm){
         # Zero out other pair formation
-        apairs[female_id, , t] <- 0
-        apairs[,female_partner_id,t] <- 0
+        apairs[female_id+1, , t+1] <- 0
+        apairs[,female_partner_id+1,t+1] <- 0
         # Add formed pair 
-        apairs[female_id, female_partner_id, t] <- 1
+        apairs[female_id+1, female_partner_id+1, t+1] <- 1
       }
     }
   }
@@ -312,7 +616,7 @@ populate_pairs <- function(cap.data, nf, nm, k){
   for(l in 1:nrow(impossible_pairs)){
     male_id <- impossible_pairs$jags_id[l]
     mother_id <- impossible_pairs$jags_mother_id[l]
-    apairs[mother_id,male_id,] <- 0
+    apairs[mother_id+1,male_id+1,] <- 0
   }
   
   # Return pairs list
@@ -323,8 +627,8 @@ populate_pairs <- function(cap.data, nf, nm, k){
 populate_surv <- function(cap.data, nf, nm, k){
 
   #Conditional Paired Survival matrices
-  af <- matrix(NA, nrow = nf+1, ncol = k)
-  am <- matrix(NA, nrow = nm+1, ncol = k)
+  af <- matrix(NA, nrow = nf, ncol = k)
+  am <- matrix(NA, nrow = nm, ncol = k)
   
   # Survival data.frames
   surv_f <- cap.data %>%
@@ -333,24 +637,41 @@ populate_surv <- function(cap.data, nf, nm, k){
     arrange(jags_id) %>% 
     distinct()
   
+  last_alive_f <- surv_f %>% 
+    group_by(jags_id) %>% 
+    summarize(last_alive = max(which(surv_individual_confounded == 1))) %>% 
+    ungroup()
+  
   surv_m <- cap.data %>% 
     select(sex, jags_id, time, surv_individual_confounded) %>%
     filter(sex == "M") %>% 
     arrange(jags_id) %>%
     distinct()
   
+  last_alive_m <- surv_m %>% 
+    group_by(jags_id) %>% 
+    summarize(last_alive = max(which(surv_individual_confounded == 1))) %>% 
+    ungroup()
+  
   # Populate survival matrices for females
   for(i in 1:nrow(surv_f)){
     id <- surv_f$jags_id[i]
     t <- surv_f$time[i]
-    af[id, t] <- surv_f$surv_individual_confounded[i]
+    last <- last_alive_f %>% filter(jags_id == id) %>% pull(last_alive)
+    
+    if(t <= last){
+      af[id, t] <- 1
+    }
   }
   
   # Populate survival matrices for males
   for(i in 1:nrow(surv_m)){
     id <- surv_m$jags_id[i]
     t <- surv_m$time[i]
-    am[id, t] <- surv_m$surv_individual_confounded[i]
+    last <- last_alive_m %>% filter(jags_id == id) %>% pull(last_alive)
+    if(t <= last){
+      am[id, t] <- 1
+    }
   }
   # Return surv data
   return(list(af = af, am = am))
@@ -360,8 +681,8 @@ populate_surv <- function(cap.data, nf, nm, k){
 populate_recap <- function(cap.data, nf, nm, k){
   
   # Assign memory 
-  recap_f <- matrix(NA, nrow = nf+1, ncol = k)
-  recap_m <- matrix(NA, nrow = nm+1, ncol = k)
+  recap_f <- matrix(NA, nrow = nf, ncol = k)
+  recap_m <- matrix(NA, nrow = nm, ncol = k)
   
   # Recapture data.frames
   recapture_f <- cap.data %>%
@@ -394,6 +715,87 @@ populate_recap <- function(cap.data, nf, nm, k){
   return(list(recap_f = recap_f, recap_m = recap_m))
 }
 
+# Assign compact known pairs by female by year using male ids 
+populate_apairs_f <- function(apairs,nf,nm,k){
+  # Build data object and set dummy variable (represents single)
+  apairs_f <- matrix(NA,nrow = nf,ncol=k+1)
+  apairs_f[,1] <- nm + 1
+  
+  for(t in 1:k){
+    for(i in 1:nf){
+      
+      pair_ijt <- apairs[i+1,2:(nm+1),t+1]
+      isPaired <- any(pair_ijt == 1,na.rm=T)
+      
+      if(isPaired){
+        partner_id <- which(pair_ijt == 1)
+        if(length(partner_id) > 1) stop("Bug found at time" %+% t %+% " and female" %+% i)
+        apairs_f[i,t+1] <- partner_id
+      } else{
+        next
+      }
+      
+    }
+  }
+  
+  return(apairs_f)
+}
+
+# Assign known re-partnerships by female by year
+populate_arepartner <- function(apairs_f, nf, nm, k){
+  
+  # Dummy matrix
+  arepartner <- matrix(NA,nrow = nf, ncol = k)
+
+  
+  # Assign based on apairs_f going forward
+  for(t in 1:k){
+      arepartner[,t] <- 1*(apairs_f[,t] == apairs_f[,t+1])
+  }
+  
+  # Set known initial case to 0
+  arepartner[,1] <- 0
+  
+  
+  # If previous partner is with another mate (that was observed) then arepartner must be zero
+  for(time in 2:k){
+    for(i in 1:nf){
+      
+      mask1 <- is.na(arepartner[i,time]) #is this case unknown
+      mask2 <- !is.na(apairs_f[i,time]) # do we know their last partner
+      mask3 <- ifelse(mask2,any(apairs_f[i,time] == c(nm+1,apairs_f[-i,time+1]), na.rm = T),FALSE) # if partner has a new mate or if past state was single
+      
+      # ...Then repartner is known zero
+      if(mask1 & mask2 & mask3){
+        arepartner[i,time] <- 0
+      } else {
+        next
+      }
+    }
+  }
+  
+  return(arepartner)
+}
+
+# Assign data object with possible pairings based on known fates and known survival apriori to sampling
+populate_psi <- function(apairs, nf, nm, k){
+  # Build index of possible pairings 
+  # Used for homogenous pair assignment mechanism
+  psi <- apairs
+  psi[is.na(psi)] <- 1
+  psi <- psi[1:nf+1,1:nm+1,]
+  psi <- psi[,,1:k+1]
+  
+  psi_array <- array(NA,dim = c(nf,nm+1,k))
+  
+  for(t in 1:k){
+    psi_array[,,t] <- cbind(psi[,,t],rep(0,nf))
+  }
+  return(psi_array)
+}
+
+
+
 # Prepare data for jags
 build_jags_data <- function(cap.data){
   
@@ -425,44 +827,39 @@ build_jags_data <- function(cap.data){
   recap_f <- recap_list[["recap_f"]]
   recap_m <- recap_list[["recap_m"]]
   
+  # Construct partner index by female
+  apairs_f <- populate_apairs_f(apairs,nf,nm,k)
+  
+  # Construct partially repartnership matrix
+  arepartner <- populate_arepartner(apairs_f, nf, nm, k)
+  
+  # Grab Possible Pairings indexed by f/m/time
+  psi <- populate_psi(apairs, nf, nm, k)
+  
+  add_dummy_row <- function(mat, x = 1){
+    return(rbind(mat,rep(x,ncol(mat))))
+  }
+  add_dummy_col <- function(mat, x = 1){
+    return(cbind(rep(x,nrow(mat)),mat))
+  }
+  
   # Store results in list 
   jags_data <- list(nf = nf, 
                     nm = nm,
                     k = k,
-                    recruit_f = recruit_f,
-                    recruit_m = recruit_m,
-                    amating_f = amating_f,
-                    amating_m = amating_m,
-                    apairs = apairs, 
-                    af = af,
-                    am = am, 
-                    recap_f = recap_f,
-                    recap_m = recap_m)
+                    recruit_f = add_dummy_row(recruit_f),
+                    recruit_m = add_dummy_row(recruit_m),
+                    amating_f = add_dummy_row(amating_f),
+                    amating_m = add_dummy_row(amating_m),
+                    apairs_f = apairs_f,
+                    arepartner = arepartner,
+                    apairs = apairs,
+                    psi = psi, 
+                    af = add_dummy_row(add_dummy_col(af)),
+                    am = add_dummy_row(add_dummy_col(am)),
+                    recap_f = add_dummy_row(recap_f, 0),
+                    recap_m = add_dummy_row(recap_m,0))
   
   # Return model data
   return(jags_data)
 }
-
-
-# NExt steps
-
-# (DONE) Add individual covariates (weight/size/etc)
-# (DONE) Add key identifiers for non-breeders (Age/Mother/Watershed Area)
-# (DONE) Address previous states for survival
-# (DONE) Map animal_ids to male_id and female_id ranging from 1:Nm and 1:Nf respectively 
-# (DONE) Build out model matrices (joint states and stuff)
-
-# Special mating cases
-# Check for special cases in joint matrix (deal with known mates but unknown partners)
-# ie. How to deal with those who are known to be mated (mother with YoY -- probably just data augment)
-# Deal with NA values in the single slots (go back and check what the model does with these)
-# Add Data augmentation (addresses one point above)
-
-# Update model to account for new information
-# Update data simulation to match what we see here
-# Build vanilla M/F JS model with recruitment 
-# Run both for many iterations and compare
-# Build out post-processesing functions + figures + tables
-# Run small simulation study to show that mod2 is identifiable 
-# Figure out conditional states for pair density 
-# Do we need a penalty function of some sort? 
