@@ -604,7 +604,7 @@ run_jags_simulation_parallel <- function(jags_data_list,     # List of datasets 
   )
   
   clusterExport(cl, export, envir = environment())
-  clusterEvalQ(cl, source(paste0(path2scripts,"/02_fn_model_code.R")))
+  clusterEvalQ(cl, source(paste0(path2scripts,"/01_fn_model_code.R")))
   clusterEvalQ(cl, {
     library(boot)
     library(rjags)

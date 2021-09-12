@@ -20,8 +20,8 @@ out_dir <- getwd() %+% "/Output/"
 
 # Source in custom functions 
 source(script_dir %+% "00_fn_sim_pair_data.R")
-source(script_dir %+% "02_fn_model_code.R")
-source(script_dir %+% "03_fn_process_hduck_data.R")
+source(script_dir %+% "01_fn_model_code.R")
+source(script_dir %+% "02_fn_process_hduck_data.R")
 
 # Prepare Data Settings -------------------------------------------------------------------------------------------------------------------------------------
 

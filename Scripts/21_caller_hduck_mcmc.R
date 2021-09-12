@@ -20,8 +20,8 @@ out_dir <- getwd() %+% "/Output/"
 
 # Source in custom functions 
 source(script_dir %+% "00_fn_sim_pair_data.R")
-source(script_dir %+% "02_fn_model_code.R")
-source(script_dir %+% "03_fn_process_hduck_data.R")
+source(script_dir %+% "01_fn_model_code.R")
+source(script_dir %+% "02_fn_process_hduck_data.R")
 
 # Data processing ----------------------------------------------------------------------------------------------------------------------------
 
@@ -51,7 +51,7 @@ par_settings <- list('n.iter' = 1e4,
 
 # Parameters to save and path to model 
 jags_params_std <- c("pF", "pM", "phiF", "phiM")
-jags_model_std <- script_dir %+% "/11_cjs_mod_standard.R"
+jags_model_std <- script_dir %+% "/10_cjs_mod_standard.R"
 
 # Run JAGS parallel 
 jags_samples_std <- run_jags_parallel(jags_data = cjs_data,
