@@ -35,7 +35,7 @@ out_dir <- getwd() %+% "/Output/"
 #SIM DATA
 
 k = 8
-n = 20
+n = 100
 
 param_list <- list(
   n = n,
@@ -51,7 +51,7 @@ param_list <- list(
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
-  init = sample(k-1, n, TRUE)
+  init = rep(1,n)#sample(k-1, n, TRUE)
 )
 
 # # # Pull individual dataset
@@ -79,27 +79,28 @@ shuffled_list <- replicate_shuffled_data(jags_data, 4)
 # 
 # # Run standard Model
 # 
-# jags_params <- c("pF", "pM", "phiF", "phiM")
-# jags_model <- script_dir %+% "/11_cjs_mod_standard.R"
-# 
-# 
-# jags_samples <- run_jags_parallel(cjs_data,
-#                                   jags_model,
-#                                   jags_params,
-#                                   par_settings,
-#                                   out_dir,
-#                                   outname = "T1_CJS_STD")
+jags_params <- c("pF", "pM", "phiF", "phiM")
+jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
+ 
+ 
+jags_samples <- run_jags_parallel(cjs_data,
+                                  jags_model,
+                                  jags_params,
+                                  par_settings,
+                                  out_dir,
+                                  save = F, 
+                                  outname = "T1_CJS_STD")
 
 
 # TEST DATA WITH PROGRAM MARK TO SEE RESULTS 
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 100, 
+par_settings <- list('n.iter' = 10000, 
                      'n.thin' = 10,
-                     'n.burn' = 100,
+                     'n.burn' = 1000,
                      'n.chains' = 1,
-                     'n.adapt' = 100)
+                     'n.adapt' = 1000)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
