@@ -456,8 +456,11 @@ initialize_partner_status <- function(n, coef_list, pairs, mating, recruit, init
   prob_mate <- psi_t * mating[,,i] * recruit[,,i]
   
   for(j in 1:(nf)){
+
     # Probability of partnerships forming for j -> 1:n
     probj <- prob_mate[j,]
+    
+    if(sum(probj==0)) probj[nm+1] <- 1
     
     # Any pairs that have formed cannot form again
     if(j == 2){
@@ -497,7 +500,7 @@ initialize_survival_status <- function(sex, k, initial_entry, sf, sm){
     enter_at_i_male <- which(initial_entry[(nf+1):n] == i)
     sm[enter_at_i_male,i] <- 1
     
-    # Turn the previous entries into NA for likelihood calculation
+    # Turn the previous entries into 1 for likelihood calculation
     if(i > 1){
       sf[enter_at_i_female,1:(i-1)] <- 0
       sm[enter_at_i_male,1:(i-1)] <- 0
@@ -799,6 +802,7 @@ compute_partnerships <- function(sex, coef_list, pairs, mating, time, repartner)
     # Probability of partnerships forming for j -> 1:n
     # If repartner = 1 then a pair reforms 
     probj <- prob_mate[j,]/sum(prob_mate[j,]) 
+    if(sum(probj==0)) probj[nm+1] <- 1
     
     # Any pairs that have formed cannot form again
     if(j == 2){
@@ -963,6 +967,36 @@ compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.
   
   # Return recapture-pairs matrix
   return(rpair)
+}
+
+compute_hidden_recruitment <- function(recruit_f, recruit_m, recap_f, recap_m){
+  
+  # First captures
+  first_female <- sapply(1:(nrow(recap_f)-1), function(x) min(which(recap_f[x,] == 1)))
+  first_male <- sapply(1:(nrow(recap_m)-1), function(x) min(which(recap_m[x,] == 1)))
+  
+  
+  for(i in 1:length(first_female)){
+    
+    if(first_female[i] == 1| first_female[i] == Inf) next
+    
+    recruit_f[i, 1:(first_female[i]-1)] <- NA
+    
+  }
+  
+  
+  for(i in 1:length(first_male)){
+    
+    if(first_male[i] == 1| first_male[i] == Inf) next
+    
+    recruit_m[i, 1:(first_male[i]-1)] <- NA
+    
+  }
+  
+  return(list(recruit_f = recruit_f,
+              recruit_m = recruit_m))
+
+  
 }
 
 
@@ -1305,6 +1339,11 @@ simulate_cr_data <- function(n,
 
   # Build partially observed/latent data variables
   
+  # Hidden recruitment 
+  recruit_list <- compute_hidden_recruitment(recruit_f, recruit_m, recap_f, recap_m)
+  recruit_f <- recruit_list[["recruit_f"]]
+  recruit_m <- recruit_list[["recruit_m"]]
+  
   # Hidden Survival
   asurv_list <- compute_hidden_survival(pairs_f, pairs_m, rpair, spair, sf, sm, k, sex)
   af <- asurv_list[["af"]]
@@ -1319,7 +1358,7 @@ simulate_cr_data <- function(n,
   apairs_f <- apairs_list[["apairs_f"]]
   apairs_m <- apairs_list[["apairs_m"]]
   psi <- apairs_list[["psi"]]
-  
+
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     

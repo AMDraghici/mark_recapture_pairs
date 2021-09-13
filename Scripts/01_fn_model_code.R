@@ -181,71 +181,18 @@ generate_init <- function(jags_data, debug = F){
     } 
   }
   
-  # Time 1 initialization (all alive at t=1)
-  t <- 1
-  
   # Intermediate objects defined within JAGS
   histories <- array(0, dim = c(nf, nm+1, k+1))
   single_female <- matrix(NA, nrow = nf, ncol = k)
   prob_repartner <- matrix(NA, nrow = nf, ncol = k)
   phi.totalF <- matrix(NA, nrow = nf, ncol = k)
   male_taken_jt <- matrix(NA, nrow = nm, ncol = k)
-  
-  # Are unknowns mating?
-  amating_f[is.na(amating_f[,t]),t] <- rbinom(length(amating_f[is.na(amating_f[,t]),t]),1,delta)
-  amating_m[is.na(amating_m[,t]),t] <- rbinom(length(amating_m[is.na(amating_m[,t]),t]),1,delta)
-  
-  # Who are they mating with? 
-  
-  # Update Exclusion matrix PSI (ignore repartner structure at time 1 since no repartnering has occured yet)
-  psi_raw <- array(NA, dim = c(nf, nm, k))
-  
-  for(i in 1:nf){
-    # Flat likelihood of mating conditional on decision to mate
-    # If repairing then force partner to be only choice
-    # If not repairing then exclude past partner plus any non-mating males
-    for(j in 1:nm){
-      psi_raw[i, j, t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1 - equals(apairs_f[i,t],j)) * (1 - arepartner[i,t]) +
-        arepartner[i,t] * equals(apairs_f[i,t],j)
-    }
-  }
-  
-  # Psi_cond and psi_cond2 are used in the 2-k loop
+  psi_raw <- array(NA, dim = c(nf, nm, k))   # Update Exclusion matrix PSI (ignore repartner structure at time 1 since no repartnering has occured yet)
   psi_cond <- psi_raw
   psi_cond2 <- array(NA, dim = c(nf, nm + 1, k))
-  psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
-  
-  if(is.na(apairs_f[1,t+1])){
-    apairs_f[1,t+1] <- rcat(psi_cond2[1, 1:(nm+1), t])
-  }
-  
-  single_female[1,t] <- equals(apairs_f[1,t+1],nm+1)
-  
-  # Mate Selection
-  for(i in 2:nf){
-    # Remove Formed Pairs
-    for(j in 1:nm){
-      psi_cond2[i,j,t] <- psi_cond[i,j,t]*(1-sum(equals(apairs_f[1:(i-1),t+1],j)))
-    }
-    
-    #Add case in which no pairs are available
-    psi_cond2[i,(nm+1),t] <- equals(sum(psi_cond2[i,1:nm,t]),0)
-    
-    # Find mate for i
-    if(is.na(apairs_f[i,t+1])){
-      apairs_f[i,t+1] <- rcat(psi_cond2[i, 1:(nm+1), t])
-    }
-    single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
-  }
-  
-  for(i in  1:nf){
-    for(j in  1:(nm+1)){
-      histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t+1],j)*(1-single_female[i,t])
-    }
-  }
   
   # Time 2 through k initialization
-  for(t in 2:k){
+  for(t in 1:k){
     
     # Female Mating Choice at time t
     for(i in 1:nf){
@@ -337,7 +284,7 @@ generate_init <- function(jags_data, debug = F){
     # Marginal Survival Event for Males in the Population (P[Y^M_T])---------------------------------------------
     for(j in 1:nm){
       if(is.na(am[j,t+1])){
-        am[j,t+1] <- rbinom(1,1,PhiM * am[j,t] * recruit_m[j,t])
+        am[j,t+1] <- rbinom(1,1,PhiM * am[j,t] * recruit_m[j,t] + (1-recruit_m[j,t]))
       }
     }
     
@@ -351,7 +298,7 @@ generate_init <- function(jags_data, debug = F){
       
       # Draw Survival Event
       if(is.na(af[i,t+1])){
-        af[i, t+1] <- rbinom(1,1, phi.totalF[i,t] * af[i,t] * recruit_f[i,t])
+        af[i, t+1] <- rbinom(1,1, phi.totalF[i,t] * af[i,t] * recruit_f[i,t] + (1-recruit_f[j,t]))
       }
     }
   }

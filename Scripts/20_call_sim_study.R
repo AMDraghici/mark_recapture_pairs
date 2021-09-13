@@ -23,19 +23,19 @@ out_dir <- getwd() %+% "/Output/"
 # cjs_data <- format_to_cjs(jags_data)
 
 
-for(i in 1:length(jags_data)){
-  print(names(jags_data[i]))
-  if(is.null(dim(jags_data[[i]]))){
-    print(jags_data[[i]])
-  } else {
-    print(dim(jags_data[[i]]))
-  }
-}
+# for(i in 1:length(jags_data)){
+#   print(names(jags_data[i]))
+#   if(is.null(dim(jags_data[[i]]))){
+#     print(jags_data[[i]])
+#   } else {
+#     print(dim(jags_data[[i]]))
+#   }
+# }
 
 #SIM DATA
 
-k = 3
-n = 6
+k = 8
+n = 20
 
 param_list <- list(
   n = n,
@@ -51,7 +51,7 @@ param_list <- list(
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,n)
+  init = sample(k-1, n, TRUE)
 )
 
 # # # Pull individual dataset
@@ -95,15 +95,21 @@ shuffled_list <- replicate_shuffled_data(jags_data, 4)
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 10000, 
+par_settings <- list('n.iter' = 100, 
                      'n.thin' = 10,
-                     'n.burn' = 1000,
+                     'n.burn' = 100,
                      'n.chains' = 1,
-                     'n.adapt' = 1000)
+                     'n.adapt' = 100)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
+
+x <- run_jags(jags_data = jags_data, 
+              jags_model  = jags_model,
+              jags_params = jags_params,
+              par_settings = par_settings,
+              debug = F)
 
 
 jags_samples2 <- run_jags_parallel(jags_data, 
@@ -183,7 +189,7 @@ param_list <- list(
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,n)
+  init  = rep(1,n)#sample(k-1, n, TRUE)
 )
 
 par_settings <- list('n.iter' = 10, 
@@ -195,14 +201,25 @@ par_settings <- list('n.iter' = 10,
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")# "psi_raw", "psi_cond", "psi_cond2", "male_taken_jt")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 jags_data <- sim_dat(param_list)
+
+
+x <- run_jags(jags_data = jags_data, 
+              jags_model  = jags_model,
+              jags_params = jags_params,
+              par_settings = par_settings,
+              debug = F)
+
+
 jags_data_list <- replicate_shuffled_data(jags_data, 100)
+jags_data_list <- sim_cr_dat(param_list, iterations = 10, ncores = 5)
+
 x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
                                   jags_model  = jags_model,
                                   jags_params = jags_params,
                                   par_settings = par_settings,
                                   out_dir = out_dir,
-                                  save = T,
-                                  ncores = 8)
+                                  save = F,
+                                  ncores = 5)
 
 
 # x <- list()

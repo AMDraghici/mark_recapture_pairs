@@ -183,7 +183,7 @@ model{
     
     # Marginal Survival Event for Males in the Population (P[Y^M_T])
     for(j in 1:nm){
-      am[j,t+1] ~ dbern(PhiM * am[j,t] * recruit_m[j,t])
+      am[j,t+1] ~ dbern(PhiM * am[j,t] * recruit_m[j,t]  + (1-recruit_m[j,t]))
     }
     
     # Marginal Recapture Event for Males in the Population (P[X^M_T|X^F_T])
@@ -195,7 +195,7 @@ model{
                                     (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # Male mated and female perished
       
       # Draw Survival Event 
-      af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t] * recruit_f[i,t])    
+      af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t] * recruit_f[i,t] + (1-recruit_f[i,t]))    
     }
     
     # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
