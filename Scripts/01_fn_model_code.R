@@ -193,7 +193,7 @@ generate_init <- function(jags_data, debug = F){
   
   # Time 2 through k initialization
   for(t in 1:k){
-    
+ #   print(t)
     # Female Mating Choice at time t
     for(i in 1:nf){
       amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta), amating_f[i,t]) 
@@ -206,8 +206,12 @@ generate_init <- function(jags_data, debug = F){
     
     # Choose to re-form pairs
     for(i in 1:nf){
-      
+  #    print("i:" %+% i %+% "t:" %+% t)
       prob_repartner[i,t] <- inv.logit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
+      
+   #   print("prob_repartner:"  %+% prob_repartner[i,t]  %+% "; hist:" %+% histories[i, apairs_f[i,t] , t] )
+   #   print("arepartner:" %+% arepartner[i,t] %+% "; amating_f:" %+% amating_f[i,t] %+% "; amating_f:" %+% amating_m[apairs_f[i,t],t])
+      
       arepartner[i,t] <- ifelse(is.na(arepartner[i,t]), 
                                 rbinom(1,1,prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t]),
                                 arepartner[i,t])
@@ -244,6 +248,8 @@ generate_init <- function(jags_data, debug = F){
     psi_cond2[1, 1:(nm+1), t] <- c(psi_cond[1,1:nm,t],equals(sum(psi_cond[1,1:nm,t]),0))
     # Find mate for 1
     if(is.na(apairs_f[1,t+1])){
+      #print("Female " %+% 1 %+% " has " %+% sum(psi_cond2[1, 1:(nm+1), t]) %+%  " partners available at " %+% t)
+      if(is.na(sum(psi_cond2[1, 1:(nm+1), t]))) browser()
       apairs_f[1,t+1] <- rcat(psi_cond2[1, 1:(nm+1), t])
     }
     
@@ -267,6 +273,8 @@ generate_init <- function(jags_data, debug = F){
       
       # Find mate for i
       if(is.na(apairs_f[i,t+1])){
+        #print("Female " %+% 1 %+% " has " %+% sum(psi_cond2[1, 1:(nm+1), t]) %+%  " partners available at " %+% t)
+        if(is.na(sum(psi_cond2[i, 1:(nm+1), t]))) browser()
         apairs_f[i,t+1] <- rcat(psi_cond2[i, 1:(nm+1), t])
       }
       single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
@@ -296,9 +304,13 @@ generate_init <- function(jags_data, debug = F){
         (1 - single_female[i,t]) * (am[apairs_f[i,t+1],t+1] * (Phifm/PhiM) + # Male mated and female surived
                                       (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # Male mated and female perished
       
+      
+     # print("female:" %+% i %+% "; time:" %+% t %+% "; phi.totalF:" %+% phi.totalF[i,t] %+% "; recruit_f" %+% recruit_f[i,t])
+      
+      
       # Draw Survival Event
       if(is.na(af[i,t+1])){
-        af[i, t+1] <- rbinom(1,1, phi.totalF[i,t] * af[i,t] * recruit_f[i,t] + (1-recruit_f[j,t]))
+        af[i, t+1] <- rbinom(1,1, phi.totalF[i,t] * af[i,t] * recruit_f[i,t] + (1-recruit_f[i,t]))
       }
     }
   }
@@ -850,7 +862,7 @@ shuffle_f_data <- function(jags_data){
 }
 
 replicate_shuffled_data <- function(jags_data, nsamples){
-  jags_data_list <- lapply(1:nsamples, function(x) shuffle_data(jags_data))
+  jags_data_list <- lapply(1:nsamples, function(x) shuffle_f_data(jags_data))
   return(jags_data_list)
 }
 

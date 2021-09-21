@@ -16,7 +16,7 @@ source(script_dir %+% "02_fn_process_hduck_data.R")
 out_dir <- getwd() %+% "/Output/"
 
 # #HDUCK Data
-# 
+#
 # cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
 # cap.data <- cap.data #%>% filter(initial_entry < 28)
 # jags_data <- build_jags_data(cap.data)
@@ -34,9 +34,10 @@ out_dir <- getwd() %+% "/Output/"
 
 #SIM DATA
 
-k = 8
-n = 100
+k = 5
+n = 50
 
+#set.seed(42)
 param_list <- list(
   n = n,
   k = k,
@@ -51,83 +52,85 @@ param_list <- list(
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
-  init = rep(1,n)#sample(k-1, n, TRUE)
+  init = sample(k-1, n, TRUE)
 )
 
-# # # Pull individual dataset
-# # #set.seed(42)
+#attach(param_list)
+
+# # # # # Pull individual dataset
+
 jags_data <- sim_dat(param_list)
-cjs_data <- format_to_cjs(jags_data)
-
-# Multiple Datasets using parallel
+# cjs_data <- format_to_cjs(jags_data)
+# 
+# # Multiple Datasets using parallel
 data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
-shuffled_list <- replicate_shuffled_data(jags_data, 4)
-
+# shuffled_list <- replicate_shuffled_data(jags_data, 4)
+# 
 
 # # Run JAGS
-# jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
+#jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 # 
 # ## MCMC parameters  
-# par_settings <- list('n.iter' = 1e4, 
+# par_settings <- list('n.iter' = 1e2,
 #                      'n.thin' = 10,
-#                      'n.burn' = 1e3,
+#                      'n.burn' = 1e2,
 #                      'n.chains' = 2,
-#                     'n.adapt' = 1e3)
+#                     'n.adapt' = 1e2)
 
 # Vaillancourt 
 # ## Jags parameters and model script
 # 
 # # Run standard Model
-# 
-jags_params <- c("pF", "pM", "phiF", "phiM")
-jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
- 
- 
-jags_samples <- run_jags_parallel(cjs_data,
-                                  jags_model,
-                                  jags_params,
-                                  par_settings,
-                                  out_dir,
-                                  save = F, 
-                                  outname = "T1_CJS_STD")
+# # 
+#jags_params <- c("pF", "pM", "phiF", "phiM")
+# jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
+#  
+#  
+# jags_samples <- run_jags_parallel(cjs_data,
+#                                   jags_model,
+#                                   jags_params,
+#                                   par_settings,
+#                                   out_dir,
+#                                   save = F, 
+#                                   outname = "T1_CJS_STD")
 
 
 # TEST DATA WITH PROGRAM MARK TO SEE RESULTS 
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 10000, 
+par_settings <- list('n.iter' = 100,
                      'n.thin' = 10,
-                     'n.burn' = 1000,
+                     'n.burn' = 100,
                      'n.chains' = 1,
-                     'n.adapt' = 1000)
+                     'n.adapt' = 100)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 
-x <- run_jags(jags_data = jags_data, 
+x <- run_jags(jags_data = jags_data,
               jags_model  = jags_model,
               jags_params = jags_params,
               par_settings = par_settings,
               debug = F)
 
+# 
+# jags_samples2 <- run_jags_parallel(jags_data,
+#                                    jags_model,
+#                                    jags_params,
+#                                    par_settings,
+#                                    out_dir,
+#                                    outname = "TESTING_MODEL2")
 
-jags_samples2 <- run_jags_parallel(jags_data, 
-                                   jags_model,
-                                   jags_params, 
-                                   par_settings,
-                                   out_dir,
-                                   outname = "TESTING_MODEL2")
-
-
-# x <- run_jags(jags_data,
-#          jags_model,
-#          jags_params, 
-#          par_settings)
-
-gather_posterior_summary(jags_samples2) #%>% 
-# add_true_values(param_list) %>% 
+# 
+# # x <- run_jags(jags_data,
+# #          jags_model,
+# #          jags_params, 
+# #          par_settings)
+# 
+# gather_posterior_summary(jags_samples2) #%>% 
+# # add_true_values(param_list) %>% 
 # plot_caterpillar(params = jags_params) +
 # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 
@@ -190,21 +193,21 @@ param_list <- list(
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
-  init  = rep(1,n)#sample(k-1, n, TRUE)
+  init  = rep(1,n)# sample(k-1, n, TRUE)
 )
 
-par_settings <- list('n.iter' = 10, 
-                     'n.thin' = 1,
-                     'n.burn' = 10,
+par_settings <- list('n.iter' = 1e2, 
+                     'n.thin' = 10,
+                     'n.burn' = 1e2,
                      'n.chains' = 1,
-                     'n.adapt' = 10)
+                     'n.adapt' = 1e2)
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")# "psi_raw", "psi_cond", "psi_cond2", "male_taken_jt")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 jags_data <- sim_dat(param_list)
 
 
-x <- run_jags(jags_data = jags_data, 
+x <- run_jags(jags_data = jags_data,
               jags_model  = jags_model,
               jags_params = jags_params,
               par_settings = par_settings,
@@ -212,15 +215,115 @@ x <- run_jags(jags_data = jags_data,
 
 
 jags_data_list <- replicate_shuffled_data(jags_data, 100)
-jags_data_list <- sim_cr_dat(param_list, iterations = 10, ncores = 5)
+jags_data_list <- sim_cr_dat(param_list, iterations = 100, ncores = 5)
+
+saveRDS(jags_data_list, out_dir %+% "jags_data_list_rep_study.rds")
 
 x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
                                   jags_model  = jags_model,
                                   jags_params = jags_params,
                                   par_settings = par_settings,
                                   out_dir = out_dir,
+                                  outname = "test",
                                   save = F,
-                                  ncores = 5)
+                                  ncores = 6)
+
+
+
+post_summary <- lapply(1:100, function(i) gather_posterior_summary(x[[i]]$jags_samples) %>% mutate(iteration = i))
+
+post_summary <- do.call(rbind, post_summary)
+
+
+post_summary %>% filter(Parameter_Name == "gamma") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = param_list$gam)
+
+
+
+post_summary %>% filter(Parameter_Name == "rho") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = param_list$rho)
+
+
+post_summary %>% filter(Parameter_Name == "PhiF") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = param_list$phi.f[1])
+
+
+post_summary %>% filter(Parameter_Name == "PhiM") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = param_list$phi.m[1])
+
+post_summary %>% filter(Parameter_Name == "PM") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = param_list$p.m[1])
+
+post_summary %>% filter(Parameter_Name == "PF") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = param_list$p.f[1])
+
+post_summary %>% filter(Parameter_Name == "beta0") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 1.0)
+
+post_summary %>% filter(Parameter_Name == "beta1") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 1.5)
+
+
+post_summary %>% filter(Parameter_Name == "delta") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 0.9)
+
+
+post_summary %>% filter(Parameter == "eps[1]") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 0.9)
+
+post_summary %>% filter(Parameter == "eps[2]") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 0.9)
+
+post_summary %>% filter(Parameter  == "eps[3]") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 0.9)
+
+post_summary %>% filter(Parameter == "eps[4]") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 0.9)
+
+post_summary %>% filter(Parameter  == "eps[5]") %>% ggplot() + 
+  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
+  geom_abline(slope = 0,  intercept = 0.9)
 
 
 # x <- list()

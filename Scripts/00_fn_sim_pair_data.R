@@ -123,7 +123,7 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
 survival <- function(previous_state, j, phi.m, phi.f, gam){
   
   # Compute Probability Distribution
-  prob.distn <- compute_jbin_cjs(phi.m, phi.f, gam)
+  prob.distn <- compute_jbin_cjs(prob.m = phi.m, prob.f = phi.f, corr = gam)
   phi.mf <- prob.distn[[1]]
   phi.f0 <- prob.distn[[2]]
   phi.m0 <- prob.distn[[3]]
@@ -145,7 +145,7 @@ survival <- function(previous_state, j, phi.m, phi.f, gam){
 recapture <- function(current_state, j, p.m, p.f, rho){
   
   # Recover Probability Distribution
-  prob.distn <- compute_jbin_cjs(p.m, p.f, rho)
+  prob.distn <- compute_jbin_cjs(prob.f = p.f, prob.m = p.m, corr =  rho)
   p.mf <- prob.distn[[1]]
   p.f0 <- prob.distn[[2]]
   p.m0 <- prob.distn[[3]]
@@ -869,19 +869,23 @@ compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit
     init_f_i <- min(which(recruit_f[i,]==1))
     init_m_i <- min(which(recruit_m[partner_i,]==1))
     
+    if(init_f_i > time & init_m_i > time) next
+    
     # Previous survival states
-    surv_i <- sf[i, time-1]*(init_f_i != time) + 1*(init_f_i == time)
-    surv_m <- (sm[partner_i, time-1]*(init_m_i != time) + 1*(init_m_i == time))*(1-single_check)
+    surv_i <- sf[i, time-1]*(init_f_i < time) + 1*(init_f_i == time)
+    surv_m <- (sm[partner_i, time-1]*(init_m_i < time) + 1*(init_m_i == time))*(1-single_check)
     
     # Recover joint survival state for this new couple at t-1
     previous_state_i <- 1 + surv_i + 2*surv_m
+    
+    if(previous_state_i == 1) next
     
     # If you've entered now then you're alive t so probability becomes 1 
     phiF <- phi.f
     phiM <- phi.m 
     
-    phiF[time-1] <- phi.f[time-1]*(init_f_i != time) + 1*(init_f_i == time)   
-    phiM[time-1] <- phi.m[time-1]*(init_m_i != time) + 1*(init_m_i == time)   
+    phiF[time-1] <- phi.f[time-1]*(init_f_i < time) + 1*(init_f_i == time)   
+    phiM[time-1] <- phi.m[time-1]*(init_m_i < time) + 1*(init_m_i == time)   
     
     # Compute joint survival at time t
     spair[i,partner_i, time] <- survival(previous_state = previous_state_i,
@@ -899,8 +903,10 @@ compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit
     # Is initial entry now or later?
     init_m_j <- min(which(recruit_m[j,]==1))
     
+    if(init_m_i > time) next
+    
     # Previous survival states
-    surv_j <- sm[j, time-1]*(init_m_j != time) + 1*(init_m_j == time)
+    surv_j <- sm[j, time-1]*(init_m_j < time) + 1*(init_m_j == time)
     
     # Recover joint survival state for this new couple at t-1
     previous_state_j <- 1 + 2*surv_j
@@ -908,7 +914,7 @@ compute_survival <- function(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit
     # If you've entered now then you're alive t so probability becomes 1 
     phiM <- phi.m
     
-    phiM[time-1] <- phi.m[time-1]*(init_m_j != time) + 1*(init_m_j == time)   
+    phiM[time-1] <- phi.m[time-1]*(init_m_j < time) + 1*(init_m_j == time)   
     
     # Compute joint survival at time t
     spair[nrow(pairs_f)+1, j, time] <- survival(previous_state = 
@@ -940,8 +946,8 @@ compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.
     current_state <- spair[i,j, time]
     i_first <- min(which(recruit_f[i,] == 1))
     j_first <- min(which(recruit_m[j,] == 1))
-    if(i_first == time) pF <- rep(1, length(p.f)) else pF <- p.f
-    if(j_first == time) pM <- rep(1, length(p.m)) else pM <- p.m
+    if(i_first == time) pF <- rep(1, length(p.f)) else if(i_first > time) pF <- rep(0, length(p.f)) else pF <- p.f
+    if(j_first == time) pM <- rep(1, length(p.m)) else if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
     rpair[i,j, time] <- recapture(current_state = current_state, 
                                   j = time, 
                                   p.m = pM, 
@@ -954,7 +960,7 @@ compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.
   for(j in single_males){
     current_state <- spair[nf+1,j, time]
     j_first <- min(which(recruit_m[j,] == 1))
-    if(j_first == time) pM <- rep(1, length(p.m)) else pM <- p.m
+    if(j_first == time) pM <- rep(1, length(p.m)) else if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
     rpair[nf+1, j, time] <- recapture(current_state = current_state,
                                       j = time,
                                       p.m = pM,
