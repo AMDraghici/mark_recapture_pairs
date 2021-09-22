@@ -822,6 +822,7 @@ plot_caterpillar <- function(post_stats,
   return(p1)
 }
 
+
 # Simulation Study Functions-----------------------------------------------------------------------------------------------------------------
 
 # 1. Shuffle female order experiment 
@@ -866,3 +867,39 @@ replicate_shuffled_data <- function(jags_data, nsamples){
   return(jags_data_list)
 }
 
+
+# Extract Posterior Summaries from simulation study list
+extract_sim_posterior <- function(sim_results){
+  
+  # Number of iterations
+  niter <- length(sim_results)
+  
+  # Extract ith Sample using gather posterior summary
+  extract_ith <- function(i, sim_results) gather_posterior_summary(sim_results[[i]]$jags_samples) %>% mutate(iteration = i)
+  
+  # Run for loop to get each sample (can parallelize if slow but doubt its necessary)
+  post_summary <- lapply(1:niter, extract_ith, sim_results)
+  
+  # Bind each item in the list sequentially until all thats left is a dataframe
+  post_summary <- do.call(rbind, post_summary)
+  
+  # Return object
+  return(post_summary)
+  
+}
+
+
+# Plot Caterpillar intervals for each iteration of a simulation study
+plot_sim_caterpillar <- function(posterior_summary, 
+                                 parameter_name,
+                                 slope = 0,
+                                 intercept = 0){
+  
+  posterior_summary %>% 
+    filter(Parameter_Name == parameter_name) %>% 
+    ggplot() + 
+    geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+    geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+    geom_point(aes(x = iteration, y = Mean), size = 3, alpha = 1.0, color = "deepskyblue3") +
+    geom_abline(slope = slope,  intercept = intercept, linetype = "dashed", color = "red")
+}

@@ -230,141 +230,20 @@ x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
 
 
 
-post_summary <- lapply(1:100, function(i) gather_posterior_summary(x[[i]]$jags_samples) %>% mutate(iteration = i))
+post_summary <- extract_sim_posterior(x)
 
-post_summary <- do.call(rbind, post_summary)
-
-
-post_summary %>% filter(Parameter_Name == "gamma") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = param_list$gam)
+plot_sim_caterpillar(posterior_summary = post_summary,
+                     parameter_name = "gamma",
+                     slope = 0,
+                     intercept = param_list$gam[1])
 
 
+plot_sim_caterpillar(posterior_summary = post_summary,
+                     parameter_name = "rho",
+                     slope = 0,
+                     intercept = param_list$rho[1])
 
-post_summary %>% filter(Parameter_Name == "rho") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = param_list$rho)
-
-
-post_summary %>% filter(Parameter_Name == "PhiF") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = param_list$phi.f[1])
-
-
-post_summary %>% filter(Parameter_Name == "PhiM") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = param_list$phi.m[1])
-
-post_summary %>% filter(Parameter_Name == "PM") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = param_list$p.m[1])
-
-post_summary %>% filter(Parameter_Name == "PF") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = param_list$p.f[1])
-
-post_summary %>% filter(Parameter_Name == "beta0") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 1.0)
-
-post_summary %>% filter(Parameter_Name == "beta1") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 1.5)
-
-
-post_summary %>% filter(Parameter_Name == "delta") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 0.9)
-
-
-post_summary %>% filter(Parameter == "eps[1]") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 0.9)
-
-post_summary %>% filter(Parameter == "eps[2]") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 0.9)
-
-post_summary %>% filter(Parameter  == "eps[3]") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 0.9)
-
-post_summary %>% filter(Parameter == "eps[4]") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 0.9)
-
-post_summary %>% filter(Parameter  == "eps[5]") %>% ggplot() + 
-  geom_linerange(aes(x = iteration, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
-  geom_linerange(aes(x = iteration, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
-  geom_point(aes(x = iteration, y = Mean), size = 5, alpha = 0.75, color = "blue") +
-  geom_abline(slope = 0,  intercept = 0.9)
-
-
-# x <- list()
-# for(i in 1:20){
-#   x[[i]] <- run_jags(jags_data = jags_data, #jags_data_list[[i]],
-#                      jags_model  = jags_model, 
-#                      jags_params = jags_params, 
-#                      par_settings = par_settings,
-#                      debug = T)
-#   
-# }
-# 
-# 
-# jags_data <-  readRDS(getwd() %+% "/jags_data_out_debug.rds") #jags_data_list[[i]]
-# jags_init_out <- readRDS(getwd() %+% "/jags_init_out_debug.rds")
-# saveRDS(jags_init_out,getwd() %+% "/jags_init_out_debug.rds")
-# jags_init <- jags_init_out$jags_inits
-# jags_debug <- jags_init_out$jags_debug
-# 
-# 
-# x <- run_jags(jags_data = jags_data,
-#               jags_model  = jags_model, 
-#               jags_params = jags_params, 
-#               par_settings = par_settings,
-#               debug = T)
-# 
-# # apairs_f[10,6]
-# # Cannot normalize density 
-# 
-# 
-# for(i in 1:5){
-#   print("Time i: "  %+% i %+% "--------------------------------------")
-#   for(j in 1:25){
-#     print("Female j: "  %+% j)
-#     print(which(jags_debug$psi_cond2[j,,i]==1))
-#   }
-# }
-# 
-# 
-# 
-# 
-# dim(jags_data$psi)
-# 
-# jags_data$psi[,nm+2,] <- jags_data$psi[,nm+1,]
+plot_sim_caterpillar(posterior_summary = post_summary,
+                     parameter_name = "PhiF",
+                     slope = 0,
+                     intercept = param_list$phi.f[1])
