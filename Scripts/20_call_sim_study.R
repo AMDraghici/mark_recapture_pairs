@@ -17,10 +17,30 @@ out_dir <- getwd() %+% "/Output/"
 
 # #HDUCK Data
 #
-# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-# cap.data <- cap.data #%>% filter(initial_entry < 28)
-# jags_data <- build_jags_data(cap.data)
-# cjs_data <- format_to_cjs(jags_data)
+cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
+cap.data <- cap.data %>% filter(initial_entry < 28)
+jags_data <- build_jags_data(cap.data)
+cjs_data <- format_to_cjs(jags_data)
+
+
+
+
+cap.data <- gather_hq_data(dat_dir) %>% build_cr_df()
+
+
+animal1cap <- cap.data %>%
+  group_by(animal_id) %>% 
+  summarize(init = min(initial_entry), 
+            first = min(which(recapture_individual==1)),
+            last = max(which(surv_individual_confounded==1))) %>%
+  ungroup() %>% 
+  mutate(known_lifespan = last-first + 1) %>% 
+  filter(known_lifespan <= 1) %>% 
+  pull(animal_id)
+
+
+cap.data2 <- cap.data %>% filter(!(animal_id %in% animal1cap)) %>%  add_implied_states() %>% assign_ids_bysex()
+jags_data2 <- build_jags_data(cap.data2)
 
 
 # for(i in 1:length(jags_data)){
@@ -109,7 +129,7 @@ par_settings <- list('n.iter' = 100,
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 
-x <- run_jags(jags_data = jags_data,
+x <- run_jags(jags_data = jags_data2,
               jags_model  = jags_model,
               jags_params = jags_params,
               par_settings = par_settings,
