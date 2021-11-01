@@ -435,6 +435,41 @@ build_cr_df <- function(hq_data){
   return(cap.data)
 } 
 
+populate_missing_mate_data <- function(cap.data){
+  
+  animal_ids <- sort(unique(cap.data$animal_id))
+  k <- max(unique(cap.data$time))
+  
+  for(i in 1:length(animal_ids)){
+    for(t in 1:k){
+      id <- animal_ids[i]
+      pid <- cap.data %>% filter(time == t, animal_id == id) %>% pull(partner_id)
+      
+      # Skip unmated case
+      if(is.na(pid)) next
+      if(!is.na(pid)) if(pid == 0) next
+      
+      # Otherwise add partner id to other sie
+      cap.data <- cap.data %>% mutate(partner_id = ifelse(animal_id == pid & time == t, id, partner_id),
+                                      mated = ifelse(animal_id == pid & time == t, 1, mated),
+                                      recapture_individual  = ifelse(animal_id == pid & time == t, 1, recapture_individual),
+                                      surv_individual_confounded = ifelse(animal_id == pid & time == t, 1, surv_individual_confounded))
+      
+    }
+  }
+  
+  # Update initial Entry
+  init_df <- cap.data %>%
+    group_by(animal_id) %>% 
+    summarize(initial_entry = min(which(recapture_individual==1))) 
+  
+  cap.data <- cap.data %>% select(-initial_entry) %>% inner_join(init_df, by = "animal_id")
+  
+  return(cap.data)
+}
+
+
+
 # Add implied survival states (must have been alive previously if alive now etc.)
 add_implied_states <- function(cap.data){
   
@@ -495,6 +530,24 @@ add_implied_states <- function(cap.data){
   return(cap.data)
 }
 
+
+add_last_capture <- function(cap.data){
+  
+  endpoints <- cap.data %>%
+    group_by(animal_id) %>% 
+    summarize(initial_entry = min(which(recapture_individual==1)),
+              final_entry = max(which(recapture_individual==1))) %>%
+    ungroup() %>% 
+    mutate(known_lifespan = final_entry-initial_entry + 1,
+           max_remaining = 12 - known_lifespan,
+           first_possible = ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining),
+           last_possible = ifelse(final_entry + max_remaining >= 28, 28, final_entry + max_remaining)) 
+  
+  cap.data <- cap.data %>% inner_join(endpoints, by = c("animal_id", "initial_entry")) 
+  
+  return(cap.data)
+}
+
 # Assign male id and female ids
 assign_ids_bysex <- function(cap.data){
   
@@ -528,21 +581,51 @@ populate_recruit <- function(cap.data, nf, nm, k){
   recruit_m <- matrix(NA, nrow = nm, ncol = k)
   
   # Extract initial entry by id 
-  female_init <- cap.data %>% select(sex, jags_id, initial_entry) %>% filter(sex == "F") %>% arrange(jags_id) %>% distinct()
-  male_init <- cap.data %>% select(sex, jags_id, initial_entry) %>% filter(sex == "M") %>% arrange(jags_id) %>% distinct()
+  female_init <- cap.data %>% 
+    select(sex, jags_id, initial_entry, final_entry) %>% 
+    filter(sex == "F") %>% 
+    arrange(jags_id) %>% 
+    distinct()
+
+  male_init <- cap.data %>%
+    select(sex, jags_id, initial_entry, final_entry) %>% 
+    filter(sex == "M") %>%
+    arrange(jags_id) %>% 
+    distinct()
+  
   
   # Populate Female 
   for(i in 1:nrow(female_init)){
     f_id <- female_init$jags_id[i]
     init_id <- female_init$initial_entry[i]
+    final_id <- female_init$final_entry[i]
+    known_life <- final_id-init_id+1
     recruit_f[f_id, init_id:k] <- 1
+    # Add limit to when they could have entered
+    max_remaining <- 12 - known_life
+    first_possible <- init_id - max_remaining 
+    if(first_possible <= 1){
+      next
+    } else {
+      recruit_f[f_id, 1:(first_possible-1)] <- 0
+    }
+
   }
   
   # Populate Male 
   for(i in 1:nrow(male_init)){
     m_id <- male_init$jags_id[i]
     init_m_id <- male_init$initial_entry[i]
+    final_m_id <- male_init$final_entry[i]
+    known_life_m <- final_m_id-init_m_id+1
     recruit_m[m_id, init_m_id:k] <- 1
+    max_m_remaining <- 12 - known_life_m
+    first_possible_m <- init_m_id - max_m_remaining 
+    if(first_possible_m <= 1){
+      next
+    } else {
+      recruit_m[m_id, 1:(first_possible_m-1)] <- 0
+    }
   }
   
   # Return recruitment list
@@ -558,8 +641,17 @@ populate_mating <- function(cap.data, nf, nm, k){
   amating_m <- matrix(NA, nrow = nm, ncol = k)
   
   # Mating status of females/males
-  female_mating <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, mated) %>% distinct()
-  male_mating <- cap.data %>% filter(sex == "M") %>% select(time, jags_id, mated) %>% distinct()
+  female_mating <- cap.data %>%
+    filter(sex == "F") %>% 
+    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    mutate(mated = ifelse(first_possible > time| time > last_possible, 0, mated)) %>% 
+    distinct()
+  
+  male_mating <- cap.data %>% 
+    filter(sex == "M") %>% 
+    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    mutate(mated = ifelse(first_possible > time| time > last_possible, 0, mated)) %>% 
+    distinct()
   
   # Assign mate status to females
   for(i in 1:nrow(female_mating)){
@@ -588,7 +680,6 @@ populate_pairs <- function(cap.data, nf, nm, k){
   apairs[1:(nf+1),1,] <- 0
   apairs[1,1:(nm+1),] <- 0
   apairs[,,1] <- 0 
-  
   
   # Females and partners
   female_mates <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
@@ -619,6 +710,34 @@ populate_pairs <- function(cap.data, nf, nm, k){
     apairs[mother_id+1,male_id+1,] <- 0
   }
   
+  # Zero-out pairs outside of the window of possibility 
+  # Mating status of females/males
+  female_mating <- cap.data %>%
+    filter(sex == "F") %>% 
+    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    mutate(mated = ifelse(first_possible > time| time > last_possible, 0, mated)) %>% 
+    distinct()
+  
+  male_mating <- cap.data %>% 
+    filter(sex == "M") %>% 
+    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    mutate(mated = ifelse(first_possible > time| time > last_possible, 0, mated)) %>% 
+    distinct()
+  
+  # Assign no mate to females who couldn't be in population based on age
+  for(i in 1:nrow(female_mating)){
+    f_id <- female_mating$jags_id[i]
+    t <- female_mating$time[i]
+    if(!is.na(female_mating$mated[i])) if(female_mating$mated[i] == 0) apairs[f_id+1,,t+1] <- 0
+  }
+  
+  # Assign no mate to males who couldn't be in population based on age
+  for(i in 1:nrow(male_mating)){
+    m_id <- male_mating$jags_id[i]
+    t <- male_mating$time[i]
+    if(!is.na(male_mating$mated[i])) if(male_mating$mated[i] == 0) apairs[,m_id+1,t+1] <- 0
+  }
+  
   # Return pairs list
   return(apairs)
 }
@@ -632,7 +751,8 @@ populate_surv <- function(cap.data, nf, nm, k){
   
   # Survival data.frames
   surv_f <- cap.data %>%
-    select(sex, jags_id, time, surv_individual_confounded) %>%
+    select(sex, jags_id, time, surv_individual_confounded, last_possible) %>%
+    #mutate(surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded)) %>% 
     filter(sex == "F") %>% 
     arrange(jags_id) %>% 
     distinct()
@@ -643,7 +763,8 @@ populate_surv <- function(cap.data, nf, nm, k){
     ungroup()
   
   surv_m <- cap.data %>% 
-    select(sex, jags_id, time, surv_individual_confounded) %>%
+    select(sex, jags_id, time, surv_individual_confounded, last_possible)  %>%
+   # mutate(surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded)) %>% 
     filter(sex == "M") %>% 
     arrange(jags_id) %>%
     distinct()
@@ -657,20 +778,36 @@ populate_surv <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(surv_f)){
     id <- surv_f$jags_id[i]
     t <- surv_f$time[i]
-    last <- last_alive_f %>% filter(jags_id == id) %>% pull(last_alive)
+    last_seen <- last_alive_f %>% filter(jags_id == id) %>% pull(last_alive)
+    last_possible <- surv_f$last_possible[i]
     
-    if(t <= last){
+    # Must have been alive prior to being seen (or not in pop yet)
+    if(t <= last_seen){
       af[id, t] <- 1
     }
+    
+    # Must have perished after maximal life expectancy is reached 
+    if(t > last_possible){
+      af[id, t] <- 0
+    }
+    
   }
   
   # Populate survival matrices for males
   for(i in 1:nrow(surv_m)){
     id <- surv_m$jags_id[i]
     t <- surv_m$time[i]
-    last <- last_alive_m %>% filter(jags_id == id) %>% pull(last_alive)
-    if(t <= last){
+    last_alive <- last_alive_m %>% filter(jags_id == id) %>% pull(last_alive)
+    last_possible <- surv_m$last_possible[i]
+    
+    # Must have been alive prior to being seen (or not in pop yet)
+    if(t <= last_alive){
       am[id, t] <- 1
+    } 
+    
+    # Must have perished after maximal life expectancy is reached 
+    if(t > last_possible){
+      am[id, t] <- 0
     }
   }
   # Return surv data
@@ -716,7 +853,7 @@ populate_recap <- function(cap.data, nf, nm, k){
 }
 
 # Assign compact known pairs by female by year using male ids 
-populate_apairs_f <- function(apairs,nf,nm,k){
+populate_apairs_f <- function(apairs,amating_f,nf,nm,k){
   # Build data object and set dummy variable (represents single)
   apairs_f <- matrix(NA,nrow = nf,ncol=k+1)
   apairs_f[,1] <- nm + 1
@@ -732,7 +869,7 @@ populate_apairs_f <- function(apairs,nf,nm,k){
         if(length(partner_id) > 1) stop("Bug found at time" %+% t %+% " and female" %+% i)
         apairs_f[i,t+1] <- partner_id
       } else{
-        next
+        if(!is.na(amating_f[i,t])) if(amating_f[i,t] == 0) apairs_f[i,t+1] <- nm + 1
       }
       
     }
@@ -750,7 +887,7 @@ populate_arepartner <- function(apairs_f, nf, nm, k){
   
   # Assign based on apairs_f going forward
   for(t in 1:k){
-      arepartner[,t] <- 1*(apairs_f[,t] == apairs_f[,t+1])
+      arepartner[,t] <- 1*(apairs_f[,t] == apairs_f[,t+1]) * (apairs_f[,t] != nm + 1) * (apairs_f[,t+1] != nm + 1)
   }
   
   # Set known initial case to 0
@@ -828,7 +965,7 @@ build_jags_data <- function(cap.data){
   recap_m <- recap_list[["recap_m"]]
   
   # Construct partner index by female
-  apairs_f <- populate_apairs_f(apairs,nf,nm,k)
+  apairs_f <- populate_apairs_f(apairs,amating_f,nf,nm,k)
   
   # Construct partially repartnership matrix
   arepartner <- populate_arepartner(apairs_f, nf, nm, k)

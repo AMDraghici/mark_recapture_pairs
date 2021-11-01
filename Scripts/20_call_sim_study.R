@@ -17,31 +17,62 @@ out_dir <- getwd() %+% "/Output/"
 
 # #HDUCK Data
 #
-cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
-cap.data <- cap.data %>% filter(initial_entry < 28)
-jags_data <- build_jags_data(cap.data)
-cjs_data <- format_to_cjs(jags_data)
+# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_data() %>% add_implied_states() %>% add_last_capture() %>% assign_ids_bysex()
+# cap.data <- cap.data #%>% filter(initial_entry < 28)
+# jags_data <- build_jags_data(cap.data)
+# cjs_data <- format_to_cjs(jags_data)
 
 
-
-
-cap.data <- gather_hq_data(dat_dir) %>% build_cr_df()
-
+cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_data() 
 
 animal1cap <- cap.data %>%
   group_by(animal_id) %>% 
   summarize(init = min(initial_entry), 
             first = min(which(recapture_individual==1)),
-            last = max(which(surv_individual_confounded==1))) %>%
+            last = max(which(recapture_individual==1))) %>%
   ungroup() %>% 
   mutate(known_lifespan = last-first + 1) %>% 
   filter(known_lifespan <= 1) %>% 
   pull(animal_id)
 
+# Drop transients and assume unmated when dropped (NEED TO FIX THIS)
+cap.data <- cap.data %>%
+  filter(!(animal_id %in% animal1cap)) %>%
+  mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
+         partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
+ populate_missing_mate_data() %>% 
+ # filter(initial_entry <= 12, time <= 12) %>% 
+  add_implied_states() %>%
+  add_last_capture() %>% 
+  assign_ids_bysex()
+jags_data <- build_jags_data(cap.data)
+cjs_data <- format_to_cjs(jags_data)
 
-cap.data2 <- cap.data %>% filter(!(animal_id %in% animal1cap)) %>%  add_implied_states() %>% assign_ids_bysex()
-jags_data2 <- build_jags_data(cap.data2)
+# Investigate max distance between recaptures before attrition
+max(sapply(1:jags_data$nf, function(i) max(diff(which(jags_data$recap_f[i,]==1)))))
+max(sapply(1:jags_data$nm, function(i) max(diff(which(jags_data$recap_m[i,]==1)))))
 
+# Investigate overall max distance between recaptures 
+max(sapply(1:jags_data$nf, function(i) diff(range(which(jags_data$recap_f[i,]==1)))))
+max(sapply(1:jags_data$nm, function(i) diff(range(which(jags_data$recap_m[i,]==1)))))
+
+animals_left <- (1:615)[!1:615 %in% animal1cap]
+
+cap.data %>% filter(animal_id == 28) %>% select(partner_id, time, mated, recapture_individual)
+cap.data %>% filter(animal_id == 116) %>% select(partner_id, time, mated, recapture_individual)
+# 
+# [1]   1   2   3   4   7   8   9  10  11  14  17  18  19  20
+# [15]  21  23  24  28  29  30  34  49  52  53  59  61  65  66
+# [29]  74  79  80  81  84  86  87  89  99 100 101 102 105 110
+# [43] 112 113 115 116 120 121 125 126 127 130 133 149 151 152
+# [57] 155 157 161 163 166 168 172 173 176 180 189 190 194 197
+# [71] 198 199 205 213 220 224 228 231 232 240 242 249 253 255
+# [85] 256 259 268 281 286 292 294 319 320 324 327 331 333 334
+# [99] 335 336 337 338 339 340 341 342 347 356 357 358 359 360
+# [113] 361 382 396 411 421 430 449 451 453 454 455 457 459 462
+# [127] 464 465 466 470 471 480 482 483 485 486 489 490 507 513
+# [141] 514 531 534 537 540 543 553 554 557 558 559 561 563 565
+# [155] 575 576 578 579 580 585 587 615
 
 # for(i in 1:length(jags_data)){
 #   print(names(jags_data[i]))
@@ -91,28 +122,28 @@ data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 #jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 # 
 # ## MCMC parameters  
-# par_settings <- list('n.iter' = 1e2,
-#                      'n.thin' = 10,
-#                      'n.burn' = 1e2,
-#                      'n.chains' = 2,
-#                     'n.adapt' = 1e2)
+par_settings <- list('n.iter' = 1e4,
+                     'n.thin' = 10,
+                     'n.burn' = 1e3,
+                     'n.chains' = 4,
+                    'n.adapt' = 1e3)
 
 # Vaillancourt 
 # ## Jags parameters and model script
 # 
 # # Run standard Model
 # # 
-#jags_params <- c("pF", "pM", "phiF", "phiM")
-# jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
+jags_params <- c("pF", "pM", "phiF", "phiM")
+jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
 #  
 #  
-# jags_samples <- run_jags_parallel(cjs_data,
-#                                   jags_model,
-#                                   jags_params,
-#                                   par_settings,
-#                                   out_dir,
-#                                   save = F, 
-#                                   outname = "T1_CJS_STD")
+jags_samples <- run_jags_parallel(cjs_data,
+                                  jags_model,
+                                  jags_params,
+                                  par_settings,
+                                  out_dir,
+                                  save = F,
+                                  outname = "T1_CJS_STD")
 
 
 # TEST DATA WITH PROGRAM MARK TO SEE RESULTS 
@@ -129,13 +160,13 @@ par_settings <- list('n.iter' = 100,
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
 
-x <- run_jags(jags_data = jags_data2,
+x <- run_jags(jags_data = jags_data,
               jags_model  = jags_model,
               jags_params = jags_params,
               par_settings = par_settings,
               debug = F)
 
-# 
+
 # jags_samples2 <- run_jags_parallel(jags_data,
 #                                    jags_model,
 #                                    jags_params,
@@ -149,9 +180,9 @@ x <- run_jags(jags_data = jags_data2,
 # #          jags_params, 
 # #          par_settings)
 # 
-# gather_posterior_summary(jags_samples2) #%>% 
-# # add_true_values(param_list) %>% 
-# plot_caterpillar(params = jags_params) +
+gather_posterior_summary(x$jags_samples) %>%
+#add_true_values(param_list) %>% 
+plot_caterpillar(params = jags_params[c(1:7,10)])# +
 # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 
 # To do
@@ -267,3 +298,29 @@ plot_sim_caterpillar(posterior_summary = post_summary,
                      parameter_name = "PhiF",
                      slope = 0,
                      intercept = param_list$phi.f[1])
+
+
+
+# 
+# Compiling model graph
+# Resolving undeclared variables
+# Allocating nodes
+# Graph information:
+#   Observed stochastic nodes: 15677
+# Unobserved stochastic nodes: 6715
+# Total graph size: 1780320
+# 
+# Initializing model
+# Deleting model
+# 
+# Error in jags.model(file = jags_model, data = jags_data, inits = jags_inits,  : 
+#                       Error in node arepartner[6,7]
+#                     Node inconsistent with parents
+#                     
+#                     In addition: Warning message:
+#                       In jags.model(file = jags_model, data = jags_data, inits = jags_inits,  :
+#                                       Unused variable "apairs" in data
+
+
+# BUG FIX 
+# ANIMAL 14 doesn't have 66 as partner for 2 of 4 years in which ANIMAL 66 has 14 as a partner
