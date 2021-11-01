@@ -135,8 +135,15 @@ par_settings <- list('n.iter' = 1e4,
 # # 
 jags_params <- c("pF", "pM", "phiF", "phiM")
 jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
-#  
-#  
+
+
+x <- run_jags(jags_data = cjs_data,
+              jags_model  = jags_model,
+              jags_params = jags_params,
+              par_settings = par_settings,
+              debug = F)
+
+
 jags_samples <- run_jags_parallel(cjs_data,
                                   jags_model,
                                   jags_params,
@@ -147,6 +154,7 @@ jags_samples <- run_jags_parallel(cjs_data,
 
 
 # TEST DATA WITH PROGRAM MARK TO SEE RESULTS 
+# ADD FLEXIBLE INIT FOR CJS RUNS
 
 # Run Full Model + No Groups
 ## MCMC parameters  
@@ -182,7 +190,7 @@ x <- run_jags(jags_data = jags_data,
 # 
 gather_posterior_summary(x$jags_samples) %>%
 #add_true_values(param_list) %>% 
-plot_caterpillar(params = jags_params[c(1:7,10)])# +
+plot_caterpillar(params = jags_params[c(1:7)])# +
 # geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
 
 # To do

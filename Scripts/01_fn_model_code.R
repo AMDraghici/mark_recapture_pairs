@@ -50,8 +50,67 @@ sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
 # 2. Fitting JAGS Model--------------------------------------------------------------------------------------------
 # Code runs using embarrassing parallel and should work on both Linux/Windows/MAC
 
+generate_init_cjs <- function(jags_data){
+  
+  #Unpack Variables -----------------------------------------------------------------
+ 
+  # Known data and indices 
+  k <- jags_data$k # Number of capture occasions
+  n <- jags_data$n # Number of animals 
+  female <- jags_data$female # Sex
+  initial_entry <- jags_data$initial_entry
+  x <- jags_data$x
+  
+  # CR data with missing components
+  a <- jags_data$a  # Survival
+  
+  # Recapture Prob and Survival Prob -------------------------------------------------
+  pF <- rbeta(1,1,1)
+  pM <- rbeta(1,1,1)
+  phiF <- rbeta(1,1,1)
+  phiM <- rbeta(1,1,1)
+ 
+  # Sample unknown initial values
+  for(i in 1:n){
+    init <- initial_entry[i]
+    sexF <- female[i]
+    phi <- phiF * sexF + phiM * (1-sexF) 
+    for(t in (init+1):k){
+      if(is.na(a[i, t])){
+        a[i, t] <- rbinom(1, 1, phi * a[i, t-1])
+      }
+    }
+  }
+  
+  # Add unknown status 
+  build_NA_mat <- function(mat, jags_mat){
+    mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
+    mat_final[is.na(jags_mat)] <- mat[is.na(jags_mat)]
+    return(mat_final)
+  }
+  
+  # Survival Init
+  a <- build_NA_mat(a, jags_data$a)
+  
+  # Return Results ------------------------------------------------------------------
+  
+  # Store in object
+  jags_inits <- list(
+    pF = pF,
+    pM = pM,
+    phiF = phiF,
+    phiM = phiM,
+    a = a
+  )
+  
+  # Return Initial Values for a single chain
+  return(jags_inits)
+
+}
+
+
 # Build initial values for jags to use
-generate_init <- function(jags_data, debug = F){
+generate_init_pairs <- function(jags_data, debug = F){
   
   #Unpack Variables -----------------------------------------------------------------
   # Indexes
@@ -395,6 +454,16 @@ generate_init <- function(jags_data, debug = F){
   
   # Return Initial Values for a single chain
   return(jags_init_out)
+}
+
+generate_init <- function(jags_data, debug){
+  # Check if CJS or Experimental model 
+  if(is.null(jags_data$n)){
+    initial_values <- generate_init_pairs(jags_data, debug)
+  } else {
+    initial_values <- generate_init_cjs(jags_data)
+  }
+  return(initial_values)
 }
 
 #Process Jags in Parallel (multiple chains same data)
