@@ -29,6 +29,7 @@ source(script_dir %+% "02_fn_process_hduck_data.R")
 cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>%  add_implied_states() %>% assign_ids_bysex()
 jags_data <- build_jags_data(cap.data)
 cjs_data <- format_to_cjs(jags_data)
+js_data <- format_to_js(jags_data)
 
 # Store Data
 saveRDS(cap.data, out_dir %+% "raw_data_hduck.rds")

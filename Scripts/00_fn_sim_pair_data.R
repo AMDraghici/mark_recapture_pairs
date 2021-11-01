@@ -1445,4 +1445,24 @@ format_to_cjs <- function(model_data){
   return(model_data)
 }
 
+
+
+format_to_js <- function(model_data){
+  
+  x <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
+  a <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
+  recruit <-  rbind(model_data$recruit_f[1:model_data$nf,],model_data$recruit_m[1:model_data$nm,])
+
+  # Store results in list
+  model_data <- list(n = model_data$nf + model_data$nm,
+                     k = model_data$k,
+                     female = c(rep(1, model_data$nf),rep(0, model_data$nm)), 
+                     recruit = recruit,
+                     x = x,
+                     a = a)
+  
+  # Return Standard CJS Data
+  return(model_data)
+}
+
 #----------------------------------------------------------------------------------------------------------------------

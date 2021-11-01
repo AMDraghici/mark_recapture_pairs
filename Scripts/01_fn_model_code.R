@@ -109,6 +109,82 @@ generate_init_cjs <- function(jags_data){
 }
 
 
+# Generate initial jolly-seber model 
+generate_init_js <- function(jags_data){
+  
+  #Unpack Variables -----------------------------------------------------------------
+  
+  # Known data and indices 
+  k <- jags_data$k # Number of capture occasions
+  n <- jags_data$n # Number of animals 
+  female <- jags_data$female # Sex
+  x <- jags_data$x # Recapture 
+  
+  # CR data with missing components
+  a <- jags_data$a  # Survival
+  recruit <- jags_data$recruit # Recruitment
+  
+  # Recapture Prob and Survival Prob -------------------------------------------------
+  pF <- rbeta(1,1,1)
+  pM <- rbeta(1,1,1)
+  phiF <- rbeta(1,1,1)
+  phiM <- rbeta(1,1,1)
+  eps <- rbeta(k, 1, 1)
+  
+  # Sample recruitment 
+  # Recruitment 
+  # Female Recruitment
+  for(i in 1:n){
+    recruit[i,1] <- ifelse(is.na(recruit[i,1]), rbinom(1, 1, eps[1]),recruit[i,1])
+    for(t in 2:(k-1)){
+      recruit[i,t] <- ifelse(is.na(recruit[i,t]), rbinom(1, 1, (recruit[i,t-1] + (1-recruit[i,t-1]) * eps[t])),recruit[i,t])
+    } 
+  }
+  
+  
+  # Sample Survival
+  for(i in 1:n){
+    sexF <- female[i]
+    phi <- phiF * sexF + phiM * (1-sexF) 
+    for(t in 1:k){
+      if(is.na(a[i, t])){
+        a[i, t] <- rbinom(1, 1, phi * a[i, t-1] * recruit[i,t] + (1-recruit[i,t]))
+      }
+    }
+  }
+  
+  # Add unknown status 
+  build_NA_mat <- function(mat, jags_mat){
+    mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
+    mat_final[is.na(jags_mat)] <- mat[is.na(jags_mat)]
+    return(mat_final)
+  }
+  
+  # Recruit init
+  recruit <- build_NA_mat(recruit, jags_data$recruit)
+  
+  # Survival Init
+  a <- build_NA_mat(a, jags_data$a)
+  
+  # Return Results ------------------------------------------------------------------
+  
+  # Store in object
+  jags_inits <- list(
+    pF = pF,
+    pM = pM,
+    phiF = phiF,
+    phiM = phiM,
+    eps = eps,
+    recruit = recruit,
+    a = a
+  )
+  
+  # Return Initial Values for a single chain
+  return(jags_inits)
+  
+}
+
+
 # Build initial values for jags to use
 generate_init_pairs <- function(jags_data, debug = F){
   
@@ -456,12 +532,14 @@ generate_init_pairs <- function(jags_data, debug = F){
   return(jags_init_out)
 }
 
-generate_init <- function(jags_data, debug){
+generate_init <- function(jags_data, debug = F){
   # Check if CJS or Experimental model 
   if(is.null(jags_data$n)){
     initial_values <- generate_init_pairs(jags_data, debug)
-  } else {
+  } else if(is.null(jags_data$recruit)){
     initial_values <- generate_init_cjs(jags_data)
+  } else {
+    initial_values <- generate_init_js(jags_data)
   }
   return(initial_values)
 }
