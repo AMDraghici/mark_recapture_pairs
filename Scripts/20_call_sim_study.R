@@ -37,13 +37,14 @@ animal1cap <- cap.data %>%
 
 # Drop transients and assume unmated when dropped (NEED TO FIX THIS)
 cap.data <- cap.data %>%
-  filter(!(animal_id %in% animal1cap)) %>%
-  mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
-         partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
+  # filter(!(animal_id %in% animal1cap)) %>%
+  # mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
+  #        partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
  populate_missing_mate_data() %>% 
  # filter(initial_entry <= 12, time <= 12) %>% 
   add_implied_states() %>%
   add_last_capture() %>% 
+  clean_filtered() %>% 
   assign_ids_bysex()
 jags_data <- build_jags_data(cap.data)
 cjs_data <- format_to_cjs(jags_data)
@@ -133,11 +134,11 @@ par_settings <- list('n.iter' = 1e4,
 # 
 # # Run standard Model
 # # 
-jags_params <- c("pF", "pM", "phiF", "phiM")
-jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
+jags_params <- c("pF", "pM", "phiF", "phiM", "eps")
+jags_model <- script_dir %+% "/10_js_mod_standard.R"
 
 
-x <- run_jags(jags_data = cjs_data,
+z <- run_jags(jags_data = js_data,
               jags_model  = jags_model,
               jags_params = jags_params,
               par_settings = par_settings,

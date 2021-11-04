@@ -363,12 +363,12 @@ build_cr_df <- function(hq_data){
     distinct() %>% 
     arrange(time)
   # 
-  # extended.cap <- process_extensive_records(hq_data, year.dat)
-  # 
-  # 
-  # # Unite Capture Records
-  # CaptureRecords <- rbind(CaptureRecords, extended.cap)
-  
+  extended.cap <- process_extensive_records(hq_data, year.dat)
+# 
+# 
+#   # Unite Capture Records
+#   CaptureRecords <- rbind(CaptureRecords, extended.cap)
+
   #Capture-Recapture format
   cap.data <- merge(unique(CaptureRecords$animal_id),year.dat$time) %>% 
     rename(animal_id = x,time = y) %>% 
@@ -526,6 +526,7 @@ add_implied_states <- function(cap.data){
   # Update mate status to be zero if age is zero (for hatch year)
   cap.data <- cap.data %>% mutate(mated = ifelse(age == 0, 0, mated))
   
+  
   # Return cleaned data
   return(cap.data)
 }
@@ -534,17 +535,30 @@ add_implied_states <- function(cap.data){
 add_last_capture <- function(cap.data){
   
   endpoints <- cap.data %>%
+    mutate(age = ifelse(is.na(age),1,age)) %>% 
     group_by(animal_id) %>% 
     summarize(initial_entry = min(which(recapture_individual==1)),
-              final_entry = max(which(recapture_individual==1))) %>%
+              final_entry = max(which(recapture_individual==1)),
+              min_age = min(age)) %>%
     ungroup() %>% 
     mutate(known_lifespan = final_entry-initial_entry + 1,
            max_remaining = 12 - known_lifespan,
-           first_possible = ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining),
+           first_possible = ifelse(min_age == 0, initial_entry, ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining)),
            last_possible = ifelse(final_entry + max_remaining >= 28, 28, final_entry + max_remaining)) 
   
   cap.data <- cap.data %>% inner_join(endpoints, by = c("animal_id", "initial_entry")) 
   
+  
+  return(cap.data)
+}
+
+# Final Cleanup
+clean_filtered <- function(cap.data){
+  cap.data <- cap.data %>% 
+    mutate(mated = ifelse(time < first_possible| time > last_possible, 0, ifelse(!is.na(age), ifelse(age== 0, 0, mated), mated)),
+           partner_id = ifelse(time < first_possible| time > last_possible, 0, partner_id),
+           surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded),
+    )
   return(cap.data)
 }
 
@@ -582,13 +596,13 @@ populate_recruit <- function(cap.data, nf, nm, k){
   
   # Extract initial entry by id 
   female_init <- cap.data %>% 
-    select(sex, jags_id, initial_entry, final_entry) %>% 
+    select(sex, jags_id, initial_entry, first_possible) %>% 
     filter(sex == "F") %>% 
     arrange(jags_id) %>% 
     distinct()
 
   male_init <- cap.data %>%
-    select(sex, jags_id, initial_entry, final_entry) %>% 
+    select(sex, jags_id, initial_entry, first_possible) %>% 
     filter(sex == "M") %>%
     arrange(jags_id) %>% 
     distinct()
@@ -598,12 +612,9 @@ populate_recruit <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(female_init)){
     f_id <- female_init$jags_id[i]
     init_id <- female_init$initial_entry[i]
-    final_id <- female_init$final_entry[i]
-    known_life <- final_id-init_id+1
     recruit_f[f_id, init_id:k] <- 1
     # Add limit to when they could have entered
-    max_remaining <- 12 - known_life
-    first_possible <- init_id - max_remaining 
+    first_possible <- female_init$first_possible[i]
     if(first_possible <= 1){
       next
     } else {
@@ -616,11 +627,8 @@ populate_recruit <- function(cap.data, nf, nm, k){
   for(i in 1:nrow(male_init)){
     m_id <- male_init$jags_id[i]
     init_m_id <- male_init$initial_entry[i]
-    final_m_id <- male_init$final_entry[i]
-    known_life_m <- final_m_id-init_m_id+1
     recruit_m[m_id, init_m_id:k] <- 1
-    max_m_remaining <- 12 - known_life_m
-    first_possible_m <- init_m_id - max_m_remaining 
+    first_possible_m <- male_init$first_possible[i]
     if(first_possible_m <= 1){
       next
     } else {
