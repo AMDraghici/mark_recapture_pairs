@@ -68,6 +68,8 @@ y <- cap.data %>% filter(!is.na(partner_id)) %>% filter(partner_id != 0, time >=
                              abs(lower_age_partner - upper_age), abs(lower_age_partner - lower_age)))
 
 barplot(prop.table(table(y$max_age_diff)))
+barplot(prop.table(table(y$probable_age_diff)))
+barplot(prop.table(table(y$min_age_diff)))
 
 jags_data <- build_jags_data(cap.data)
 js_data <- format_to_js(jags_data)
