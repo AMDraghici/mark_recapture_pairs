@@ -351,8 +351,17 @@ process_capture_records <- function(hq_data){
                              ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
     select(-ID.x,-ID.y,-ID.x.x,-ID.y.y)
   
+  # Drop hatchlings that only seen once (we only want adults)
+  drop_transient_hatchlings <- CaptureRecords %>%
+    mutate(age2 = ifelse(age == "HY",1,0)) %>% 
+    group_by(animal_id) %>% 
+    summarize(newborn = sum(age2), nobs = n()) %>% 
+    ungroup() %>% 
+    filter(newborn > 0 & nobs <= 1) %>% 
+    pull(animal_id)
+  
   # Return Processed Data
-  return(CaptureRecords)
+  return(CaptureRecords %>% filter(!(animal_id %in% drop_transient_hatchlings)))
 }
 
 build_cr_df <- function(hq_data){
@@ -534,7 +543,7 @@ add_implied_states <- function(cap.data){
 
 add_last_capture <- function(cap.data){
   
-  endpoints <- cap.data %>%
+    endpoints <- cap.data %>%
     mutate(age = ifelse(is.na(age),1,age)) %>% 
     group_by(animal_id) %>% 
     summarize(initial_entry = min(which(recapture_individual==1)),
@@ -543,7 +552,7 @@ add_last_capture <- function(cap.data){
     ungroup() %>% 
     mutate(known_lifespan = final_entry-initial_entry + 1,
            max_remaining = 12 - known_lifespan,
-           first_possible = ifelse(min_age == 0, initial_entry, ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining)),
+           first_possible = ifelse(min_age == 0, initial_entry + 1, ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining)),
            last_possible = ifelse(final_entry + max_remaining >= 28, 28, final_entry + max_remaining)) 
   
   cap.data <- cap.data %>% inner_join(endpoints, by = c("animal_id", "initial_entry")) 
@@ -554,11 +563,24 @@ add_last_capture <- function(cap.data){
 
 # Final Cleanup
 clean_filtered <- function(cap.data){
+  
+  
+  
   cap.data <- cap.data %>% 
-    mutate(mated = ifelse(time < first_possible| time > last_possible, 0, ifelse(!is.na(age), ifelse(age== 0, 0, mated), mated)),
+    mutate(initial_entry = ifelse(first_possible > initial_entry, first_possible, initial_entry),
+           mated = ifelse(time < first_possible| time > last_possible, 0, ifelse(!is.na(age), ifelse(age== 0, 0, mated), mated)),
            partner_id = ifelse(time < first_possible| time > last_possible, 0, partner_id),
            surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded),
+           recapture_individual = ifelse(time < first_possible,0,recapture_individual), # this one ensures hatchlings are excluded at first capture
     )
+  
+  # Add minimum possible age and maximum possible age
+  cap.data <- cap.data %>% 
+    mutate(upper_age = ifelse(time - first_possible + 1 < 12, time - first_possible + 1, 12),
+           upper_age = ifelse(upper_age < 0, 0, upper_age),
+           lower_age = ifelse(time - initial_entry + 1 < 12, time - initial_entry + 1, 12),
+           lower_age = ifelse(lower_age < 0, 0, lower_age))
+  
   return(cap.data)
 }
 

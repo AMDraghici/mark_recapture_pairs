@@ -24,29 +24,53 @@ out_dir <- getwd() %+% "/Output/"
 
 
 cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_data() 
-
-animal1cap <- cap.data %>%
-  group_by(animal_id) %>% 
-  summarize(init = min(initial_entry), 
-            first = min(which(recapture_individual==1)),
-            last = max(which(recapture_individual==1))) %>%
-  ungroup() %>% 
-  mutate(known_lifespan = last-first + 1) %>% 
-  filter(known_lifespan <= 1) %>% 
-  pull(animal_id)
+# 
+# animal1cap <- cap.data %>%
+#   group_by(animal_id) %>%
+#   summarize(init = min(initial_entry),
+#             first = min(which(recapture_individual==1)),
+#             last = max(which(recapture_individual==1))) %>%
+#   ungroup() %>%
+#   mutate(known_lifespan = last-first + 1) %>%
+#   filter(known_lifespan <= 1) %>%
+#   pull(animal_id)
 
 # Drop transients and assume unmated when dropped (NEED TO FIX THIS)
 cap.data <- cap.data %>%
-  # filter(!(animal_id %in% animal1cap)) %>%
-  # mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
-  #        partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
- populate_missing_mate_data() %>% 
- # filter(initial_entry <= 12, time <= 12) %>% 
+#   filter(!(animal_id %in% animal1cap)) %>%
+#   mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
+#          partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
+  populate_missing_mate_data() %>% 
+ #filter(initial_entry <= 12, time <= 12) %>%
   add_implied_states() %>%
   add_last_capture() %>% 
   clean_filtered() %>% 
   assign_ids_bysex()
+
+# Age diff experiment
+cap.data %>% select(animal_id, time, lower_age, upper_age, initial_entry) %>% rename(partner_id = animal_id,
+                                                                                     lower_age_partner = lower_age,
+                                                                                     upper_age_partner = upper_age,
+                                                                                     initial_entry_partner = initial_entry) -> x
+
+
+
+
+cap.data <- left_join(cap.data, x, by = c("partner_id", "time"))
+
+
+cap.data %>% filter(!is.na(partner_id)) %>% filter(partner_id != 0) %>% select(animal_id, partner_id, time, lower_age, upper_age, lower_age_partner, upper_age_partner)
+
+y <- cap.data %>% filter(!is.na(partner_id)) %>% filter(partner_id != 0, time >= initial_entry & time>=initial_entry_partner) %>% 
+  mutate(max_age_diff = pmax(upper_age_partner - lower_age, upper_age - lower_age_partner),
+         probable_age_diff = abs((time-initial_entry) - (time-initial_entry_partner)),
+         min_age_diff = pmin(abs(upper_age_partner - lower_age), abs(upper_age_partner - upper_age),
+                             abs(lower_age_partner - upper_age), abs(lower_age_partner - lower_age)))
+
+barplot(prop.table(table(y$max_age_diff)))
+
 jags_data <- build_jags_data(cap.data)
+js_data <- format_to_js(jags_data)
 cjs_data <- format_to_cjs(jags_data)
 
 # Investigate max distance between recaptures before attrition
@@ -87,7 +111,7 @@ cap.data %>% filter(animal_id == 116) %>% select(partner_id, time, mated, recapt
 #SIM DATA
 
 k = 5
-n = 50
+n = 100
 
 #set.seed(42)
 param_list <- list(
@@ -101,7 +125,7 @@ param_list <- list(
   p.f = rep(0.75, k),
   p.m = rep(0.75, k),
   rho = rep(0.6, k),
-  betas = list(beta0 = 1.0, beta1 = 1.5),
+  betas = list(beta0 = 0.0, beta1 = 1.5),
   rand_sex = F,
   rand_init = F,
   init = sample(k-1, n, TRUE)
@@ -112,8 +136,9 @@ param_list <- list(
 # # # # # Pull individual dataset
 
 jags_data <- sim_dat(param_list)
-# cjs_data <- format_to_cjs(jags_data)
-# 
+
+cjs_data <- format_to_cjs(jags_data)
+js_data <- format_to_js(jags_data)
 # # Multiple Datasets using parallel
 data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 # shuffled_list <- replicate_shuffled_data(jags_data, 4)
@@ -145,6 +170,32 @@ z <- run_jags(jags_data = js_data,
               debug = F)
 
 
+jags_params <- c("pF", "pM", "phiF", "phiM")
+jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
+
+
+y <- run_jags(jags_data = cjs_data,
+              jags_model  = jags_model,
+              jags_params = jags_params,
+              par_settings = par_settings,
+              debug = F)
+
+
+jags_data$n <- NULL
+jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
+jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
+
+x <- run_jags(jags_data = jags_data,
+              jags_model  = jags_model,
+              jags_params = jags_params,
+              par_settings = par_settings,
+              debug = F)
+
+
+
+
+#STARTED AT 8:00pm monday
+
 jags_samples <- run_jags_parallel(cjs_data,
                                   jags_model,
                                   jags_params,
@@ -159,11 +210,11 @@ jags_samples <- run_jags_parallel(cjs_data,
 
 # Run Full Model + No Groups
 ## MCMC parameters  
-par_settings <- list('n.iter' = 100,
-                     'n.thin' = 10,
-                     'n.burn' = 100,
+par_settings <- list('n.iter' = 10,
+                     'n.thin' = 1,
+                     'n.burn' = 10,
                      'n.chains' = 1,
-                     'n.adapt' = 100)
+                     'n.adapt' = 10)
 
 
 jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
