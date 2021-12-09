@@ -32,11 +32,7 @@ cat(pars_mat_name,"\n")
 
 ## Load parameter matrix ---------------------------------------------------------------------------------
 pars_list <- readRDS(pars_mat_name)
-
 parameter_list <- pars_list[[par_index]]
-
-cat(parameter_list, "\n")
-
 saveRDS(parameter_list, out_dir %+% "parameter_list_" %+% k %+% ".rds")
 
 # Generate a Dataset and Format to Pair-Swap, CJS, and JS --------------------------------------------------
@@ -62,7 +58,6 @@ par_settings <- list(`n.iter` = 10,
 
 cjs_jags_params <- c("pF","pM", "phiF", "phiM")
 cjs_jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
-
 cjs_run <- run_jags(jags_data = cjs_data,
                     jags_model = cjs_jags_model,
                     jags_params = cjs_jags_params, 
@@ -76,7 +71,6 @@ saveRDS(cjs_run, out_dir %+% "cjs_run_" %+% k %+% ".rds")
 
 js_jags_params <- c("pF","pM", "phiF", "phiM", "eps")
 js_jags_model <- script_dir %+% "/10_js_mod_standard.R"
-
 js_run <- run_jags(jags_data = js_data,
                    jags_model = js_jags_model,
                    jags_params = js_jags_params, 
@@ -90,7 +84,6 @@ saveRDS(js_run, out_dir %+% "js_run_" %+% k %+% ".rds")
 jags_data$n <- NULL
 jags_params <- c("PF","PM", "PhiF", "PhiM","rho", "gamma", "delta", "beta0", "beta1", "eps")
 jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
-
 ps_run <- run_jags(jags_data = jags_data,
                    jags_model = jags_model,
                    jags_params = jags_params, 
