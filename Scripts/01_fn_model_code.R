@@ -2,7 +2,7 @@
 #    Code runs using embarrassing parallel and should work on both Linux/Windows/MAC
 
 #Generate Data
-sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
+sim_cr_dat <- function(parameter_list, iterations, script_dir, ncores = detectCores() - 1){
   
   #Assign Core count (will not use more than the system has minus one)
   cat("Initializing cluster for data generation...\n")
@@ -15,15 +15,15 @@ sim_cr_dat <- function(parameter_list, iterations, ncores = detectCores() - 1){
   cat("Pushing objects to children...\n")
   
   #Get Script Path
-  path2scripts <- getwd() %+% "/Scripts"
+  #path2scripts <- getwd() %+% "/Scripts"
   
   #Export Variables to clusters
   export <- list(
-    "parameter_list", "iterations","path2scripts"
+    "parameter_list", "iterations","script_dir"
   )
   
   clusterExport(cl, export, envir = environment())
-  clusterEvalQ(cl, source(paste0(path2scripts,"/00_fn_sim_pair_data.R")))
+  clusterEvalQ(cl, source(paste0(script_dir,"/00_fn_sim_pair_data.R")))
   
   # Set Random Seeds
   clusterSetRNGStream(cl)
