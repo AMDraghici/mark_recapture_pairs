@@ -1050,3 +1050,37 @@ plot_sim_caterpillar <- function(posterior_summary,
     geom_point(aes(x = iteration, y = Mean), size = 3, alpha = 1.0, color = "deepskyblue3") +
     geom_abline(slope = slope,  intercept = intercept, linetype = "dashed", color = "red")
 }
+
+
+# Simulation Results
+process_simulation_data <- function(results_list, param_list){
+  
+  n <- length(results_list)
+  df_list <- list()
+  
+  for(i in 1:n){
+    df_list[[i]] <- gather_posterior_summary(results_list[[i]]$jags_samples) %>%
+      mutate(iteration = i,
+             true_vals = ifelse(Parameter_Name == "eps", 1/param_list$k,
+                                ifelse(Parameter_Name == "pF", param_list$p.f[1],
+                                       ifelse(Parameter_Name == "pM", param_list$p.m[1],
+                                              ifelse(Parameter_Name == "phiF", param_list$phi.f[1],
+                                                     ifelse(Parameter_Name == "phiM", param_list$phi.m[1],
+                                                            ifelse(Parameter_Name == "delta", param_list$delta[1],
+                                                                   ifelse(Parameter_Name == "gamma", param_list$gam[1],
+                                                                          ifelse(Parameter_Name == "rho", param_list$rho[1],
+                                                                                 ifelse(Parameter_Name == "beta0", param_list$betas$beta0,
+                                                                                        ifelse(Parameter_Name == "beta1", param_list$betas$beta1,NA)))))))))),
+             In_50 = ifelse(true_vals <= `75%` & true_vals >= `25%`, 1, 0),
+             In_95 = ifelse(true_vals <= `97.5%` & true_vals >= `2.5%`, 1, 0),
+             Range_50 = `75%` - `25%`,
+             Range_95 = `97.5%` - `2.5%`,
+             Bias = Mean - true_vals,
+             coef_var = SD/Mean)
+      
+      
+  }
+  
+  return(do.call(rbind,df_list))
+
+}

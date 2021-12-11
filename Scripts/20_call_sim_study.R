@@ -5,7 +5,7 @@ library(readxl)
 library(lubridate)
 library(rjags)
 
-#setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
+setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
 dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
@@ -41,11 +41,18 @@ cap.data <- cap.data %>%
 #   mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
 #          partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
   populate_missing_mate_data() %>% 
- #filter(initial_entry <= 12, time <= 12) %>%
+  filter(initial_entry <= 10, time <= 10) %>% 
   add_implied_states() %>%
   add_last_capture() %>% 
-  clean_filtered() %>% 
+  clean_filtered() 
+
+
+
+drop_id_yr_filter <- cap.data %>% group_by(animal_id) %>% summarize(num = sum(recapture_individual)) %>% filter(num < 1) %>% pull(animal_id)
+
+cap.data <- cap.data %>% filter(!(animal_id %in% drop_id_yr_filter)) %>% 
   assign_ids_bysex()
+
 
 # Age diff experiment
 cap.data %>% select(animal_id, time, lower_age, upper_age, initial_entry) %>% rename(partner_id = animal_id,
@@ -113,7 +120,7 @@ cap.data %>% filter(animal_id == 116) %>% select(partner_id, time, mated, recapt
 #SIM DATA
 
 k = 5
-n = 100
+n = 10
 
 #set.seed(42)
 param_list <- list(
@@ -150,11 +157,11 @@ data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 #jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 # 
 # ## MCMC parameters  
-par_settings <- list('n.iter' = 1e4,
-                     'n.thin' = 10,
-                     'n.burn' = 1e3,
-                     'n.chains' = 4,
-                    'n.adapt' = 1e3)
+par_settings <- list('n.iter' = 1e2,
+                     'n.thin' = 1,
+                     'n.burn' = 1e2,
+                     'n.chains' = 1,
+                    'n.adapt' = 1e2)
 
 # Vaillancourt 
 # ## Jags parameters and model script
@@ -164,12 +171,25 @@ par_settings <- list('n.iter' = 1e4,
 jags_params <- c("pF", "pM", "phiF", "phiM", "eps")
 jags_model <- script_dir %+% "/10_js_mod_standard.R"
 
+z <- list()
 
-z <- run_jags(jags_data = js_data,
-              jags_model  = jags_model,
-              jags_params = jags_params,
-              par_settings = par_settings,
-              debug = F)
+for(i in 1:100){
+  z[[i]] <- run_jags(jags_data = js_data,
+                jags_model  = jags_model,
+                jags_params = jags_params,
+                par_settings = par_settings,
+                debug = F)
+}
+
+
+results <- process_simulation_data(z, param_list)
+
+results %>% group_by(Parameter) %>% summarize(coverage_50 = mean(In_50),
+                                              coverage_95 = mean(In_95),
+                                              avg_range_50 = mean(Range_50),
+                                              avg_range_95 = mean(Range_95),
+                                              avg_bias = mean(Bias),
+                                              avg_cv = mean(coef_var))
 
 
 jags_params <- c("pF", "pM", "phiF", "phiM")

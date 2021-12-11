@@ -230,10 +230,10 @@ model{
   }
   
   # Attempt to Mate 
-  delta ~ dbeta(3,2)
+  delta ~ dbeta(1,1)
   
   # Pairs reforming
-  beta0 ~ dnorm(0, 2)
+  beta0 ~ dnorm(0, 1)
   beta1 ~ dnorm(0, 1)
   
   # Survival Terms
@@ -252,7 +252,7 @@ model{
   
   ##Correlation (with FH bounds)
   gamma <- (gu - gl)*gamma_raw + gl 
-  gamma_raw ~ dbeta(3,3) 
+  gamma_raw ~ dbeta(1.5,1.5) 
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -269,8 +269,8 @@ model{
   odds.PhiF <- PhiF/(1 - PhiF)
   
   ##Survival Rates M/F
-  PhiF ~ dbeta(3,3)
-  PhiM ~ dbeta(3,3)
+  PhiF ~ dbeta(1,1)
+  PhiM ~ dbeta(1,1)
   
   # Recapture Terms
   ### Derived Parameters ####
@@ -287,7 +287,7 @@ model{
   
   ##Correlation using four parameter beta (with FH bounds)
   rho <- (ru - rl)*rho_raw + rl 
-  rho_raw ~ dbeta(3,3) 
+  rho_raw ~ dbeta(1.5,1.5) 
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -306,6 +306,6 @@ model{
   ### Prior Parameters ####
   
   # Recapture Rates M/F
-  PF ~ dbeta(3,3)
-  PM ~ dbeta(3,3)
+  PF ~ dbeta(1,1)
+  PM ~ dbeta(1,1)
 }
