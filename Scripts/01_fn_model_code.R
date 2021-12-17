@@ -1053,19 +1053,25 @@ plot_sim_caterpillar <- function(posterior_summary,
 
 
 # Simulation Results
-process_simulation_data <- function(results_list, param_list){
+process_simulation_data <- function(results_sim_list, param_sim_list){
   
-  n <- length(results_list)
+  n <- length(results_sim_list)
   df_list <- list()
+
   
   for(i in 1:n){
-    df_list[[i]] <- gather_posterior_summary(results_list[[i]]$jags_samples) %>%
+    
+    if(is.null(results_sim_list[[i]])) next
+    
+    param_list <- param_sim_list[[i]]
+    df_list[[i]] <- gather_posterior_summary(results_sim_list[[i]]$jags_samples) %>%
       mutate(iteration = i,
+             Parameter_Name = tolower(Parameter_Name),
              true_vals = ifelse(Parameter_Name == "eps", 1/param_list$k,
-                                ifelse(Parameter_Name == "pF", param_list$p.f[1],
-                                       ifelse(Parameter_Name == "pM", param_list$p.m[1],
-                                              ifelse(Parameter_Name == "phiF", param_list$phi.f[1],
-                                                     ifelse(Parameter_Name == "phiM", param_list$phi.m[1],
+                                ifelse(Parameter_Name == "pf", param_list$p.f[1],
+                                       ifelse(Parameter_Name == "pm", param_list$p.m[1],
+                                              ifelse(Parameter_Name == "phif", param_list$phi.f[1],
+                                                     ifelse(Parameter_Name == "phim", param_list$phi.m[1],
                                                             ifelse(Parameter_Name == "delta", param_list$delta[1],
                                                                    ifelse(Parameter_Name == "gamma", param_list$gam[1],
                                                                           ifelse(Parameter_Name == "rho", param_list$rho[1],
