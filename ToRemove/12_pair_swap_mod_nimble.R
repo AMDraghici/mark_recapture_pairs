@@ -1,43 +1,4 @@
 library(nimble)
-# 
-# ## Nimble Functions
-# sumEqualsInt1 <- nimbleFunction(
-#   run = function(animal_i = integer(1), 
-#                  t = integer(1),
-#                  x = double(), 
-#                  y = double()){
-#     
-#     ans <- 0
-#     
-#     if(animal_i == 1){
-#       ans <- equals(x[1,t],y)
-#     } else {
-#       for(i in 1:animal_i){
-#         ans <- ans + equals(x[i,t],y)
-#       }
-#     }
-#     
-#     return(ans)
-#     returnType(double())
-#   }
-# )
-# 
-# sumEqualsInt2 <- nimbleFunction(
-#   run = function(nf = integer(1),
-#                  x = double(),
-#                  y = integer(1), 
-#                  z = double()){
-#     
-#     ans <- 0
-#     for(i in 1:nf){
-#       ans <- ans + equals(x[i],y)*z[i]
-#     }
-#     
-#     
-#     return(ans)
-#     returnType(double())
-#   }
-# )
 
 anyMatch <- nimbleFunction(
   
@@ -46,7 +7,7 @@ anyMatch <- nimbleFunction(
     
     returnType(double(0))
     
-    output <- any(y == x)
+    output <- 1*any(y == x)
     
     return(output)}
 )
@@ -63,13 +24,49 @@ vectorMatch <- nimbleFunction(
     return(output)}
 )
 
+dpaircat <- nimbleFunction(
+  run = function(x = double(1), prob = double(2), nf, log = integer(0, default = 1)){
+    
+    possible_mates <- rep(0,nf)
+    
+    returnType(double(0))
+    
+    for(i in 1:nf){
+      possible_mates[i] <- sum(prob[i,])
+    }
+    
+    logProb <- sum(log(1/possible_mates))
+    
+    if(log) return(logProb)
+    else return(exp(logProb))
+  }
+)
+
+rpaircat <- nimbleFunction(
+  run = function(n = integer(0),prob = double(2)){
+    
+    returnType(double(1))
+    if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
+    
+    
+    
+    return(pair_assignment)
+  }
+)
+
+
+t <- 13
+n <- 10
+dpaircat(x = replace_na(jags_data$apairs_f[,t+n],0) + replace_na(nimble_inits$apairs_f[,t+n],0),
+         prob = nimble_inits$psi_cond2[,,t],
+         nf = 50,
+         log = 1)
 
 
 
 nimble_cjs <- nimbleCode({
-  # Multiple-Partners Joint-Fates Extended CJS Model-----------------------------------------------------------------------------
   # 1. Recruitment into population-----------------------------------------------------------------------------------------------------------
-
+  
   # Female Recruitment
   for(i in 1:nf){
     recruit_f[i,1] ~  dbern(eps[1])
@@ -134,7 +131,7 @@ nimble_cjs <- nimbleCode({
     for(j in 1:nm){
       
       # Is male j available at time t 
-      male_taken_jt[j,t] <- anyMatch(j, apairs_f[1:nf,t])# * arepartner[1:nf,t]) #sum(vectorMatch(j, apairs_f[1:nf,t]) * arepartner[1:nf,t])
+      male_taken_jt[j,t] <- sum(vectorMatch(apairs_f[1:nf,t],j)*arepartner[1:nf,t])
       
       # Add Exclusion
       for(i in 1:nf){
@@ -155,7 +152,7 @@ nimble_cjs <- nimbleCode({
       
       # Remove Formed Pairs
       for(j in 1:nm){
-        psi_cond2[i,j,t] <- psi_cond[i,j,t]*(1-anyMatch(j, apairs_f[1:(i-1),t+1])) #psi_cond[i,j,t]*(1-sum(equals(apairs_f[1:(i-1),t+1],j)))
+        psi_cond2[i,j,t] <- psi_cond[i,j,t]*(1-anyMatch(apairs_f[1:(i-1),t+1], j))
       }
       
       #Add case in which no pairs are available 
@@ -251,7 +248,7 @@ nimble_cjs <- nimbleCode({
   
   ##Correlation (with FH bounds)
   gamma <- (gu - gl)*gamma_raw + gl 
-  gamma_raw ~ dbeta(1.5,1.5) 
+  gamma_raw ~ dbeta(1,1) 
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -286,7 +283,7 @@ nimble_cjs <- nimbleCode({
   
   ##Correlation using four parameter beta (with FH bounds)
   rho <- (ru - rl)*rho_raw + rl 
-  rho_raw ~ dbeta(1.5,1.5) 
+  rho_raw ~ dbeta(1,1) 
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -755,7 +752,7 @@ cjsMCMC <- buildMCMC(cjsConf)
 CcjsMCMC <- compileNimble(cjsMCMC, project = cjsModel)
 
 
-samples <- runMCMC(CcjsMCMC, niter = 1e2, nburnin = 1e2, thin = 1, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
+samples <- runMCMC(CcjsMCMC, niter = 1e3, nburnin = 1e2, thin = 1, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
 
 
 coda.samples <- as.mcmc(samples)
