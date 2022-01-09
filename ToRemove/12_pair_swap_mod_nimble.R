@@ -33,7 +33,7 @@ dpaircat <- nimbleFunction(
     
     possible_mates <- rep(0,nf)
     psi_cond2 <- matrix(value = 0, nrow = nf, ncol = nm + 1)
-   
+    
     returnType(double(0))
     
     psi_cond2[1, 1:(nm+1)] <- c(psi_cond[1,1:nm],equals(sum(psi_cond[1,1:nm]),0))
@@ -52,7 +52,7 @@ dpaircat <- nimbleFunction(
       possible_mates[i] <- sum(psi_cond2[i,])
     }
     
-    logProb <- sum(log(1/possible_mates))
+    logProb <- sum(log(1.0/possible_mates))
     
     if(log) return(logProb)
     else return(exp(logProb))
@@ -64,7 +64,7 @@ rpaircat <- nimbleFunction(
     
     x <- rep(0,nf)
     psi_cond2 <- matrix(value = 0, nrow = nf, ncol = nm + 1)
-      
+    
     returnType(double(1))
     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
     
@@ -90,6 +90,7 @@ rpaircat <- nimbleFunction(
   }
 )
 
+
 dbernV <- nimbleFunction(
   
   run = function(x = double(1), 
@@ -98,16 +99,16 @@ dbernV <- nimbleFunction(
                  log = integer(0, default = 1)
   ){
     
-    log_lik <- rep(0, obs)
+    logProb <- rep(0, obs)
     
     returnType(double(0))
     
     for(i in 1:obs){
-      log_lik[i] <-  log(prob[i] * x[i] + (1-prob[i]) * (1 - x[i]))
+      logProb[i] <-  dbinom(x[i], 1, prob[i], 1) #log(prob[i] * x[i] + (1-prob[i]) * (1 - x[i]))
     }
     
-    if(log) return(sum(log_lik))
-    else return(sum(exp(log_lik)))
+    if(log) return(sum(logProb))
+    else return(sum(exp(logProb)))
   }
   
 )
@@ -125,7 +126,7 @@ rbernV <- nimbleFunction(
     if(n != 1) print("rbern_v only allows n = 1; using n = 1.")
     
     for(i in 1:obs){
-      x[i] <- runif(1,0,1) <= prob[i]
+      x[i] <- rbinom(1, 1, prob[i])#runif(1,0,1) <= prob[i]
     }
     
     return(x)
@@ -133,7 +134,7 @@ rbernV <- nimbleFunction(
 )
 
 prob <- runif(100,0,1)
-dbernV(rbernV(1,prob,100),prob,100)
+dbernV(rbernV(1,prob,100),prob,100, 0)
 
 registerDistributions(list(
   dpaircat = list(
@@ -153,7 +154,7 @@ registerDistributions(list(
 ))
 
 
-          
+
 dpaircat(rpaircat(n=1,nimble_inits$psi_cond[,,5], nm = jags_data$nm, nf = jags_data$nf), 
          psi_cond = nimble_inits$psi_cond[,,5], 
          nf = jags_data$nf, nm = jags_data$nm, log = 1)
@@ -192,19 +193,35 @@ nimble_cjs <- nimbleCode({
     
     # 2. Decision to Mate -------------------------------------------------------------------------------------------------------------------
     
-    # Female Mating Choice at time t
-    amating_f[1:nf,t] ~ dbernV(af[1:nf,t] * recruit_f[1:nf,t] * delta, nf)
-
-    # Male Mating Choice at time t
-    amating_m[1:nm,t] ~ dbernV(am[1:nm,t] * recruit_m[1:nm,t] * delta, nm)
-
-    # Choose to re-form pairs 
+    #Female Mating Choice at time t
     for(i in 1:nf){
-      prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t] * amating_f[i,t] * amating_m[apairs_f[i,t],t]
+      amating_f[i,t] ~ dbern(af[i,t] * recruit_f[i,t] * delta)
     }
     
-    # Decide to repair or not
-    arepartner[1:nf,t] ~ dbernV(prob_repartner[1:nf, t], nf)
+    # Male Mating Choice at time t
+    for(j in 1:nm){
+      amating_m[j,t] ~ dbern(am[j,t] * recruit_m[j,t] * delta)
+    }
+    
+    # Choose to re-form pairs
+    for(i in 1:nf){
+      prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
+      arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
+    }
+    
+    # # Female Mating Choice at time t
+    # amating_f[1:nf,t] ~ dbernV(af[1:nf,t] * recruit_f[1:nf,t] * delta, nf)
+    # 
+    # # Male Mating Choice at time t
+    # amating_m[1:nm,t] ~ dbernV(am[1:nm,t] * recruit_m[1:nm,t] * delta, nm)
+    # 
+    # # Choose to re-form pairs
+    # for(i in 1:nf){
+    #   prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t] * amating_f[i,t] * amating_m[apairs_f[i,t],t]
+    # }
+    # 
+    # # Decide to repair or not
+    # arepartner[1:nf,t] ~ dbernV(prob_repartner[1:nf, t], nf)
     
     # Is Male j taken at time t based on re-partnership? 
     # we need Exclude Males who are now unavailable from the catalog of non-repairing individuals
@@ -240,38 +257,79 @@ nimble_cjs <- nimbleCode({
     # 4. Joint Survival ---------------------------------------------------------------------------------------------------------------------
     
     # Marginal Survival Event for Males in the Population (P[Y^M_T])
-    am[1:nm, t+1] ~ dbernV(PhiM * am[1:nm,t] * recruit_m[1:nm,t]  + (1-recruit_m[1:nm,t]), nm)
-    
-    # Marginal Recapture Probability for Females in the Population (P[X^F_T|X^M_T])
-    for(i in 1:nf){
-      # Probability of female surviving given partnership and partner recapture status
-      phi.totalF[i, t] <- single_female[i,t] * PhiF + # female was single
-        (1 - single_female[i,t]) * (am[apairs_f[i,t+1],t+1] * (Phifm/PhiM) + # mated and male Survived
-                                      (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # mated and male perished
+    for(j in 1:nm){
+      am[j,t+1] ~ dbern(PhiM * am[j,t] * recruit_m[j,t]  + (1-recruit_m[j,t]))
     }
     
-    # # Draw Survival Event 
-    af[1:nf,t+1] ~ dbernV(phi.totalF[1:nf,t] * af[1:nf,t] * recruit_f[1:nf,t] + (1-recruit_f[1:nf,t]), nf)   
+    # am[1:nm, t+1] ~ dbernV(PhiM * am[1:nm,t] * recruit_m[1:nm,t]  + (1-recruit_m[1:nm,t]), nm)
+    
+    # Marginal Recapture Event for Males in the Population (P[X^M_T|X^F_T])
+    for(i in 1:nf){
+      
+      # Probability of female surviving given partnership and partner recapture status
+      phi.totalF[i, t] <- single_female[i,t] * PhiF + # female was single
+        (1 - single_female[i,t]) * (am[apairs_f[i,t+1],t+1] * (Phifm/PhiM) + # Male mated and female surived
+                                      (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # Male mated and female perished
+      
+      # Draw Survival Event
+      af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t] * recruit_f[i,t] + (1-recruit_f[i,t]))
+    }
+    
+    
+    # # Marginal Survival Event for Males in the Population (P[Y^M_T])
+    # am[1:nm, t+1] ~ dbernV(PhiM * am[1:nm,t] * recruit_m[1:nm,t]  + (1-recruit_m[1:nm,t]), nm)
+    # 
+    # # Marginal Recapture Probability for Females in the Population (P[X^F_T|X^M_T])
+    # for(i in 1:nf){
+    #   # Probability of female surviving given partnership and partner recapture status
+    #   phi.totalF[i, t] <- single_female[i,t] * PhiF + # female was single
+    #     (1 - single_female[i,t]) * (am[apairs_f[i,t+1],t+1] * (Phifm/PhiM) + # mated and male Survived
+    #                                   (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # mated and male perished
+    # }
+    # 
+    # # Draw Survival Event
+    # af[1:nf,t+1] ~ dbernV(phi.totalF[1:nf,t] * af[1:nf,t] * recruit_f[1:nf,t] + (1-recruit_f[1:nf,t]), nf)
     
     # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
     
-    
     # Marginal Recapture Event for Males in the Population (P[X^M_T])
-    recap_m[1:nm,t] ~ dbernV(PM * am[1:nm,t+1] * recruit_m[1:nm,t], nm)
+    for(j in 1:nm){
+      recap_m[j,t] ~ dbern(PM * am[j,t+1] * recruit_m[j,t])
+    }
     
+    
+    # recap_m[1:nm,t] ~ dbernV(PM * am[1:nm,t+1] * recruit_m[1:nm,t], nm)
+    #
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
     for(i in 1:nf){
       
       # Probability of female being captured given partnership and partner recapture status
       p.totalF[i, t] <- single_female[i,t] * PF + # Female was single
-        (1 - single_female[i,t]) * (recap_m[apairs_f[i,t+1],t] * (Pfm/PM) + # Mated and male captured
-                                      (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Mated and male not captured
+        (1 - single_female[i,t]) * (recap_m[apairs_f[i,t+1],t] * (Pfm/PM) + # Male mated and female captured
+                                      (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Male mated and female not captured
+      
+      # Draw Recapture Probability
+      recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t+1] * recruit_f[i,t])
     }
     
-    # Draw Recapture Probability 
-    recap_f[1:nf, t] ~ dbernV(p.totalF[1:nf,t] * af[1:nf,t+1] * recruit_f[1:nf,t], nf)    
+    # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
+    
+    
+    # # Marginal Recapture Event for Males in the Population (P[X^M_T])
+    # recap_m[1:nm,t] ~ dbernV(PM * am[1:nm,t+1] * recruit_m[1:nm,t], nm)
+    # 
+    # # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
+    # for(i in 1:nf){
+    #   
+    #   # Probability of female being captured given partnership and partner recapture status
+    #   p.totalF[i, t] <- single_female[i,t] * PF + # Female was single
+    #     (1 - single_female[i,t]) * (recap_m[apairs_f[i,t+1],t] * (Pfm/PM) + # Mated and male captured
+    #                                   (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Mated and male not captured
+    # }
+    # 
+    # # Draw Recapture Probability
+    # recap_f[1:nf, t] ~ dbernV(p.totalF[1:nf,t] * af[1:nf,t+1] * recruit_f[1:nf,t], nf)
   }
-  
   
   
   # 6. Prior Distributions-------------------------------------------------------------------------------------------------------------------
@@ -635,28 +693,28 @@ generate_nimble_init_pairs <- function(jags_data){
     mat_final[is.na(jags_mat)] <- mat[is.na(jags_mat)]
     return(mat_final)
   }
-
+  
   #Female Recruitment
   recruit_f <- build_NA_mat(recruit_f, jags_data$recruit_f)
-
+  
   # Male Recruitment
   recruit_m <- build_NA_mat(recruit_m, jags_data$recruit_m)
-
+  
   # Female Survival
   af <- build_NA_mat(af, jags_data$af)
-
+  
   # Female Mating Status
   amating_f <- build_NA_mat(amating_f, jags_data$amating_f)
-
+  
   # Male Survival
   am <- build_NA_mat(am, jags_data$am)
-
+  
   # Male Mating Status
   amating_m <- build_NA_mat(amating_m, jags_data$amating_m)
-
+  
   # Pair index (female perspective)
   apairs_f <- build_NA_mat(apairs_f, jags_data$apairs_f)
-
+  
   # Repartner index (female perspective)
   arepartner <- build_NA_mat(arepartner, jags_data$arepartner)
   # 
@@ -691,7 +749,7 @@ generate_nimble_init_pairs <- function(jags_data){
     psi_cond = psi_cond#,
     #psi_cond2 = psi_cond2
   )
- 
+  
   
   # Return Initial Values for a single chain
   return(jags_inits)
@@ -731,7 +789,7 @@ dims <- list(histories = c(cjs_constants$nf, cjs_constants$nm+1, cjs_constants$k
              single_female = c(cjs_constants$nf, cjs_constants$k),
              phi.totalF = c(cjs_constants$nf, cjs_constants$k),
              p.totalF = c(cjs_constants$nf, cjs_constants$k)
-             )
+)
 
 
 cjsModel <- nimbleModel(code = nimble_cjs, 
@@ -753,8 +811,9 @@ cjsMCMC <- buildMCMC(cjsConf)
 CcjsMCMC <- compileNimble(cjsMCMC, project = cjsModel)
 
 
-samples <- runMCMC(CcjsMCMC, niter = 1e5, nburnin = 1, thin = 1, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
+samples <- runMCMC(CcjsMCMC, niter = 1e5, nburnin = 1e4, thin = 10, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
 
 
 coda.samples <- as.mcmc(samples)
 summary(coda.samples)
+
