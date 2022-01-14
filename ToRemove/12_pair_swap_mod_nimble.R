@@ -104,7 +104,7 @@ dbernV <- nimbleFunction(
     returnType(double(0))
     
     for(i in 1:obs){
-      logProb[i] <-  dbinom(x[i], 1, prob[i], 1) #log(prob[i] * x[i] + (1-prob[i]) * (1 - x[i]))
+      logProb[i] <- log(prob[i] * x[i] + (1-prob[i]) * (1 - x[i])) # dbinom(x[i], 1, prob[i], 1) #
     }
     
     if(log) return(sum(logProb))
@@ -155,8 +155,8 @@ registerDistributions(list(
 
 
 
-dpaircat(rpaircat(n=1,nimble_inits$psi_cond[,,5], nm = jags_data$nm, nf = jags_data$nf), 
-         psi_cond = nimble_inits$psi_cond[,,5], 
+dpaircat(rpaircat(n=1,nimble_inits$psi_cond[,,10], nm = jags_data$nm, nf = jags_data$nf), 
+         psi_cond = nimble_inits$psi_cond[,,10], 
          nf = jags_data$nf, nm = jags_data$nm, log = 1)
 
 nimble_cjs <- nimbleCode({
@@ -165,11 +165,15 @@ nimble_cjs <- nimbleCode({
   
   # Female Recruitment
   for(i in 1:nf){
+    
+    # recruit_f[i, 1:(k-1)] ~ dbern_cv(prob_recruit = eps[1:(k-1)]
+    
     recruit_f[i,1] ~  dbern(eps[1])
     for(t in 2:(k-1)){
       recruit_f[i,t] ~ dbern(recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])
     } 
   }
+  
   
   # Male Recruitment
   for(j in 1:nm){
@@ -193,7 +197,7 @@ nimble_cjs <- nimbleCode({
     
     # 2. Decision to Mate -------------------------------------------------------------------------------------------------------------------
     
-    #Female Mating Choice at time t
+    # Female Mating Choice at time t
     for(i in 1:nf){
       amating_f[i,t] ~ dbern(af[i,t] * recruit_f[i,t] * delta)
     }
@@ -201,27 +205,14 @@ nimble_cjs <- nimbleCode({
     # Male Mating Choice at time t
     for(j in 1:nm){
       amating_m[j,t] ~ dbern(am[j,t] * recruit_m[j,t] * delta)
-    }
+    } 
     
-    # Choose to re-form pairs
+    # Choose to re-form pairs 
     for(i in 1:nf){
       prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t]
       arepartner[i,t] ~ dbern(prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t])
     }
     
-    # # Female Mating Choice at time t
-    # amating_f[1:nf,t] ~ dbernV(af[1:nf,t] * recruit_f[1:nf,t] * delta, nf)
-    # 
-    # # Male Mating Choice at time t
-    # amating_m[1:nm,t] ~ dbernV(am[1:nm,t] * recruit_m[1:nm,t] * delta, nm)
-    # 
-    # # Choose to re-form pairs
-    # for(i in 1:nf){
-    #   prob_repartner[i,t] <- ilogit(beta0 + beta1*histories[i, apairs_f[i,t] , t]) * psi[i, apairs_f[i,t], t] * amating_f[i,t] * amating_m[apairs_f[i,t],t]
-    # }
-    # 
-    # # Decide to repair or not
-    # arepartner[1:nf,t] ~ dbernV(prob_repartner[1:nf, t], nf)
     
     # Is Male j taken at time t based on re-partnership? 
     # we need Exclude Males who are now unavailable from the catalog of non-repairing individuals
@@ -261,8 +252,6 @@ nimble_cjs <- nimbleCode({
       am[j,t+1] ~ dbern(PhiM * am[j,t] * recruit_m[j,t]  + (1-recruit_m[j,t]))
     }
     
-    # am[1:nm, t+1] ~ dbernV(PhiM * am[1:nm,t] * recruit_m[1:nm,t]  + (1-recruit_m[1:nm,t]), nm)
-    
     # Marginal Recapture Event for Males in the Population (P[X^M_T|X^F_T])
     for(i in 1:nf){
       
@@ -275,21 +264,6 @@ nimble_cjs <- nimbleCode({
       af[i, t+1] ~ dbern(phi.totalF[i,t] * af[i,t] * recruit_f[i,t] + (1-recruit_f[i,t]))
     }
     
-    
-    # # Marginal Survival Event for Males in the Population (P[Y^M_T])
-    # am[1:nm, t+1] ~ dbernV(PhiM * am[1:nm,t] * recruit_m[1:nm,t]  + (1-recruit_m[1:nm,t]), nm)
-    # 
-    # # Marginal Recapture Probability for Females in the Population (P[X^F_T|X^M_T])
-    # for(i in 1:nf){
-    #   # Probability of female surviving given partnership and partner recapture status
-    #   phi.totalF[i, t] <- single_female[i,t] * PhiF + # female was single
-    #     (1 - single_female[i,t]) * (am[apairs_f[i,t+1],t+1] * (Phifm/PhiM) + # mated and male Survived
-    #                                   (1 - am[apairs_f[i,t+1],t+1]) * (Phif0/(1-PhiM))) # mated and male perished
-    # }
-    # 
-    # # Draw Survival Event
-    # af[1:nf,t+1] ~ dbernV(phi.totalF[1:nf,t] * af[1:nf,t] * recruit_f[1:nf,t] + (1-recruit_f[1:nf,t]), nf)
-    
     # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
     
     # Marginal Recapture Event for Males in the Population (P[X^M_T])
@@ -297,9 +271,6 @@ nimble_cjs <- nimbleCode({
       recap_m[j,t] ~ dbern(PM * am[j,t+1] * recruit_m[j,t])
     }
     
-    
-    # recap_m[1:nm,t] ~ dbernV(PM * am[1:nm,t+1] * recruit_m[1:nm,t], nm)
-    #
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
     for(i in 1:nf){
       
@@ -312,23 +283,6 @@ nimble_cjs <- nimbleCode({
       recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t+1] * recruit_f[i,t])
     }
     
-    # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
-    
-    
-    # # Marginal Recapture Event for Males in the Population (P[X^M_T])
-    # recap_m[1:nm,t] ~ dbernV(PM * am[1:nm,t+1] * recruit_m[1:nm,t], nm)
-    # 
-    # # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
-    # for(i in 1:nf){
-    #   
-    #   # Probability of female being captured given partnership and partner recapture status
-    #   p.totalF[i, t] <- single_female[i,t] * PF + # Female was single
-    #     (1 - single_female[i,t]) * (recap_m[apairs_f[i,t+1],t] * (Pfm/PM) + # Mated and male captured
-    #                                   (1 - recap_m[apairs_f[i,t+1],t]) * (Pf0/(1-PM))) # Mated and male not captured
-    # }
-    # 
-    # # Draw Recapture Probability
-    # recap_f[1:nf, t] ~ dbernV(p.totalF[1:nf,t] * af[1:nf,t+1] * recruit_f[1:nf,t], nf)
   }
   
   
@@ -362,7 +316,12 @@ nimble_cjs <- nimbleCode({
   
   ##Correlation (with FH bounds)
   gamma <- (gu - gl)*gamma_raw + gl 
-  gamma_raw ~ dbeta(1,1) 
+  gamma_raw ~ dbeta(1,1)
+  # gamma_phi_raw ~ dunif(0,1)
+  # gamma_kappa_raw ~ dexp(1)
+  # gamma_alpha_raw <- gamma_phi_raw *  gamma_kappa_raw
+  # gamma_beta_raw <- (1-gamma_phi_raw) *  gamma_kappa_raw
+  
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -397,7 +356,20 @@ nimble_cjs <- nimbleCode({
   
   ##Correlation using four parameter beta (with FH bounds)
   rho <- (ru - rl)*rho_raw + rl 
-  rho_raw ~ dbeta(1,1) 
+  rho_raw ~ dbeta(1,1)
+  # rho_phi_raw ~ dunif(0,1)
+  # rho_kappa_raw ~ dexp(1)
+  # rho_alpha_raw <- rho_phi_raw *  rho_kappa_raw
+  # rho_beta_raw <- (1-rho_phi_raw) *  rho_kappa_raw
+  
+  # TEST
+  # rho_raw <- ilogit(logit_rho_raw)
+  # logit_rho_raw ~ dnorm(mu_rho_raw, sd_rho_raw)
+  # mu_rho_raw ~ dnorm(hp_mu_rho_raw_mu, hp_mu_rho_raw_sd)
+  # sd_rho_raw ~ dexp(hp_sd_rho_raw_rate)
+  # hp_mu_rho_raw_mu ~ dnorm(0, 1)
+  # hp_mu_rho_raw_sd ~ dexp(1)
+  # hp_sd_rho_raw_rate ~ dexp(1)
   
   ###Frechet-Hoeffding Bounds for Correlation
   
@@ -778,7 +750,7 @@ cjs_dat <- list(
   recap_m = jags_data$recap_m
 )
 
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
 
 dims <- list(histories = c(cjs_constants$nf, cjs_constants$nm+1, cjs_constants$k+1),
              prob_repartner = c(cjs_constants$nf, cjs_constants$k),
@@ -811,9 +783,19 @@ cjsMCMC <- buildMCMC(cjsConf)
 CcjsMCMC <- compileNimble(cjsMCMC, project = cjsModel)
 
 
-samples <- runMCMC(CcjsMCMC, niter = 1e5, nburnin = 1e4, thin = 10, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
+samples <- runMCMC(CcjsMCMC, niter = 5e4, nburnin = 1e4, thin = 10, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
 
 
 coda.samples <- as.mcmc(samples)
 summary(coda.samples)
 
+
+library(ggmcmc)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)

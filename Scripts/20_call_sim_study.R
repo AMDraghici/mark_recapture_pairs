@@ -17,10 +17,19 @@ out_dir <- getwd() %+% "/Output/"
 
 # #HDUCK Data
 #
-# cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_data() %>% add_implied_states() %>% add_last_capture() %>% assign_ids_bysex()
-# cap.data <- cap.data #%>% filter(initial_entry < 28)
-# jags_data <- build_jags_data(cap.data)
-# cjs_data <- format_to_cjs(jags_data)
+cap.data <- gather_hq_data(dat_dir) %>% 
+  build_cr_df() %>% 
+  populate_missing_mate_data() %>% 
+  populate_missing_mate_data() %>%
+  add_implied_states() %>%
+  add_last_capture() %>% 
+  clean_filtered() %>% 
+  assign_ids_bysex()
+
+
+cap.data <- cap.data %>% filter(initial_entry < 28)
+jags_data <- build_jags_data(cap.data)
+cjs_data <- format_to_cjs(jags_data)
 
 
 cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_data() 
@@ -41,7 +50,7 @@ cap.data <- cap.data %>%
 #   mutate(mated = ifelse(partner_id %in% animal1cap,0,mated),
 #          partner_id = ifelse(partner_id %in% animal1cap, 0, partner_id)) %>%
   populate_missing_mate_data() %>% 
-  filter(initial_entry <= 10, time <= 10) %>% 
+  #filter(initial_entry <= 10, time <= 10) %>% 
   add_implied_states() %>%
   add_last_capture() %>% 
   clean_filtered() 
@@ -119,28 +128,28 @@ cap.data %>% filter(animal_id == 116) %>% select(partner_id, time, mated, recapt
 
 #SIM DATA
 
-k = 5
-n = 10
+k = 28
+n = 331
 
 #set.seed(42)
 param_list <- list(
   n = n,
   k = k,
-  prop.female = 0.5,
+  prop.female = 0.4652568,
   delta = rep(0.9, k),
-  phi.f = rep(0.8, k),
-  phi.m = rep(0.8, k),
-  gam = rep(0.6, k),
-  p.f = rep(0.75, k),
-  p.m = rep(0.75, k),
-  rho = rep(0.6, k),
-  betas = list(beta0 = 0.0, beta1 = 1.5),
-  rand_sex = F,
+  phi.f = rep(0.9, k),
+  phi.m = rep(0.9, k),
+  gam = rep(0.7, k),
+  p.f = rep(0.8, k),
+  p.m = rep(0.8, k),
+  rho = rep(0.7, k),
+  betas = list(beta0 = 1.5, beta1 = 2),
+  rand_sex = T,
   rand_init = F,
   init = sample(k-1, n, TRUE)
 )
 
-#attach(param_list)
+# attach(param_list)
 
 # # # # # Pull individual dataset
 

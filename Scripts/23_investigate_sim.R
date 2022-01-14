@@ -96,3 +96,9 @@ param_sim_list[[301]]$gam
 # #  geom_hline(yintercept = 0.5, col = "red") + 
 #   geom_point(aes(x = scenario, y = avg_bias), col = "blue") #+
 #  # geom_point(aes(x = scenario, y = coverage_50), col = "red")
+
+
+cjs_sim_list[[400]]$jags_samples %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
+js_sim_list[[400]]$jags_samples %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[400]]$jags_samples %>% ggs() %>% filter(Parameter %in% c("PM","PF","PhiF","PhiM","rho","gamma", "delta")) %>% ggs_traceplot() + ylim(0,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
