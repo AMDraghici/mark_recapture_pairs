@@ -783,19 +783,20 @@ cjsMCMC <- buildMCMC(cjsConf)
 CcjsMCMC <- compileNimble(cjsMCMC, project = cjsModel)
 
 
-samples <- runMCMC(CcjsMCMC, niter = 5e4, nburnin = 1e4, thin = 10, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
+samples <- runMCMC(CcjsMCMC, niter = 1e5, nburnin = 1e4, thin = 10, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
 
 
 coda.samples <- as.mcmc(samples)
 summary(coda.samples)
 
-
+saveRDS(coda.samples, "long_run_332_28.rds")
 library(ggmcmc)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
-coda.samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0,1)
-coda.samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0.70,0.95)
+coda.samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_density() #+ ylim(0,1)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+

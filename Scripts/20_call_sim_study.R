@@ -126,10 +126,23 @@ cap.data %>% filter(animal_id == 116) %>% select(partner_id, time, mated, recapt
 #   }
 # }
 
+for(t in 1:30){
+  index <- which(!is.na(jags_data$af[,t]))
+  print(all(jags_data$sf[index,t] == jags_data$af[index,t]))
+} 
+
+
+
+t <- 4
+index <- which(!is.na(jags_data$af[,t]))
+jags_data$repartner[index,t]
+jags_data$arepartner[index,t]
+
+
 #SIM DATA
 
-k = 28
-n = 331
+k = 30
+n = 500
 
 #set.seed(42)
 param_list <- list(
