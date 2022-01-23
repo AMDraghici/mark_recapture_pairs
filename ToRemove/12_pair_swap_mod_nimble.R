@@ -155,8 +155,8 @@ registerDistributions(list(
 
 
 
-dpaircat(rpaircat(n=1,nimble_inits$psi_cond[,,10], nm = jags_data$nm, nf = jags_data$nf), 
-         psi_cond = nimble_inits$psi_cond[,,10], 
+dpaircat(rpaircat(n=1,nimble_inits$psi_cond[,,1], nm = jags_data$nm, nf = jags_data$nf), 
+         psi_cond = nimble_inits$psi_cond[,,1], 
          nf = jags_data$nf, nm = jags_data$nm, log = 1)
 
 nimble_cjs <- nimbleCode({
@@ -189,6 +189,26 @@ nimble_cjs <- nimbleCode({
       histories[i, j, 1] <- 0
     }
   }
+  
+  # # Dummy issue
+  # for(i in 1:nf){
+  #   af[i,1] ~ dbern(1)
+  # }
+  # 
+  # for(t in 1:(k+1)){
+  #   af[nf+1,t] ~ dbern(1)
+  #   am[nm+1,t] ~ dbern(1)
+  # }
+  # 
+  # for(t in 1:k){
+  #   recap_f[nf+1,t] ~ dbern(0)
+  #   recap_m[nm+1,t] ~ dbern(0)
+  # }
+  # 
+  # for(j in 1:nm){
+  #   am[j,1] ~ dbern(1)
+  # }
+  
   
   # Conditional Partnership/Survival/Recapture Steps ----------------------------------------------------------------------------------------
   
@@ -392,6 +412,9 @@ nimble_cjs <- nimbleCode({
   PM ~ dbeta(1,1)
 })
 
+# 
+
+
 
 generate_nimble_init_pairs <- function(jags_data){
   
@@ -405,11 +428,11 @@ generate_nimble_init_pairs <- function(jags_data){
   # CR data with missing components
   recruit_f <- jags_data$recruit_f
   recruit_m <- jags_data$recruit_m
-  amating_f <- jags_data$amating_f 
+  amating_f <- jags_data$amating_f
   amating_m <- jags_data$amating_m
   arepartner <- jags_data$arepartner
-  apairs_f <-  jags_data$apairs_f 
-  af <- jags_data$af 
+  apairs_f <-  jags_data$apairs_f
+  af <- jags_data$af
   am <- jags_data$am
   
   # Define local fn equals to emulate jags code
@@ -436,12 +459,12 @@ generate_nimble_init_pairs <- function(jags_data){
   OR.P <- odds.PF/odds.PM
   
   # Recapture Rates (Rho)
-  ru <-  min(sqrt(OR.P), 1/sqrt(OR.P)) 
-  rl <- -min(sqrt(OP.P), 1/sqrt(OP.P)) 
+  ru <-  min(sqrt(OR.P), 1/sqrt(OR.P))
+  rl <- -min(sqrt(OP.P), 1/sqrt(OP.P))
   
   ##Correlation using four parameter beta (with FH bounds)
   rho_raw <- rbeta(1,3,3)
-  rho <- (ru - rl)*rho_raw + rl 
+  rho <- (ru - rl)*rho_raw + rl
   
   ###Binomial SD for recapture
   sig.PF <- sqrt(PF*(1-PF))
@@ -466,12 +489,12 @@ generate_nimble_init_pairs <- function(jags_data){
   OR.Phi <- odds.PhiF/odds.PhiM
   
   # Recapture Rates (Rho)
-  gu <-  min(sqrt(OR.Phi), 1/sqrt(OR.Phi)) 
-  gl <- -min(sqrt(OP.Phi), 1/sqrt(OP.Phi)) 
+  gu <-  min(sqrt(OR.Phi), 1/sqrt(OR.Phi))
+  gl <- -min(sqrt(OP.Phi), 1/sqrt(OP.Phi))
   
   ##Correlation using four parameter beta (with FH bounds)
   gamma_raw <-  rbeta(1,3,3)
-  gamma <- (gu - gl)*gamma_raw + gl 
+  gamma <- (gu - gl)*gamma_raw + gl
   
   ###Binomial SD for survival
   sig.PhiF <- sqrt(PhiF*(1-PhiF))
@@ -484,13 +507,13 @@ generate_nimble_init_pairs <- function(jags_data){
   Phim0 <- PhiM - Phifm
   
   # Simple Processes --------------------------------------------------------------
-  # Recruitment 
+  # Recruitment
   eps <- rep(NA, k)
   for(t in 1:k){
     eps[t] <- rbeta(1,1,1)
   }
   
-  # Attempt to Mate 
+  # Attempt to Mate
   delta <- rbeta(1, 3, 2)
   
   # Pairs reforming
@@ -504,15 +527,15 @@ generate_nimble_init_pairs <- function(jags_data){
   # af/am
   # apairs f/m
   
-  # package up the mating stuff into a few functions its a little unweildy 
+  # package up the mating stuff into a few functions its a little unweildy
   
-  # Recruitment 
+  # Recruitment
   # Female Recruitment
   for(i in 1:nf){
     recruit_f[i,1] <- ifelse(is.na(recruit_f[i,1]), rbinom(1, 1, eps[1]),recruit_f[i,1])
     for(t in 2:(k-1)){
       recruit_f[i,t] <- ifelse(is.na(recruit_f[i,t]), rbinom(1, 1, (recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])),recruit_f[i,t])
-    } 
+    }
   }
   
   # Male Recruitment
@@ -520,7 +543,7 @@ generate_nimble_init_pairs <- function(jags_data){
     recruit_m[j,1] <- ifelse(is.na(recruit_m[j,1]), rbinom(1, 1, eps[1]), recruit_m[j,1])
     for(t in 2:(k-1)){
       recruit_m[j,t] <- ifelse(is.na(recruit_m[j,t]), rbinom(1, 1, (recruit_m[j,t-1] + (1-recruit_m[j,t-1]) * eps[t])), recruit_m[j,t])
-    } 
+    }
   }
   
   # Intermediate objects defined within JAGS
@@ -538,12 +561,12 @@ generate_nimble_init_pairs <- function(jags_data){
     #   print(t)
     # Female Mating Choice at time t
     for(i in 1:nf){
-      amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta), amating_f[i,t]) 
+      amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta), amating_f[i,t])
     }
     
     # Male Mating Choice at time t
     for(j in 1:nm){
-      amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),rbinom(1, 1, am[j,t] * recruit_m[j,t] * delta),  amating_m[j,t]) 
+      amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),rbinom(1, 1, am[j,t] * recruit_m[j,t] * delta),  amating_m[j,t])
     }
     
     # Choose to re-form pairs
@@ -554,7 +577,7 @@ generate_nimble_init_pairs <- function(jags_data){
       #   print("prob_repartner:"  %+% prob_repartner[i,t]  %+% "; hist:" %+% histories[i, apairs_f[i,t] , t] )
       #   print("arepartner:" %+% arepartner[i,t] %+% "; amating_f:" %+% amating_f[i,t] %+% "; amating_f:" %+% amating_m[apairs_f[i,t],t])
       
-      arepartner[i,t] <- ifelse(is.na(arepartner[i,t]), 
+      arepartner[i,t] <- ifelse(is.na(arepartner[i,t]),
                                 rbinom(1,1,prob_repartner[i,t] * amating_f[i,t] * amating_m[apairs_f[i,t],t]),
                                 arepartner[i,t])
     }
@@ -583,7 +606,7 @@ generate_nimble_init_pairs <- function(jags_data){
       }
     }
     
-    # some error handling 
+    # some error handling
     if(!all(sort(which(male_taken_jt[,t] == 1)) == sort(apairs_f[which(arepartner[,t] == 1),t]))) stop("Male taken not working at time:" %+% t)
     
     # Initialize choice selection
@@ -622,7 +645,7 @@ generate_nimble_init_pairs <- function(jags_data){
       single_female[i,t] <- equals(apairs_f[i,t+1],nm+1)
     }
     
-    # some error handling 
+    # some error handling
     if(any(sort(table(apairs_f[,t]))[-length(table(apairs_f[,t]))] > 1)) stop("Illegal apairing_f at " %+% t)
     
     for(i in  1:nf){
@@ -689,7 +712,7 @@ generate_nimble_init_pairs <- function(jags_data){
   
   # Repartner index (female perspective)
   arepartner <- build_NA_mat(arepartner, jags_data$arepartner)
-  # 
+  #
   # Return Results ------------------------------------------------------------------
   
   # Store in object
@@ -699,7 +722,7 @@ generate_nimble_init_pairs <- function(jags_data){
     rho_raw = rho_raw,
     PhiF = PhiF,
     PhiM = PhiM,
-    gamma_raw = gamma_raw, 
+    gamma_raw = gamma_raw,
     eps = eps,
     delta = delta,
     beta0 = beta0,
@@ -715,8 +738,8 @@ generate_nimble_init_pairs <- function(jags_data){
     histories = histories,
     single_female = single_female,
     phi.totalF = phi.totalF,
-    male_taken_jt = male_taken_jt, 
-    prob_repartner = prob_repartner, 
+    male_taken_jt = male_taken_jt,
+    prob_repartner = prob_repartner,
     #psi_raw = psi_raw,
     psi_cond = psi_cond#,
     #psi_cond2 = psi_cond2
@@ -726,6 +749,8 @@ generate_nimble_init_pairs <- function(jags_data){
   # Return Initial Values for a single chain
   return(jags_inits)
 }
+
+
 
 
 nimble_inits <- generate_nimble_init_pairs(jags_data)
@@ -750,7 +775,7 @@ cjs_dat <- list(
   recap_m = jags_data$recap_m
 )
 
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")#,"single_female","apairs_f","am","af","recap_f","recap_m","arepartner")
 
 dims <- list(histories = c(cjs_constants$nf, cjs_constants$nm+1, cjs_constants$k+1),
              prob_repartner = c(cjs_constants$nf, cjs_constants$k),
@@ -783,7 +808,7 @@ cjsMCMC <- buildMCMC(cjsConf)
 CcjsMCMC <- compileNimble(cjsMCMC, project = cjsModel)
 
 
-samples <- runMCMC(CcjsMCMC, niter = 1e5, nburnin = 1e4, thin = 10, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
+samples <- runMCMC(CcjsMCMC, niter = 100, nburnin = 2, thin = 1, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
 
 
 coda.samples <- as.mcmc(samples)
@@ -799,4 +824,9 @@ coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_trace
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+
+
+
+
+
 

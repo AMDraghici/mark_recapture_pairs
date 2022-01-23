@@ -141,14 +141,14 @@ jags_data$arepartner[index,t]
 
 #SIM DATA
 
-k = 30
-n = 500
+k = 5
+n = 10
 
 #set.seed(42)
 param_list <- list(
   n = n,
   k = k,
-  prop.female = 0.4652568,
+  prop.female = 0.5,#0.4652568,
   delta = rep(0.9, k),
   phi.f = rep(0.9, k),
   phi.m = rep(0.9, k),
@@ -157,9 +157,9 @@ param_list <- list(
   p.m = rep(0.8, k),
   rho = rep(0.7, k),
   betas = list(beta0 = 1.5, beta1 = 2),
-  rand_sex = T,
+  rand_sex = F,
   rand_init = F,
-  init = sample(k-1, n, TRUE)
+  init = sample(1, n, TRUE)
 )
 
 # attach(param_list)

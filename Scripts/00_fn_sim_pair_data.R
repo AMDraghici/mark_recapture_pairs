@@ -1264,24 +1264,6 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   }
   
   
-  # 
-  # # If previous partner is with another mate (that was observed) then arepartner must be zero
-  # for(time in 2:k){
-  #   for(i in 1:nf){
-  #     
-  #     mask1 <- is.na(arepartner[i,time]) #is this case unknown
-  #     mask2 <- !is.na(apairs_f[i,time-1]) # do we know their last partner
-  #     mask3 <- ifelse(mask2,any(apairs_f[i,time-1] == c(nm+1,apairs_f[-i,time]), na.rm = T),FALSE) # if partner has a new mate or if past state was single
-  #     
-  #     # ...Then repartner is known zero
-  #     if(mask1 & mask2 & mask3){
-  #       arepartner[i,time] <- 0
-  #     } else {
-  #       next
-  #     }
-  #   }
-  # }
-  
   # Dummy states always available
   amating_f[(nf+1),1:k] <- 1
   amating_m[(nm+1),1:k] <- 1
@@ -1292,8 +1274,8 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   arepartner[,1] <- 0 
     
   # add dummy index (used to make JAGS/NIMBLE code cleaner)
-  apairs_f <- cbind(rep((nf+1),nrow(apairs_f)),apairs_f)
-  apairs_m <- cbind(rep((nm+1),nrow(apairs_m)),apairs_m)
+  apairs_f <- cbind(rep((nm+1),nrow(apairs_f)),apairs_f)
+  apairs_m <- cbind(rep((nf+1),nrow(apairs_m)),apairs_m)
   
   
   # Build index of possible pairings 
