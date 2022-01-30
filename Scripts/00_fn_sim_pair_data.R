@@ -1317,7 +1317,6 @@ simulate_cr_data <- function(n,
                              p.m, 
                              rho, 
                              betas, 
-                             rand_sex = F,
                              rand_init = T,
                              init = NULL){
   
@@ -1330,44 +1329,44 @@ simulate_cr_data <- function(n,
   }
   
   # Generate SKeleton Data Structures
-  sex <- construct_sexes(n, prop.female, rand_sex)
-  initial_entry <- construct_init_entry(n, k, rand_init,init) 
-  recruit_list <- construct_recruit(n, k, sex)
+  sex <- construct_sexes(n = n, prop.female = prop.female)
+  initial_entry <- construct_init_entry(n = n, k = k, random = rand_init, init = init) 
+  recruit_list <- construct_recruit(n = n, k = k, sex = sex)
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m  <- recruit_list[["recruit_m"]]
   recruit <- recruit_list[["recruit"]]
-  mating_list <- construct_mated(n, k, sex)
+  mating_list <- construct_mated(n=n, k=k, sex = sex)
   mating_f <- mating_list[["mating_f"]] 
   mating_m <- mating_list[["mating_m"]]  
   mating <- mating_list[["mating"]]
-  repartner <- construct_repartner(sex, k)
-  pairs_list <- construct_pairs(sex, k)
+  repartner <- construct_repartner(sex = sex, k = k)
+  pairs_list <- construct_pairs(sex = sex, k = k)
   pairs_f <- pairs_list[["pairs_f"]]
   pairs_m <- pairs_list[["pairs_m"]]
   pairs <- pairs_list[["pairs"]]
-  coef_list <- construct_coef(sex, k)
-  survival_list <- construct_survival(sex, k)
+  coef_list <- construct_coef(sex = sex, k = k)
+  survival_list <- construct_survival(sex = sex, k = k)
   sf <- survival_list[["sf"]]
   sm <- survival_list[["sm"]]
   spair <- survival_list[["spair"]]
-  rpair <- construct_recapture(sex,k)
+  rpair <- construct_recapture(sex = sex, k = k)
   
   # Initialize Data 
   initial_time <- min(initial_entry)
-  recruit_list <- initialize_recruit(sex, k, initial_entry, recruit_f, recruit_m, recruit)
+  recruit_list <- initialize_recruit(sex = sex, k = k, initial_entry = initial_entry, recruit_f = recruit_f, recruit_m = recruit_m, recruit = recruit)
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m <- recruit_list[["recruit_m"]]
   recruit <- recruit_list[["recruit"]]
-  mating_list_init <- initialize_mating_choice(n, k, initial_entry,delta, mating_f, mating_m, mating, sex)
+  mating_list_init <- initialize_mating_choice(n = n, k = k, initial_entry = initial_entry,delta = delta, mating_f = mating_f, mating_m = mating_m,  mating = mating, sex = sex)
   mating_f <- mating_list_init[["mating_f"]] 
   mating_m <- mating_list_init[["mating_m"]]  
   mating <- mating_list_init[["mating"]]
-  pairs <- initialize_partner_status(n, coef_list, pairs, mating, recruit, initial_entry, sex)
-  coef_list <- update_history(coef_list, pairs, initial_time + 1, sex)
-  pairs_ind_list <- propogate_partner_state(pairs, sex, pairs_f, pairs_m, initial_time)
+  pairs <- initialize_partner_status(n = n, coef_list = coef_list, pairs = pairs, mating = mating, recruit = recruit, initial_entry = initial_entry, sex = sex)
+  coef_list <- update_history(coef_list = coef_list, pairs = pairs, time = initial_time + 1, sex = sex)
+  pairs_ind_list <- propogate_partner_state(pairs = pairs, sex =  sex, pairs_f = pairs_f, pairs_m = pairs_m, time = initial_time)
   pairs_f <- pairs_ind_list[["pairs_f"]]
   pairs_m <- pairs_ind_list[["pairs_m"]]
-  init_surv_list <-  initialize_survival_status(sex, k, initial_entry, sf, sm)
+  init_surv_list <-  initialize_survival_status(sex = sex, k =  k, initial_entry = initial_entry, sf= sf, sm = sm)
   sf <- init_surv_list[["sf"]]
   sm <- init_surv_list[["sm"]]
   
@@ -1375,37 +1374,80 @@ simulate_cr_data <- function(n,
   if(any(rowSums(sf, na.rm = T) < 1)) browser()
   if(any(rowSums(sm, na.rm = T) < 1)) browser()
   
-  spair <- propogate_surv_pairs(sex, sf, sm, spair, initial_time, pairs_f, pairs_m)
-  rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, initial_time, p.m, p.f, rho, recruit_f, recruit_m)
+  spair <- propogate_surv_pairs(sex = sex, sf =  sf, sm =  sm, spair = spair, time = initial_time, pairs_f = pairs_f, pairs_m = pairs_m)
+  rpair <- compute_recapture(sex = sex, 
+                             rpair = rpair,
+                             spair = spair, 
+                             pairs_f = pairs_f,
+                             pairs_m = pairs_m, 
+                             time = initial_time,
+                             p.m = p.m, 
+                             p.f = p.f, 
+                             rho = rho,
+                             recruit_f = recruit_f,
+                             recruit_m = recruit_m)
   
   # Simulate Fates
   for(time in (initial_time+1):k){
     # Compute mating status at t 
-    mating_list_t <- compute_mating(sex, time, delta, 
-                                    recruit, recruit_f, recruit_m, 
-                                    mating_f, mating_m, mating, 
-                                    sf, sm)
+    mating_list_t <- compute_mating(sex = sex, time = time, delta = delta, 
+                                    recruit = recruit, recruit_f = recruit_f, recruit_m = recruit_m, 
+                                    mating_f = mating_f, mating_m = mating_m, mating = mating, 
+                                    sf = sf, sm = sm)
     mating_f <- mating_list_t[["mating_f"]] 
     mating_m <- mating_list_t[["mating_m"]]  
     mating <- mating_list_t[["mating"]]
     
     # Will previous pairs from time t-1 reform? 
-    repartner <- compute_re_partner(repartner, sex, coef_list, betas, pairs, mating, time)
+    repartner <- compute_re_partner(repartner = repartner, 
+                                    sex =  sex, 
+                                    coef_list = coef_list,
+                                    betas = betas, 
+                                    pairs = pairs, 
+                                    mating = mating, 
+                                    time = time)
     
     # Compute partnership probability at t based on surv at t-1
-    pairs <- compute_partnerships(sex, coef_list, pairs, mating, time, repartner)
+    pairs <- compute_partnerships(sex = sex,
+                                  coef_list = coef_list, 
+                                  pairs = pairs,
+                                  mating = mating,
+                                  time = time,
+                                  repartner = repartner)
     # Update partner histories going into next survival check (at time k we don't need this)
     if(time < k){
-      coef_list <- update_history(coef_list, pairs, time + 1, sex)
+      coef_list <- update_history(coef_list = coef_list,
+                                  pairs =  pairs,
+                                  time =  time + 1,
+                                  sex = sex)
     }
 
-    pairs_ind_list <- propogate_partner_state(pairs, sex, pairs_f, pairs_m, time)
+    pairs_ind_list <- propogate_partner_state(pairs = pairs, 
+                                              sex =  sex, 
+                                              pairs_f = pairs_f, 
+                                              pairs_m = pairs_m, 
+                                              time = time)
     pairs_f <- pairs_ind_list[["pairs_f"]]
     pairs_m <- pairs_ind_list[["pairs_m"]]
     
     # Compute survival probability at t based on partners at t 
-    spair <- compute_survival(spair, sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, time, phi.m, phi.f, gam)
-    sind_list_t <- propogate_surv_individual(sf, sm, spair, time, sex)
+    spair <- compute_survival(spair = spair, 
+                              sf = sf, 
+                              sm =  sm, 
+                              pairs_f = pairs_f,
+                              pairs_m = pairs_m, 
+                              recruit_f = recruit_f, 
+                              recruit_m = recruit_m,
+                              time = time,
+                              phi.m = phi.m, 
+                              phi.f = phi.f,
+                              gam = gam)
+    
+    sind_list_t <- propogate_surv_individual(sf = sf,
+                                             sm = sm, 
+                                             spair = spair, 
+                                             time = time, 
+                                             sex = sex)
     sf <- sind_list_t[["sf"]]
     sm <- sind_list_t[["sm"]]
     
@@ -1414,28 +1456,54 @@ simulate_cr_data <- function(n,
     if(any(rowSums(sm, na.rm = T) < 1)) browser()
     
     # Compute recapture probability at t based on survival at t
-    rpair <- compute_recapture(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.f, rho, recruit_f, recruit_m)
+    rpair <- compute_recapture(sex = sex,
+                               rpair =  rpair,
+                               spair = spair, 
+                               pairs_f = pairs_f,
+                               pairs_m = pairs_m, 
+                               time =  time, 
+                               p.m = p.m,
+                               p.f = p.f, 
+                               rho = rho, 
+                               recruit_f = recruit_f,
+                               recruit_m = recruit_m)
   }
   
   # Grab individual recaptures
-  recap_ind_list <- propogate_recap_individual(sex, k, rpair)
+  recap_ind_list <- propogate_recap_individual(sex = sex, k = k, rpair = rpair)
   recap_f <- recap_ind_list[["recap_f"]] 
   recap_m <- recap_ind_list[["recap_m"]] 
 
   # Build partially observed/latent data variables
   
   # Hidden recruitment 
-  recruit_list <- compute_hidden_recruitment(recruit_f, recruit_m, recap_f, recap_m)
+  recruit_list <- compute_hidden_recruitment(recruit_f = recruit_f, 
+                                             recruit_m = recruit_m,
+                                             recap_f = recap_f,
+                                             recap_m = recap_m)
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m <- recruit_list[["recruit_m"]]
   
   # Hidden Survival
-  asurv_list <- compute_hidden_survival(pairs_f, pairs_m, rpair, spair, sf, sm, k, sex)
+  asurv_list <- compute_hidden_survival(pairs_f = pairs_f, 
+                                        pairs_m = pairs_m,
+                                        rpair = rpair, 
+                                        spair = spair,
+                                        sf = sf, 
+                                        sm = sm, 
+                                        k = k, 
+                                        sex =  sex)
   af <- asurv_list[["af"]]
   am <- asurv_list[["am"]]
   
   # Hidden Partnerships and mate choice
-  apairs_list <- compute_hidden_pairs(pairs_f, pairs_m, rpair, k, sex, repartner)
+  apairs_list <- compute_hidden_pairs(pairs_f  = pairs_f,
+                                      pairs_m = pairs_m, 
+                                      rpair = rpair,
+                                      k = k,
+                                      sex = sex,
+                                      repartner = repartner)
+  
   apairs  <- apairs_list[["apairs"]]
   amating_f <- apairs_list[["amating_f"]]
   amating_m <- apairs_list[["amating_m"]]

@@ -4,6 +4,8 @@ library(tidyverse)
 library(readxl)
 library(lubridate)
 library(rjags)
+library(nimble)
+
 
 setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
@@ -13,10 +15,66 @@ dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
+source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-# #HDUCK Data
-#
+
+k = 10
+n = 100
+
+#set.seed(42)
+param_list <- list(
+  n = n,
+  k = k,
+  prop.female = 0.5,#0.4652568,
+  delta = rep(0.9, k),
+  phi.f = rep(0.9, k),
+  phi.m = rep(0.9, k),
+  gam = rep(0.7, k),
+  p.f = rep(0.8, k),
+  p.m = rep(0.8, k),
+  rho = rep(0.7, k),
+  betas = list(beta0 = 1.5, beta1 = 2),
+  rand_init = F,
+  init = sample(1, n, TRUE)
+)
+
+
+jags_data <- sim_dat(param_list)
+
+
+CpsMCMC <- compile_pair_swap_nimble(jags_data)
+samples <- run_nimble(CpsMCMC,niter = 100,nburnin = 10, thin = 2)
+
+gather_posterior_summary(samples)
+plot_caterpillar(samples)
+
+# 
+# saveRDS(samples, "long_run_332_28.rds")
+# library(ggmcmc)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0.70,0.95)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_density() #+ ylim(0,1)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
+# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#HDUCK Data
 cap.data <- gather_hq_data(dat_dir) %>% 
   build_cr_df() %>% 
   populate_missing_mate_data() %>% 
@@ -141,8 +199,8 @@ jags_data$arepartner[index,t]
 
 #SIM DATA
 
-k = 5
-n = 10
+k = 10
+n = 100
 
 #set.seed(42)
 param_list <- list(
@@ -157,7 +215,6 @@ param_list <- list(
   p.m = rep(0.8, k),
   rho = rep(0.7, k),
   betas = list(beta0 = 1.5, beta1 = 2),
-  rand_sex = F,
   rand_init = F,
   init = sample(1, n, TRUE)
 )
@@ -385,7 +442,7 @@ x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
 
 
 
-post_summary <- extract_sim_posterior(x)
+post_summary <- extract_sim_posterior(samples)
 
 plot_sim_caterpillar(posterior_summary = post_summary,
                      parameter_name = "gamma",
@@ -403,28 +460,3 @@ plot_sim_caterpillar(posterior_summary = post_summary,
                      slope = 0,
                      intercept = param_list$phi.f[1])
 
-
-
-# 
-# Compiling model graph
-# Resolving undeclared variables
-# Allocating nodes
-# Graph information:
-#   Observed stochastic nodes: 15677
-# Unobserved stochastic nodes: 6715
-# Total graph size: 1780320
-# 
-# Initializing model
-# Deleting model
-# 
-# Error in jags.model(file = jags_model, data = jags_data, inits = jags_inits,  : 
-#                       Error in node arepartner[6,7]
-#                     Node inconsistent with parents
-#                     
-#                     In addition: Warning message:
-#                       In jags.model(file = jags_model, data = jags_data, inits = jags_inits,  :
-#                                       Unused variable "apairs" in data
-
-
-# BUG FIX 
-# ANIMAL 14 doesn't have 66 as partner for 2 of 4 years in which ANIMAL 66 has 14 as a partner
