@@ -21,36 +21,36 @@ source(script_dir %+% "01_fn_model_code.R")
 
 # Simulation Settings -------------------------------------
 
-k = 5 
-n = 100
+k = 15 
+n = 200
 
+#set.seed(42)
 parameter_list <- list(
   n = n,
   k = k,
   prop.female = 0.5,
   delta = rep(0.9, k),
-  phi.f = rep(0.8, k),
-  phi.m = rep(0.8, k),
-  gam = rep(0.1, k),
+  phi.f = rep(0.9, k),
+  phi.m = rep(0.9, k),
+  gam = rep(0.7, k),
   p.f = rep(0.8, k),
   p.m = rep(0.8, k),
-  rho = rep(0.1, k),
-  betas = list(beta0 = 1.0, beta1 = 1.5),
-  rand_sex = F,
+  rho = rep(0.7, k),
+  betas = list(beta0 = 0.5, beta1 = 1.0),
   rand_init = F,
-  init = sample(x = floor(k/2), size = n, replace = T)
+  init = sample(x = k-1, size = n, replace = T)
 )
 
 # Baseline Parameters that do not vary
-to_vary <- list("phi.f" = seq(0.8,0.8,by=0.1),
-                "phi.m"= seq(0.8,0.8,by=0.1),
+to_vary <- list("phi.f" = seq(0.9,0.9,by=0.1),
+                "phi.m"= seq(0.9,0.9,by=0.1),
                 "p.f" = seq(0.8,0.8,by=0.1),
                 "p.m" = seq(0.8,0.8,by=0.1),
                 "n" = c(n)) 
 
 # Add parameters that do vary 
-to_vary$gam <- c(0.1, 0.9) #seq(0, 0.9, 0.1) # Survival correlation 
-to_vary$rho <- c(0.1, 0.9) #seq(0, 0.9, 0.1) # recapture correlation
+to_vary$gam <- c(0.2, 0.7) #Survival correlation 
+to_vary$rho <- c(0.2, 0.7)  # recapture correlation
 
 # Grid of model settings for simulation study 
 grid_data <- generate_grid(parameter_list,to_vary)

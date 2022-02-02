@@ -38,12 +38,6 @@ inv.logit <- function(x){
 }
 
 
-#Softmax Function
-# softmax <- function(vector){
-#   out <- exp(vector)/sum(exp(vector))
-#   return(out)
-# }
-
 # Numerically Stable Version
 softmax <- function(par){
   n.par <- length(par)
@@ -445,7 +439,7 @@ initialize_partner_status <- function(n, coef_list, pairs, mating, recruit, init
   nm <- length(sex[sex == "M"]) # Number of males
   
   # Raw probability of mating (without conditions)
-  psi_t <- 1 + 0 * compute_partner_probs(sex, time, coef_list, c(1,0))
+  psi_t <- matrix(1, nrow = nf+1, ncol = nm + 1) #1 + 0 * compute_partner_probs(sex, time, coef_list, c(1,0))
 
   # Flat probability of partnerships
   prob_mate <- psi_t * mating[,,time] * recruit[,,time]

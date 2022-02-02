@@ -669,12 +669,15 @@ compile_pair_swap_nimble <- function(jags_data,
   
   if(!is.null(params)){
     cat("User-specified Params Detected...","\n")
-    cat("Using params := " %+% params)
+    cat("Using params := ", "\n")
+    cat(params, "\n")
+    
     nimble_params <- params
   } else {
     cat("Params argument is NULL...","\n")
     nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
-    cat("Using params := " %+% nimble_params)
+    cat("Using params := ", "\n")
+    cat(nimble_params, "\n")
   }
   
   
@@ -719,10 +722,11 @@ compile_pair_swap_nimble <- function(jags_data,
 run_nimble <- function(CpsMCMC, 
                        niter,
                        nburnin,
-                       thin){
+                       thin,
+                       seed = F){
   
   cat("MCMC Sampling from Model...","\n")
-  samples <- runMCMC(CpsMCMC, niter = niter, nburnin = nburnin, thin = thin, setSeed = TRUE, samplesAsCodaMCMC = TRUE)
+  samples <- runMCMC(CpsMCMC, niter = niter, nburnin = nburnin, thin = thin, setSeed = seed, samplesAsCodaMCMC = TRUE)
   cat("Converting to CODA samples...","\n")
   coda.samples <- as.mcmc(samples)
   cat("Returning Output...","\n")

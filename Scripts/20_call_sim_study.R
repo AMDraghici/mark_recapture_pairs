@@ -6,7 +6,6 @@ library(lubridate)
 library(rjags)
 library(nimble)
 
-
 setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 `%+%` <- function(a, b) paste0(a, b)
 script_dir <- getwd() %+% "/Scripts/"
@@ -54,23 +53,12 @@ plot_caterpillar(samples)
 # library(ggmcmc)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0.70,0.95)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_density() #+ ylim(0,1)
+ps_run %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_density() #+ ylim(0,1)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
 # coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -188,13 +176,6 @@ for(t in 1:30){
   index <- which(!is.na(jags_data$af[,t]))
   print(all(jags_data$sf[index,t] == jags_data$af[index,t]))
 } 
-
-
-
-t <- 4
-index <- which(!is.na(jags_data$af[,t]))
-jags_data$repartner[index,t]
-jags_data$arepartner[index,t]
 
 
 #SIM DATA
