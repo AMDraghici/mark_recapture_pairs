@@ -1109,7 +1109,7 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   return(state_list)
 }
 
-compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
+compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner, mating_f, mating_m, show_unmated = F){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -1129,6 +1129,8 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
   pair_state <- c(NA, NA, NA, 1)
   
   # Add observations directly from joint recapture matrix
+  
+  # Females 
   for(i in 1:nf){
     for(time in 1:k){
       
@@ -1149,10 +1151,28 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
       arepartner[i,time] <- pair_state[x_ijt] * pair_state[x_ijt_minus_1] * repartner[i, time]
       
       if(!is.na(pair_state[x_ijt]))  amating_m[ apairs_f[i, time], time] <- pair_state[x_ijt]
+      
+      
+      # If we change the setting to show mating status of observed individuals 
+      # We must update the case in which only females are observed
+      # Then if she is not mating, or if her pair status is set to no partner
+      # We update the data to reflect this
+      if(show_unmated & x_ijt == 2){
+        amating_f[i,time] <- mating_f[i, time]
+        if(mating_f[i,time] == 0|pairs_f[i,time]==nm+1){
+          arepartner[i,time] <- 0
+          apairs_f[i, time] <- nm + 1
+          # amating_f[i,time] <- 0
+          # mating_f[i, time] <- 0
+        }
+      }
+      
+      
+      
     }
   }
   
-  
+  # Males
   for(j in 1:nm){
     for(time in 1:k){
       
@@ -1163,6 +1183,23 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner){
       apairs_m[j, time] <- pair_state[x_ijt] * pairs_m[j, time]
       amating_m[j, time] <- pair_state[x_ijt]
       if(!is.na(pair_state[x_ijt]))  amating_f[ apairs_m[j, time], time] <- pair_state[x_ijt]
+      
+      
+      
+      # If we change the setting to show mating status of observed individuals 
+      # We must update the case in which only males are observed
+      # Then if he is not mating, or if his pair status is set to no partner
+      # We update the data to reflect this
+      if(show_unmated & x_ijt == 3){
+        amating_m[j,time] <- mating_m[j, time]
+        if(mating_m[j,time] == 0|pairs_m[j,time]==nf+1){
+          apairs_m[j, time] <- nf + 1
+          # amating_m[j,time] <- 0
+          # mating_m[j, time] <- 0
+        }
+      }
+      
+      
     }
   }
   
@@ -1312,7 +1349,8 @@ simulate_cr_data <- function(n,
                              rho, 
                              betas, 
                              rand_init = T,
-                             init = NULL){
+                             init = NULL,
+                             show_unmated){
   
   # Make sure the number of individuals simulated is even
   if(!n %% 2 == 0){
@@ -1496,7 +1534,10 @@ simulate_cr_data <- function(n,
                                       rpair = rpair,
                                       k = k,
                                       sex = sex,
-                                      repartner = repartner)
+                                      repartner = repartner,
+                                      mating_m = mating_m,
+                                      mating_f = mating_f,
+                                      show_unmated = show_unmated)
   
   apairs  <- apairs_list[["apairs"]]
   amating_f <- apairs_list[["amating_f"]]
@@ -1531,6 +1572,7 @@ simulate_cr_data <- function(n,
     spair = spair, # true survival of partnerships
     repartner = repartner, # whether partner from time t-1 was repicked (female x time)
     psi = psi, # Pairs that may exist (not excluded due to already formed pairs)
+    rpair = rpair, # 2D Recapture Matrix
     
     # Observed /Inferred states (Missing Values are possible)
     af = af,  # Female Survival with missing values

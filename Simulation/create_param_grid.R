@@ -13,46 +13,47 @@ library(rjags)
 # Paths
 proj_dir <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
 script_dir <- proj_dir %+% "/Scripts/"
-out_dir <- proj_dir %+% "Simulation/"
+out_dir <- proj_dir %+% "/Simulation/"
 
 # Source code
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "01_fn_model_code.R")
 
 # Simulation Settings -------------------------------------
-
-k = 15 
+k = 10
 n = 200
 
-#set.seed(42)
-parameter_list <- list(
-  n = n,
-  k = k,
-  prop.female = 0.5,
-  delta = rep(0.9, k),
-  phi.f = rep(0.9, k),
-  phi.m = rep(0.9, k),
-  gam = rep(0.7, k),
-  p.f = rep(0.8, k),
-  p.m = rep(0.8, k),
-  rho = rep(0.7, k),
-  betas = list(beta0 = 0.5, beta1 = 1.0),
-  rand_init = F,
-  init = sample(x = k-1, size = n, replace = T)
-)
-
 # Baseline Parameters that do not vary
-to_vary <- list("phi.f" = seq(0.9,0.9,by=0.1),
-                "phi.m"= seq(0.9,0.9,by=0.1),
-                "p.f" = seq(0.8,0.8,by=0.1),
-                "p.m" = seq(0.8,0.8,by=0.1),
+to_vary <- list("phi.f" = c(0.8,1.0),
+                "phi.m"= c(0.8,1.0),
+                "p.f" = c(0.9,1.0),
+                "p.m" = c(0.9,1.0),
+                "gam" = c(0.7,0),
+                "rho" = c(0.7, 0),
                 "n" = c(n)) 
+parameter_grid <-list()
 
-# Add parameters that do vary 
-to_vary$gam <- c(0.2, 0.7) #Survival correlation 
-to_vary$rho <- c(0.2, 0.7)  # recapture correlation
+ik <- 1
+for(i in 1:2){
+  for(j in 1:2){
+    parameter_grid[[ik]] <- list(n = n,
+                                 k = k,
+                                 prop.female = 0.5,
+                                 delta = rep(0.9, k),
+                                 phi.f = rep(to_vary$phi.f[i], k),
+                                 phi.m = rep(to_vary$phi.m[i], k),
+                                 gam = rep(to_vary$gam[i], k),
+                                 p.f = rep(to_vary$p.f[i], k),
+                                 p.m = rep(to_vary$p.m[i], k),
+                                 rho = rep(to_vary$rho[i], k),
+                                 betas = list(beta0 = 1.0, beta1 = 1.5),
+                                 rand_init = F,
+                                 init = sample(1, n, TRUE),
+                                 show_unmated = ifelse(j == 1, T, F))
+    ik <- ik+1
+  }
+}
 
-# Grid of model settings for simulation study 
-grid_data <- generate_grid(parameter_list,to_vary)
-saveRDS(grid_data$parameter_grid, out_dir %+% "param_grid.rds")
+
+saveRDS(parameter_grid, out_dir %+% "param_grid.rds")
 

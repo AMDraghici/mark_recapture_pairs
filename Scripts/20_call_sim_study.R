@@ -27,39 +27,59 @@ param_list <- list(
   k = k,
   prop.female = 0.5,#0.4652568,
   delta = rep(0.9, k),
-  phi.f = rep(0.9, k),
-  phi.m = rep(0.9, k),
+  phi.f = rep(0.8, k),
+  phi.m = rep(0.8, k),
   gam = rep(0.7, k),
-  p.f = rep(0.8, k),
-  p.m = rep(0.8, k),
+  p.f = rep(0.9, k),
+  p.m = rep(0.9, k),
   rho = rep(0.7, k),
-  betas = list(beta0 = 1.5, beta1 = 2),
+  betas = list(beta0 = 1, beta1 = 1.5),
   rand_init = F,
-  init = sample(1, n, TRUE)
+  init = sample(1, n, TRUE),
+  show_unmated = T
 )
 
 
 jags_data <- sim_dat(param_list)
 
 
+
 CpsMCMC <- compile_pair_swap_nimble(jags_data)
-samples <- run_nimble(CpsMCMC,niter = 100,nburnin = 10, thin = 2)
+samples <- run_nimble(CpsMCMC,niter = 2e4,nburnin = 1e4, thin = 1)
 
 gather_posterior_summary(samples)
 plot_caterpillar(samples)
 
 # 
 # saveRDS(samples, "long_run_332_28.rds")
-# library(ggmcmc)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0.70,0.95)
-ps_run %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_density() #+ ylim(0,1)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
-# coda.samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+library(ggmcmc)
+samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
+samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() #+ ylim(0.70,0.95)
+samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
+samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
+samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
 
+n <- 332
+k <- 28
+param_list <- list(
+  n = n,
+  k = k,
+  prop.female = 0.4652568,
+  delta = rep(0.55, k),
+  phi.f = rep(0.8, k),
+  phi.m = rep(0.75, k),
+  gam = rep(0.5, k),
+  p.f = rep(0.5, k),
+  p.m = rep(0.4, k),
+  rho = rep(0.75, k),
+  betas = list(beta0 = 1, beta1 = 1.5),
+  rand_init = F,
+  init = sample(k-1, n, TRUE),
+  show_unmated = T
+)
 
 
 #HDUCK Data

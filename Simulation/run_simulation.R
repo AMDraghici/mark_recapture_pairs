@@ -26,7 +26,7 @@ options(echo = TRUE)
 args <- commandArgs(trailingOnly = TRUE)
 k <- as.numeric(args[1])
 pars_mat_name <- args[2]
-par_index <- (k >= 1)*1 + (k > 100)*1 + (k > 200)*1+ (k > 300)*1 
+par_index <- (k >= 1)*1 + (k > 25)*1 + (k > 50)*1 + (k > 75)*1 + (k > 100)*1 + (k > 125)*1 + (k > 150)*1 
 
 cat(k,"\n")
 cat(par_index, "\n")
