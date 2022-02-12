@@ -1064,10 +1064,11 @@ process_simulation_data <- function(results_sim_list, param_sim_list){
     if(is.null(results_sim_list[[i]])) next
     
     param_list <- param_sim_list[[i]]
-    df_list[[i]] <- gather_posterior_summary(results_sim_list[[i]]$jags_samples) %>%
+    df_list[[i]] <- gather_posterior_summary(results_sim_list[[i]]) %>%
+      dplyr::filter(!(Parameter_Name %in% c("gl", "gu", "rl", "ru","gamma_raw","rho_raw", "eps", "eps1"))) %>% 
       mutate(iteration = i,
              Parameter_Name = tolower(Parameter_Name),
-             true_vals = ifelse(Parameter_Name == "eps", 1/param_list$k,
+             true_vals = #ifelse(Parameter_Name == "eps"|Parameter_Name == "eps1", 1/param_list$k,
                                 ifelse(Parameter_Name == "pf", param_list$p.f[1],
                                        ifelse(Parameter_Name == "pm", param_list$p.m[1],
                                               ifelse(Parameter_Name == "phif", param_list$phi.f[1],
@@ -1076,7 +1077,7 @@ process_simulation_data <- function(results_sim_list, param_sim_list){
                                                                    ifelse(Parameter_Name == "gamma", param_list$gam[1],
                                                                           ifelse(Parameter_Name == "rho", param_list$rho[1],
                                                                                  ifelse(Parameter_Name == "beta0", param_list$betas$beta0,
-                                                                                        ifelse(Parameter_Name == "beta1", param_list$betas$beta1,NA)))))))))),
+                                                                                        ifelse(Parameter_Name == "beta1", param_list$betas$beta1,NA))))))))),
              In_50 = ifelse(true_vals <= `75%` & true_vals >= `25%`, 1, 0),
              In_95 = ifelse(true_vals <= `97.5%` & true_vals >= `2.5%`, 1, 0),
              Range_50 = `75%` - `25%`,

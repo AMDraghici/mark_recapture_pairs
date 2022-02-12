@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --array=1-100
-#SBATCH --time=84:00:00
-#SBATCH --mem=16G
+#SBATCH --array=1-150
+#SBATCH --time=72:00:00
+#SBATCH --mem=10G
 #SBATCH --error=Logs/rep_%A_%a_long.log
 #SBATCH --output=Logs/rep_%A_%a_long.log
 

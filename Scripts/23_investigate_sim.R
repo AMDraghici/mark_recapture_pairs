@@ -24,7 +24,7 @@ js_sim_list <- list()
 ps_sim_list <- list()
 files <- list.files(out_dir)
 n.failed <- 0
-for(i in 1:400){
+for(i in 1:100){
   
   # File names 
   param_file <-"parameter_list_" %+% i %+% ".rds"
@@ -45,15 +45,15 @@ for(i in 1:400){
   }
   
   param_sim_list[[i]] <- readRDS(out_dir %+% param_file)
-  cjs_sim_list[[i]]   <- readRDS(out_dir %+% cjs_file)
-  js_sim_list[[i]]    <- readRDS(out_dir %+% js_file)
+  cjs_sim_list[[i]]   <- readRDS(out_dir %+% cjs_file)$jags_samples
+  js_sim_list[[i]]    <- readRDS(out_dir %+% js_file)$jags_samples
   ps_sim_list[[i]]    <- readRDS(out_dir %+% ps_file)
 }
 
 
-ps_results  <-  process_simulation_data(ps_sim_list,param_sim_list) %>% mutate(scenario = 1 + (iteration > 100) + (iteration > 200)  + (iteration > 300))
-js_results  <-  process_simulation_data(js_sim_list,param_sim_list) %>% mutate(scenario = 1 + (iteration > 100) + (iteration > 200)  + (iteration > 300))
-cjs_results <-  process_simulation_data(cjs_sim_list,param_sim_list) %>% mutate(scenario = 1 + (iteration > 100) + (iteration > 200)  + (iteration > 300))
+ps_results  <-  process_simulation_data(ps_sim_list,param_sim_list) %>%  mutate(scenario = 1 + (iteration > 25) + (iteration > 50)  + (iteration > 75))
+js_results  <-  process_simulation_data(js_sim_list,param_sim_list) %>%  mutate(scenario = 1 + (iteration > 25) + (iteration > 50)  + (iteration > 75))
+cjs_results <-  process_simulation_data(cjs_sim_list,param_sim_list) %>% mutate(scenario = 1 + (iteration > 25) + (iteration > 50)  + (iteration > 75))
 
 
 ps_results %>% 
@@ -63,8 +63,8 @@ ps_results %>%
             avg_range_50 = mean(Range_50),
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
-            avg_cv = mean(coef_var)) %>%
-  filter(Parameter == "PhiF")
+            avg_cv = mean(coef_var)) %>% View() #%>%
+ # filter(Parameter == "PhiF")
 
 
 js_results %>% 
@@ -74,8 +74,7 @@ js_results %>%
             avg_range_50 = mean(Range_50),
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
-            avg_cv = mean(coef_var)) %>%
-  filter(Parameter == "phiF")
+            avg_cv = mean(coef_var)) %>% View()
 
 cjs_results %>% 
   group_by(Parameter, scenario) %>% 
@@ -84,9 +83,7 @@ cjs_results %>%
             avg_range_50 = mean(Range_50),
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
-            avg_cv = mean(coef_var)) %>%
-  filter(Parameter == "phiF")
-
+            avg_cv = mean(coef_var)) %>% View()
 
 param_sim_list[[301]]$rho
 param_sim_list[[301]]$gam
@@ -97,8 +94,8 @@ param_sim_list[[301]]$gam
 #   geom_point(aes(x = scenario, y = avg_bias), col = "blue") #+
 #  # geom_point(aes(x = scenario, y = coverage_50), col = "red")
 
-
-cjs_sim_list[[400]]$jags_samples %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
-js_sim_list[[400]]$jags_samples %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
-ps_sim_list[[400]]$jags_samples %>% ggs() %>% filter(Parameter %in% c("PM","PF","PhiF","PhiM","rho","gamma", "delta")) %>% ggs_traceplot() + ylim(0,1)
+library(ggmcmc)
+cjs_sim_list[[1]] %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
+js_sim_list[[1]] %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[1]] %>% ggs() %>% filter(Parameter %in% c("PM","PF","PhiF","PhiM","rho","gamma", "delta")) %>% ggs_traceplot() + ylim(0,1)
 coda.samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)

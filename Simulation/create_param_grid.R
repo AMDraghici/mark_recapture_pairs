@@ -24,17 +24,17 @@ k = 10
 n = 200
 
 # Baseline Parameters that do not vary
-to_vary <- list("phi.f" = c(0.8,1.0),
-                "phi.m"= c(0.8,1.0),
-                "p.f" = c(0.9,1.0),
-                "p.m" = c(0.9,1.0),
-                "gam" = c(0.7,0),
-                "rho" = c(0.7, 0),
+to_vary <- list("phi.f" = c(0.8,0.8,1.0),
+                "phi.m"= c(0.8,0.8,1.0),
+                "p.f" = c(0.9,0.9, 1.0),
+                "p.m" = c(0.9,0.9, 1.0),
+                "gam" = c(0.7,0,0),
+                "rho" = c(0.7,0,0),
                 "n" = c(n)) 
 parameter_grid <-list()
 
 ik <- 1
-for(i in 1:2){
+for(i in 1:3){
   for(j in 1:2){
     parameter_grid[[ik]] <- list(n = n,
                                  k = k,
