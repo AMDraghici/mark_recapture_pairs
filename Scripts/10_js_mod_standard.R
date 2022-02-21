@@ -12,11 +12,14 @@ model{
   
   # JS Likelihood -----------------------------------------------------------------------------------
   for(i in 1:n){
-    for(t in 1:k){
-      x[i,t] ~ dbern(p[i] * a[i,t+1] * recruit[i,t])
-      a[i,t+1] ~ dbern(phi[i] * a[i,t] * recruit[i,t] + (1 - recruit[i,t]))
+    ## 1) Survival
+    for(t in 2:k){
+      a[i,t] ~ dbern(phi[i] * a[i,t-1] * recruit[i,t] + (1 - recruit[i,t]))
     }
     
+    for(t in 1:k){
+      x[i,t] ~ dbern(p[i] * a[i,t] * recruit[i,t])
+    }
   }
   
   # Priors--------------------------------------------------------------------------------------------

@@ -885,8 +885,10 @@ populate_recap <- function(cap.data, nf, nm, k){
 # Assign compact known pairs by female by year using male ids 
 populate_apairs_f <- function(apairs,amating_f,nf,nm,k){
   # Build data object and set dummy variable (represents single)
-  apairs_f <- matrix(NA,nrow = nf,ncol=k+1)
-  apairs_f[,1] <- nm + 1
+  # apairs_f <- matrix(NA,nrow = nf,ncol=k+1)
+  # apairs_f[,1] <- nm + 1
+  
+  apairs_f <- matrix(NA,nrow = nf,ncol=k)
   
   for(t in 1:k){
     for(i in 1:nf){
@@ -897,9 +899,9 @@ populate_apairs_f <- function(apairs,amating_f,nf,nm,k){
       if(isPaired){
         partner_id <- which(pair_ijt == 1)
         if(length(partner_id) > 1) stop("Bug found at time" %+% t %+% " and female" %+% i)
-        apairs_f[i,t+1] <- partner_id
+        apairs_f[i,t] <- partner_id
       } else{
-        if(!is.na(amating_f[i,t])) if(amating_f[i,t] == 0) apairs_f[i,t+1] <- nm + 1
+        if(!is.na(amating_f[i,t])) if(amating_f[i,t] == 0) apairs_f[i,t] <- nm + 1
       }
       
     }
@@ -916,8 +918,8 @@ populate_arepartner <- function(apairs_f, nf, nm, k){
 
   
   # Assign based on apairs_f going forward
-  for(t in 1:k){
-      arepartner[,t] <- 1*(apairs_f[,t] == apairs_f[,t+1]) * (apairs_f[,t] != nm + 1) * (apairs_f[,t+1] != nm + 1)
+  for(t in 2:k){
+      arepartner[,t] <- 1*(apairs_f[,t] == apairs_f[,t-1]) * (apairs_f[,t-1] != nm + 1) * (apairs_f[,t] != nm + 1)
   }
   
   # Set known initial case to 0
@@ -929,8 +931,8 @@ populate_arepartner <- function(apairs_f, nf, nm, k){
     for(i in 1:nf){
       
       mask1 <- is.na(arepartner[i,time]) #is this case unknown
-      mask2 <- !is.na(apairs_f[i,time]) # do we know their last partner
-      mask3 <- ifelse(mask2,any(apairs_f[i,time] == c(nm+1,apairs_f[-i,time+1]), na.rm = T),FALSE) # if partner has a new mate or if past state was single
+      mask2 <- !is.na(apairs_f[i,time-1]) # do we know their last partner
+      mask3 <- ifelse(mask2,any(apairs_f[i,time-1] == c(nm+1,apairs_f[-i,time]), na.rm = T),FALSE) # if partner has a new mate or if past state was single
       
       # ...Then repartner is known zero
       if(mask1 & mask2 & mask3){
@@ -1022,8 +1024,8 @@ build_jags_data <- function(cap.data){
                     arepartner = arepartner,
                     apairs = apairs,
                     psi = psi, 
-                    af = add_dummy_row(add_dummy_col(af)),
-                    am = add_dummy_row(add_dummy_col(am)),
+                    af = add_dummy_row(af),
+                    am = add_dummy_row(am),
                     recap_f = add_dummy_row(recap_f, 0),
                     recap_m = add_dummy_row(recap_m,0))
   

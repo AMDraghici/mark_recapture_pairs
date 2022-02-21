@@ -1045,7 +1045,7 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   # Add observations directly from joint recapture matrix (single males)
   for(j in 1:nm){
     for(time in 1:k){
-      
+      if(is.na(pairs_m[j, time])) browser()
       # skip if its not a single male
       if(pairs_m[j,time] != (nf+1)) next
       
@@ -1102,8 +1102,8 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   
   # Store results in a list
   # add dummy row 1 for the repartner mechanism (in model index t is t+1)
-  state_list <- list(af = cbind(rep(1,nrow(af)),af), 
-                     am = cbind(rep(1,nrow(am)),am))
+  state_list <- list(af = af, #cbind(rep(1,nrow(af)),af), 
+                     am = am) #cbind(rep(1,nrow(am)),am))
   
   # Return List
   return(state_list)
@@ -1298,15 +1298,14 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner, mat
   # Dummy states always available
   amating_f[(nf+1),1:k] <- 1
   amating_m[(nm+1),1:k] <- 1
-  
   apairs[1:(nf+1),1,] <- 0
   apairs[1,1:(nm+1),] <- 0
   apairs[,,1] <- 0 
   arepartner[,1] <- 0 
     
-  # add dummy index (used to make JAGS/NIMBLE code cleaner)
-  apairs_f <- cbind(rep((nm+1),nrow(apairs_f)),apairs_f)
-  apairs_m <- cbind(rep((nf+1),nrow(apairs_m)),apairs_m)
+  # # add dummy index (used to make JAGS/NIMBLE code cleaner)
+  # apairs_f <- cbind(rep((nm+1),nrow(apairs_f)),apairs_f)
+  # apairs_m <- cbind(rep((nf+1),nrow(apairs_m)),apairs_m)
   
   
   # Build index of possible pairings 
@@ -1617,7 +1616,7 @@ format_to_cjs <- function(model_data){
   
   
   # Store results in list
-  model_data <- list(n = model_data$nf + model_data$nm,
+  results <- list(n = model_data$nf + model_data$nm,
                      k = model_data$k,
                      female = c(rep(1, model_data$nf),rep(0, model_data$nm)), 
                      initial_entry = initial_entry,
@@ -1625,7 +1624,7 @@ format_to_cjs <- function(model_data){
                      a = a)
   
   # Return Standard CJS Data
-  return(model_data)
+  return(results)
 }
 
 
