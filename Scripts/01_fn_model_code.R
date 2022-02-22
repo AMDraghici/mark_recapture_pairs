@@ -146,7 +146,7 @@ generate_init_js <- function(jags_data){
   for(i in 1:n){
     sexF <- female[i]
     phi <- phiF * sexF + phiM * (1-sexF) 
-    for(t in 1:k){
+    for(t in 2:k){
       if(is.na(a[i, t])){
         a[i, t] <- rbinom(1, 1, phi * a[i, t-1] * recruit[i,t] + (1-recruit[i,t]))
       }
