@@ -550,7 +550,7 @@ propogate_surv_individual <- function(sf, sm, spair, time, sex){
 
 
 # Convert marginal recapture states (at the end)
-propogate_recap_individual <- function(sex, k, rpair){
+propogate_recap_individual <- function(sex, k, rpair, recruit_f, recruit_m){
   
   nf <- length(sex[sex == "F"]) # Number of females
   nm <- length(sex[sex == "M"]) # Number of males
@@ -571,6 +571,11 @@ propogate_recap_individual <- function(sex, k, rpair){
       female_observation <- recap_marginal_female[max(rpair[i,,time])]
       recap_f[i,time] <- female_observation
     }
+    
+    # HACKY ADJUSTMENT FOR WHEN AN INDIVIDUAL IS NEVER CAUGHT
+    # If they're never seen force an observation at initial entry
+    # Should introduce negligble bias 
+    if(sum(recap_f[i,]) == 0){recap_f[i, min(which(recruit_f[i, ] == 1))] <- 1}
   }
   
   # Only update males (not dummy states)
@@ -580,7 +585,16 @@ propogate_recap_individual <- function(sex, k, rpair){
       recap_m[j,time] <- male_observation
     }
     
+    # HACKY ADJUSTMENT FOR WHEN AN INDIVIDUAL IS NEVER CAUGHT
+    # If they're never seen force an observation at initial entry
+    # Should introduce negligble bias 
+    if(sum(recap_m[j,]) == 0){recap_m[j, min(which(recruit_m[j, ] == 1))] <- 1}
+    
   }
+  
+ 
+  
+  
   
   
   # Group and return results 
@@ -953,8 +967,10 @@ compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.
     current_state <- spair[i,j, time]
     i_first <- min(which(recruit_f[i,] == 1))
     j_first <- min(which(recruit_m[j,] == 1))
-    if(i_first == time) pF <- rep(1, length(p.f)) else if(i_first > time) pF <- rep(0, length(p.f)) else pF <- p.f
-    if(j_first == time) pM <- rep(1, length(p.m)) else if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
+    # if(i_first == time) pF <- rep(1, length(p.f)) else if(i_first > time) pF <- rep(0, length(p.f)) else pF <- p.f
+    # if(j_first == time) pM <- rep(1, length(p.m)) else if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
+    if(i_first > time) pF <- rep(0, length(p.f)) else pF <- p.f
+    if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
     rpair[i,j, time] <- recapture(current_state = current_state, 
                                   j = time, 
                                   p.m = pM * (1-single_check), 
@@ -967,7 +983,10 @@ compute_recapture <- function(sex, rpair, spair, pairs_f, pairs_m, time, p.m, p.
   for(j in single_males){
     current_state <- spair[nf+1,j, time]
     j_first <- min(which(recruit_m[j,] == 1))
-    if(j_first == time) pM <- rep(1, length(p.m)) else if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
+    #if(j_first == time) pM <- rep(1, length(p.m)) else if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
+    if(j_first > time) pM <- rep(0, length(p.m)) else pM <- p.m
+    
+    
     rpair[nf+1, j, time] <- recapture(current_state = current_state,
                                       j = time,
                                       p.m = pM,
@@ -1096,6 +1115,12 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
     rm(last_alive)
   }
   
+  # Must be alive at time 1 (if not recruited considered alive (or going to be alive) but not in pop)
+  # This line is necessary because of the fact that some animals will be unobserved throughout the whole study//
+  # and we need to force their first capture to 1
+  af[,1] <- 1
+  am[,1] <- 1
+  
   # Set dummy states to known ones 
   af[(nf+1),] <- 1
   am[(nm+1),] <- 1
@@ -1109,7 +1134,7 @@ compute_hidden_survival <- function(pairs_f, pairs_m, rpair, spair, sf, sm, k, s
   return(state_list)
 }
 
-compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner, mating_f, mating_m, show_unmated = F){
+compute_hidden_pairs <- function(pairs_f, pairs_m, recap_f, recap_m, k, sex, repartner, mating_f, mating_m, show_unmated = F){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -1124,7 +1149,6 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner, mat
   amating_m <- matrix(NA, nrow = nm+1, ncol = k) 
   arepartner <- matrix(NA, nrow = nf, ncol = k)
 
-  
   # States based on observations
   pair_state <- c(NA, NA, NA, 1)
   
@@ -1141,7 +1165,8 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner, mat
       }
       
       # Joint Recapture of pair i and pf[i,t] at time t
-      x_ijt <- rpair[i, pairs_f[i,time] , time]
+      # x_ijt <- rpair[i, pairs_f[i,time] , time]
+      x_ijt <- 1 + recap_f[i, time] + recap_m[pairs_f[i,time], time] * 2
       
       # Uncouple Pair Index
       apairs_f[i, time] <- pair_state[x_ijt] * pairs_f[i, time]
@@ -1177,14 +1202,13 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, rpair, k, sex, repartner, mat
     for(time in 1:k){
       
       # Joint Recapture of pair i and pf[i,t] at time t
-      x_ijt <- rpair[pairs_m[j, time], j , time]
+      # x_ijt <- rpair[pairs_m[j, time], j , time]
+      x_ijt <- 1 + recap_f[pairs_m[j, time], time] + recap_m[j, time] * 2
       
       # Uncouple Pair Index
       apairs_m[j, time] <- pair_state[x_ijt] * pairs_m[j, time]
       amating_m[j, time] <- pair_state[x_ijt]
       if(!is.na(pair_state[x_ijt]))  amating_f[ apairs_m[j, time], time] <- pair_state[x_ijt]
-      
-      
       
       # If we change the setting to show mating status of observed individuals 
       # We must update the case in which only males are observed
@@ -1501,17 +1525,18 @@ simulate_cr_data <- function(n,
   }
   
   # Grab individual recaptures
-  recap_ind_list <- propogate_recap_individual(sex = sex, k = k, rpair = rpair)
+  recap_ind_list <- propogate_recap_individual(sex = sex, k = k, rpair = rpair, recruit_f = recruit_f, recruit_m = recruit_m)
   recap_f <- recap_ind_list[["recap_f"]] 
   recap_m <- recap_ind_list[["recap_m"]] 
 
   # Build partially observed/latent data variables
   
-  # Hidden recruitment 
+  # Hidden recruitment (Mask unknown states for recruitment variables)
   recruit_list <- compute_hidden_recruitment(recruit_f = recruit_f, 
                                              recruit_m = recruit_m,
                                              recap_f = recap_f,
                                              recap_m = recap_m)
+  # Now they have can NAs
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m <- recruit_list[["recruit_m"]]
   
@@ -1530,7 +1555,8 @@ simulate_cr_data <- function(n,
   # Hidden Partnerships and mate choice
   apairs_list <- compute_hidden_pairs(pairs_f  = pairs_f,
                                       pairs_m = pairs_m, 
-                                      rpair = rpair,
+                                      recap_f = recap_f,
+                                      recap_m = recap_m,
                                       k = k,
                                       sex = sex,
                                       repartner = repartner,

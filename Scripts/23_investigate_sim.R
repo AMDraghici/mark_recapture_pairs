@@ -104,16 +104,33 @@ cjs_summary <- cjs_results %>%
             avg_range_50 = mean(Range_50),
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
-            avg_cv = mean(coef_var)) %>% filter(scenario == 1)# %>% View() #%>%
+            avg_cv = mean(coef_var)) %>% filter(scenario ==3)# %>% View() #%>%
 
-ps_results %>% filter(Parameter == "PF", scenario == 1) %>%
+p1 <- ps_results %>% filter(Parameter == "delta", scenario == 6) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +
   geom_line(aes(x = iteration, y = Mean)) +
   geom_line(aes(x = iteration, y = true_vals),col = "red") 
   
+p2 <- js_results %>% filter(Parameter == "phiM", scenario == 1) %>%
+  ggplot() +
+  geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
+  geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +
+  geom_line(aes(x = iteration, y = Mean)) +
+  geom_line(aes(x = iteration, y = true_vals),col = "red") 
 
+p3 <- cjs_results %>% filter(Parameter == "phiM", scenario == 1) %>%
+  ggplot() +
+  geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
+  geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +
+  geom_line(aes(x = iteration, y = Mean)) +
+  geom_line(aes(x = iteration, y = true_vals),col = "red") 
+
+gridExtra::grid.arrange(p1,p2, p3, nrow = 3)
+
+
+# RECAPTURE FOR MALES/FEMALES SEEMS A LITTLE BIASED HIGH FOR JS AND PS MODELS
 
 param_sim_list[[301]]$rho
 param_sim_list[[301]]$gam
