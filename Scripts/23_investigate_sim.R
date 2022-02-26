@@ -82,7 +82,7 @@ ps_summary <- ps_results %>%
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>%
-  filter(scenario == 3) #%>% 
+  filter(scenario == 1) #%>% 
   # View() #%>%
  # filter(Parameter == "PhiF")
 
@@ -95,7 +95,7 @@ js_summary <- js_results %>%
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>% 
-  filter(scenario == 3) #%>% View() #%>%
+  filter(scenario == 1) #%>% View() #%>%
 
 cjs_summary <- cjs_results %>% 
   group_by(Parameter, scenario) %>% 
@@ -104,9 +104,9 @@ cjs_summary <- cjs_results %>%
             avg_range_50 = mean(Range_50),
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
-            avg_cv = mean(coef_var)) %>% filter(scenario ==3)# %>% View() #%>%
+            avg_cv = mean(coef_var)) %>% filter(scenario ==1)# %>% View() #%>%
 
-p1 <- ps_results %>% filter(Parameter == "delta", scenario == 6) %>%
+p1 <- ps_results %>% filter(Parameter == "PF", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +

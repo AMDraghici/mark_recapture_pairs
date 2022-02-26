@@ -42,15 +42,15 @@ param_list <- list(
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
 
 nimble_params <- c("apairs_f", "arepartner","single_female","af","am")
-for(i in 1:100){
+# for(i in 1:100){
   jags_data <- sim_dat(param_list)
-}
+# }
 
 # js_data
 
 
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data)
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 2e4,nburnin = 1e4, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 
 gather_posterior_summary(samples)
 plot_caterpillar(gather_posterior_summary(samples))
@@ -62,7 +62,7 @@ samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplo
 samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() #+ ylim(0.70,0.95)
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
-samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() + ylim(-1,1)
+samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
@@ -255,11 +255,11 @@ data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 #jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
 # 
 # ## MCMC parameters  
-par_settings <- list('n.iter' = 1e4,
+par_settings <- list('n.iter' = 1e5,
                      'n.thin' = 1,
-                     'n.burn' = 1e4/2,
+                     'n.burn' = 1e5/2,
                      'n.chains' = 1,
-                    'n.adapt' = 1e4/2)
+                    'n.adapt' = 1e5/2)
 
 # Vaillancourt 
 # ## Jags parameters and model script
@@ -279,11 +279,8 @@ for(i in 1:100){
                 debug = F)
 }
 
-z <- run_jags(jags_data = js_data,
-                   jags_model  = jags_model,
-                   jags_params = jags_params,
-                   par_settings = par_settings,
-                   debug = F)
+
+
 
 results <- process_simulation_data(z, param_list)
 
