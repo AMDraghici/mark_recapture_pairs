@@ -26,7 +26,14 @@ options(echo = TRUE)
 args <- commandArgs(trailingOnly = TRUE)
 k <- as.numeric(args[1])
 pars_mat_name <- args[2]
-par_index <- (k >= 1)*1 + (k > 25)*1 + (k > 50)*1 + (k > 75)*1 + (k > 100)*1 + (k > 125)*1 + (k > 150)*1 
+
+if(k <= 75){
+  par_index <- 1
+} else {
+  par_index <- 3
+}
+
+# par_index <- (k >= 1)*1 + (k > 25)*1 + (k > 50)*1 + (k > 75)*1 + (k > 100)*1 + (k > 125)*1 + (k > 150)*1 
 
 cat(k,"\n")
 cat(par_index, "\n")
@@ -50,11 +57,11 @@ saveRDS(js_data, out_dir %+% "js_data_test_" %+% k %+% ".rds")
 # RUN MODELS ------------------------------------------------------------------------------------------------
 
 # Number of iterations is universal to all three runs
-par_settings <- list(`n.iter` = 2e4,
-                     `n.thin` = 1,
-                     `n.burn` = 1e4,
+par_settings <- list(`n.iter` = 1e5,
+                     `n.thin` = 50,
+                     `n.burn` = 5e4,
                      `n.chains` = 1,
-                     `n.adapt` = 1e4)
+                     `n.adapt` = 5e4)
 
 # RUN 1 CJS MODEL
 cjs_jags_params <- c("pF","pM", "phiF", "phiM")
