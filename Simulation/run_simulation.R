@@ -50,11 +50,11 @@ saveRDS(js_data, out_dir %+% "js_data_test_" %+% k %+% ".rds")
 # RUN MODELS ------------------------------------------------------------------------------------------------
 
 # Number of iterations is universal to all three runs
-par_settings <- list(`n.iter` = 1e5,
-                     `n.thin` = 50,
-                     `n.burn` = 5e4,
+par_settings <- list(`n.iter` = 2e4,
+                     `n.thin` = 1,
+                     `n.burn` = 1e4,
                      `n.chains` = 1,
-                     `n.adapt` = 5e4)
+                     `n.adapt` = 1e4)
 
 # RUN 1 CJS MODEL
 cjs_jags_params <- c("pF","pM", "phiF", "phiM")

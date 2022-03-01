@@ -74,7 +74,7 @@ cjs_results <-  process_simulation_data(cjs_sim_list,param_sim_list) %>% mutate(
                                                                                   (iteration > 150))
 
 
-ps_summary <- ps_results %>% 
+ps_results %>% 
   group_by(Parameter, scenario) %>% 
   summarize(coverage_50 = mean(In_50),
             coverage_95 = mean(In_95),
@@ -87,7 +87,7 @@ ps_summary <- ps_results %>%
  # filter(Parameter == "PhiF")
 
 
-js_summary <- js_results %>% 
+js_results %>% 
   group_by(Parameter, scenario) %>% 
   summarize(coverage_50 = mean(In_50),
             coverage_95 = mean(In_95),
@@ -97,7 +97,7 @@ js_summary <- js_results %>%
             avg_cv = mean(coef_var)) %>% 
   filter(scenario == 1) #%>% View() #%>%
 
-cjs_summary <- cjs_results %>% 
+cjs_results %>% 
   group_by(Parameter, scenario) %>% 
   summarize(coverage_50 = mean(In_50),
             coverage_95 = mean(In_95),
@@ -106,7 +106,7 @@ cjs_summary <- cjs_results %>%
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>% filter(scenario ==1)# %>% View() #%>%
 
-p1 <- ps_results %>% filter(Parameter == "PF", scenario == 1) %>%
+p1 <- ps_results %>% filter(Parameter == "PhiF", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +

@@ -29,12 +29,12 @@ param_list <- list(
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
   gam = rep(0.7, k),
-  p.f = rep(0.9, k),
-  p.m = rep(0.9, k),
-  rho = rep(0.7, k),
+  p.f = rep(1.0, k),
+  p.m = rep(1.0, k),
+  rho = rep(0, k),
   betas = list(beta0 = 1, beta1 = 1.5),
   rand_init = F,
-  init = sample(1, n, TRUE),
+  init = sample(k-1, n, TRUE),
   show_unmated = T
 )
 
@@ -50,7 +50,7 @@ nimble_params <- c("apairs_f", "arepartner","single_female","af","am")
 
 
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data)
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 2e4,nburnin = 1e4, thin = 1)
 
 gather_posterior_summary(samples)
 plot_caterpillar(gather_posterior_summary(samples))
@@ -280,7 +280,11 @@ for(i in 1:100){
 }
 
 
-
+z <- run_jags(jags_data = js_data,
+              jags_model  = jags_model,
+              jags_params = jags_params,
+              par_settings = par_settings,
+              debug = F)
 
 results <- process_simulation_data(z, param_list)
 
