@@ -272,6 +272,18 @@ rpaircat <- nimbleFunction(
 # BUGS/JAGS Code
 nimble_ps_model <- nimbleCode({
   
+  # 0. Data Augmentation-----------------------------------------------------------------------------------------------------------------
+  for(i in 1:nf){
+    zf[i] ~ dbern(xi)
+  }
+  
+  for(j in 1:nm){
+    zm[j] ~ dbern(xi)
+  }
+  
+  Nf <- sum(zf[1:nf])
+  Nm <- sum(zm[1:nm])
+  
   # 1. Recruitment into population-----------------------------------------------------------------------------------------------------------
   
   # Female Recruitment
@@ -408,7 +420,7 @@ nimble_ps_model <- nimbleCode({
     
     # Marginal Recapture Event for Males in the Population (P[X^M_T])
     for(j in 1:nm){
-      recap_m[j,t] ~ dbern(PM * am[j,t] * recruit_m[j,t])
+      recap_m[j,t] ~ dbern(PM * am[j,t] * recruit_m[j,t] * zm[j])
     }
     
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
@@ -420,12 +432,14 @@ nimble_ps_model <- nimbleCode({
                                       (1 - recap_m[apairs_f[i,t],t]) * (Pf0/(1-PM))) # Male mated and female not captured
       
       # Draw Recapture Probability
-      recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t] * recruit_f[i,t])
+      recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t] * recruit_f[i,t] * zf[i])
     }
   }
   
   
   # 6. Prior Distributions-------------------------------------------------------------------------------------------------------------------
+  # Data augmentation
+  xi ~ dbeta(0.1,1.0)
   
   # Recruitment 
   for(t in 1:k){
@@ -522,8 +536,11 @@ generate_nimble_init_pairs <- function(jags_data){
   nf <- jags_data$nf
   nm <- jags_data$nm
   psi <- jags_data$psi # index who is taken
+
   
   # CR data with missing components
+  zf <- jags_data$zf
+  zm <- jags_data$zm
   recruit_f <- jags_data$recruit_f
   recruit_m <- jags_data$recruit_m
   amating_f <- jags_data$amating_f
@@ -619,6 +636,8 @@ generate_nimble_init_pairs <- function(jags_data){
   beta0 <- rnorm(1, 0, 1/4)
   beta1 <- rnorm(1, 0, 1/4)
   
+  xi <- rbeta(1,0.1,1)
+  
   # Missing Data Simulation --------------------------------------------------------
   
   # amating f/m
@@ -627,6 +646,18 @@ generate_nimble_init_pairs <- function(jags_data){
   # apairs f/m
   
   # package up the mating stuff into a few functions its a little unweildy
+  
+  # Sample augmentation female
+  for(i in 1:nf){
+    zf[i] <- ifelse(is.na(zf[i]), rbinom(1, 1, xi),zf[i])
+  }
+  
+  
+  # Sample augmentation male
+  for(j in 1:nm){
+    zm[j] <- ifelse(is.na(zm[j]), rbinom(1, 1, xi),zm[j])
+  }
+  
   
   # Recruitment
   # Female Recruitment
@@ -800,6 +831,12 @@ generate_nimble_init_pairs <- function(jags_data){
     return(mat_final)
   }
   
+  build_NA_vec <- function(vec, jags_vec){
+    vec_final <- rep(NA, length(jags_vec))
+    vec_final[is.na(jags_vec)] <- vec[is.na(jags_vec)]
+    return(vec_final)
+  }
+  
   #Female Recruitment
   recruit_f <- build_NA_mat(recruit_f, jags_data$recruit_f)
   
@@ -823,7 +860,9 @@ generate_nimble_init_pairs <- function(jags_data){
   
   # Repartner index (female perspective)
   arepartner <- build_NA_mat(arepartner, jags_data$arepartner)
-  #
+  
+  zf <- build_NA_vec(zf, jags_data$zf)
+  zm <- build_NA_vec(zm, jags_data$zm)
   # Return Results ------------------------------------------------------------------
   
   # Store in object
@@ -838,6 +877,8 @@ generate_nimble_init_pairs <- function(jags_data){
     delta = delta,
     beta0 = beta0,
     beta1 = beta1,
+    zf = zf,
+    zm = zm,
     recruit_m = recruit_m,
     recruit_f = recruit_f,
     amating_f = amating_f,
@@ -903,6 +944,8 @@ compile_pair_swap_nimble <- function(jags_data,
   )
   
   nimble_ps_dat <- list(
+    zf = jags_data$zf,
+    zm = jags_data$zm,
     recruit_f = jags_data$recruit_f,
     recruit_m = jags_data$recruit_m,
     amating_f = jags_data$amating_f,
@@ -924,7 +967,7 @@ compile_pair_swap_nimble <- function(jags_data,
     nimble_params <- params
   } else {
     cat("Params argument is NULL...","\n")
-    nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
+    nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","Nf","Nm","xi")
     cat("Using params := ", "\n")
     cat(nimble_params, "\n")
   }

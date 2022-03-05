@@ -52,26 +52,26 @@ for(i in 1:150){
 
 
 ps_results  <-  process_simulation_data(ps_sim_list,param_sim_list) %>%  mutate(scenario = 1 +
-                                                                                  (iteration > 25) + 
-                                                                                  (iteration > 50)  + 
-                                                                                  (iteration > 75) + 
-                                                                                  (iteration > 100) +
-                                                                                  (iteration > 125) +
-                                                                                  (iteration > 150))
+                                                                                  #(iteration > 25) + 
+                                                                                  #(iteration > 50)  + 
+                                                                                  (iteration > 75)*2) #+ 
+                                                                                  #(iteration > 100) +
+                                                                                  #(iteration > 125) +
+                                                                                  #(iteration > 150))
 js_results  <-  process_simulation_data(js_sim_list,param_sim_list) %>%  mutate(scenario = 1 +
-                                                                                  (iteration > 25) + 
-                                                                                  (iteration > 50)  + 
-                                                                                  (iteration > 75) + 
-                                                                                  (iteration > 100) +
-                                                                                  (iteration > 125) +
-                                                                                  (iteration > 150))
+                                                                                  #(iteration > 25) + 
+                                                                                  #(iteration > 50)  + 
+                                                                                  (iteration > 75)*2) #+ 
+#(iteration > 100) +
+#(iteration > 125) +
+#(iteration > 150))
 cjs_results <-  process_simulation_data(cjs_sim_list,param_sim_list) %>% mutate(scenario = 1 +
-                                                                                  (iteration > 25) + 
-                                                                                  (iteration > 50)  + 
-                                                                                  (iteration > 75) + 
-                                                                                  (iteration > 100) +
-                                                                                  (iteration > 125) +
-                                                                                  (iteration > 150))
+                                                                                  #(iteration > 25) + 
+                                                                                  #(iteration > 50)  + 
+                                                                                  (iteration > 75)*2) #+ 
+#(iteration > 100) +
+#(iteration > 125) +
+#(iteration > 150))
 
 
 ps_results %>% 
@@ -82,7 +82,7 @@ ps_results %>%
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>%
-  filter(scenario == 1) #%>% 
+  filter(scenario == 3) #%>% 
   # View() #%>%
  # filter(Parameter == "PhiF")
 
@@ -106,7 +106,7 @@ cjs_results %>%
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>% filter(scenario ==1)# %>% View() #%>%
 
-p1 <- ps_results %>% filter(Parameter == "PhiF", scenario == 1) %>%
+p1 <- ps_results %>% filter(Parameter == "PM", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +

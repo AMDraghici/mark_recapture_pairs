@@ -75,7 +75,7 @@ saveRDS(cjs_run, out_dir %+% "cjs_run_" %+% k %+% ".rds")
 
 
 # RUN 2 JS MODEL ----------------------------------------------------------------------------------------------
-js_jags_params <- c("pF","pM", "phiF", "phiM", "eps")
+js_jags_params <- c("pF","pM", "phiF", "phiM", "eps", "N", "xi")
 js_jags_model <- script_dir %+% "/10_js_mod_standard.R"
 js_run <- run_jags(jags_data    = js_data,
                    jags_model   = js_jags_model,
@@ -85,7 +85,7 @@ js_run <- run_jags(jags_data    = js_data,
 saveRDS(js_run, out_dir %+% "js_run_" %+% k %+% ".rds")
 
 # RUN 3 PAIR-SWAP JS MODEL -------------------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","Nf","Nm","xi")
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, params = nimble_params)
 ps_run <- run_nimble(CpsMCMC_List$CpsMCMC,
                      niter   = par_settings$`n.iter` + (par_settings$`n.adapt` + par_settings$`n.burn`),

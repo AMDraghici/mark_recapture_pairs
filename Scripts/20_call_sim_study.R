@@ -17,24 +17,26 @@ source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 10
-n = 200
+k = 4
+n = 20
 
 #set.seed(42)
 param_list <- list(
   n = n,
   k = k,
+  lf = 20,
+  lm = 20,
   prop.female = 0.5,#0.4652568,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
   gam = rep(0.7, k),
-  p.f = rep(1.0, k),
-  p.m = rep(1.0, k),
-  rho = rep(0, k),
-  betas = list(beta0 = 1, beta1 = 1.5),
+  p.f = rep(0.7, k),
+  p.m = rep(0.7, k),
+  rho = rep(0.7, k),
+  betas = list(beta0 = -1.0, beta1 = 1.5),
   rand_init = F,
-  init = sample(k-1, n, TRUE),
+  init = sample(1, n, TRUE),
   show_unmated = T
 )
 
@@ -42,9 +44,9 @@ param_list <- list(
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
 
 nimble_params <- c("apairs_f", "arepartner","single_female","af","am")
-# for(i in 1:100){
-  jags_data <- sim_dat(param_list)
-# }
+
+jags_data <- sim_dat(param_list)
+
 
 # js_data
 

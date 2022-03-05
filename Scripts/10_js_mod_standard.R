@@ -2,7 +2,15 @@
 
 model{
   
-  # Recruit Likelihood -----------------------------------------------------------------------------------
+  # Data Augmentation --------------------------------------------------------------------------------
+  for(i in 1:n){
+    z[i] ~ dbern(xi)
+  }
+
+  ## Compute population size
+  N <- sum(z[1:n])
+  
+  # Recruit Likelihood -------------------------------------------------------------------------------
   for(i in 1:n){
     recruit[i, 1] ~  dbern(eps[1])
     for(t in 2:(k-1)){
@@ -18,7 +26,7 @@ model{
     }
     
     for(t in 1:k){
-      x[i,t] ~ dbern(p[i] * a[i,t] * recruit[i,t])
+      x[i,t] ~ dbern(p[i] * a[i,t] * recruit[i,t]* z[i])
     }
   }
   
@@ -30,7 +38,9 @@ model{
     phi[i] <- female[i] * phiF + (1-female[i])* phiM
   }
   
-  
+  # # Data augmentation
+  xi ~ dbeta(1.0,1.0)
+
   # Survival by sex
   phiF ~ dbeta(1,1)
   phiM ~ dbeta(1,1)

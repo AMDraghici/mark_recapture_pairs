@@ -9,12 +9,12 @@ for(t in 1:jags_data$k){
 # apairs check
 for(t in 1:jags_data$k){
   index <- which(!is.na(jags_data$apairs_f[,t]))
-  print(all(jags_data$pairs_f[index,t-1] == jags_data$apairs_f[index,t]))
+  print(all(jags_data$pairs_f[index,t] == jags_data$apairs_f[index,t]))
 } 
 
 for(t in 1:jags_data$k){
   index <- which(!is.na(jags_data$apairs_m[,t]))
-  print(all(jags_data$pairs_m[index,t-1] == jags_data$apairs_m[index,t]))
+  print(all(jags_data$pairs_m[index,t] == jags_data$apairs_m[index,t]))
 } 
 
 # mating check
@@ -33,7 +33,7 @@ index <- which(!is.na(jags_data$arepartner[,t]))
 jags_data$arepartner[index,t]
 jags_data$repartner[index,t]
 
-for(t in 2:31){
+for(t in 1:jags_data$k){
   rpair <- which((jags_data$rpair[1:nf,t]))
   print(all(jags_data$pairs_f[index,t-1] == jags_data$apairs_f[index,t]))
   print(all(jags_data$pairs_f[index,t-1] == jags_data$apairs_f[index,t]))

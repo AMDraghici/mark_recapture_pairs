@@ -119,7 +119,7 @@ generate_init_js <- function(jags_data){
   n <- jags_data$n # Number of animals 
   female <- jags_data$female # Sex
   x <- jags_data$x # Recapture 
-  
+  z <- jags_data$z
   # CR data with missing components
   a <- jags_data$a  # Survival
   recruit <- jags_data$recruit # Recruitment
@@ -130,6 +130,12 @@ generate_init_js <- function(jags_data){
   phiF <- rbeta(1,1,1)
   phiM <- rbeta(1,1,1)
   eps <- rbeta(k, 1, 1)
+  xi <- rbeta(1,1,0.1)
+  
+  # Sample augmentation
+  for(i in 1:n){
+    z[i] <- ifelse(is.na(z[i]), rbinom(1, 1, xi),z[i])
+  }
   
   # Sample recruitment 
   # Recruitment 
@@ -160,12 +166,18 @@ generate_init_js <- function(jags_data){
     return(mat_final)
   }
   
+  build_NA_vec <- function(vec, jags_vec){
+    vec_final <- rep(NA, length(jags_vec))
+    vec_final[is.na(jags_vec)] <- vec[is.na(jags_vec)]
+    return(vec_final)
+  }
   # Recruit init
   recruit <- build_NA_mat(recruit, jags_data$recruit)
   
   # Survival Init
   a <- build_NA_mat(a, jags_data$a)
   
+  z <- build_NA_vec(z, jags_data$z)
   # Return Results ------------------------------------------------------------------
   
   # Store in object
@@ -176,7 +188,8 @@ generate_init_js <- function(jags_data){
     phiM = phiM,
     eps = eps,
     recruit = recruit,
-    a = a
+    a = a,
+    z = z
   )
   
   # Return Initial Values for a single chain
