@@ -11,22 +11,22 @@ setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_rec
 script_dir <- getwd() %+% "/Scripts/"
 dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 
-source(script_dir %+% "00_fn_sim_pair_data.R")
+source(script_dir %+% "00_fn_sim_pair_datav2.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 4
-n = 20
+k = 5
+n = 10
 
 #set.seed(42)
 param_list <- list(
   n = n,
   k = k,
-  lf = 20,
-  lm = 20,
-  prop.female = 0.5,#0.4652568,
+  lf = 3,
+  lm = 3,
+  prop.female = 0.4652568,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
@@ -34,25 +34,29 @@ param_list <- list(
   p.f = rep(0.7, k),
   p.m = rep(0.7, k),
   rho = rep(0.7, k),
-  betas = list(beta0 = -1.0, beta1 = 1.5),
+  betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_init = F,
   init = sample(1, n, TRUE),
   show_unmated = T
 )
 
+#7:14am
 
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
 
-nimble_params <- c("apairs_f", "arepartner","single_female","af","am")
+nimble_params <- c("amating_f","amating_m","apairs_f")
 
-jags_data <- sim_dat(param_list)
+
+  jags_data <- sim_dat(param_list)
+  # View(samples[,c(49,232)])
+
 
 
 # js_data
 
 
-CpsMCMC_List <- compile_pair_swap_nimble(jags_data)
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 2e4,nburnin = 1e4, thin = 1)
+CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 500,nburnin = 0, thin = 1)
 
 gather_posterior_summary(samples)
 plot_caterpillar(gather_posterior_summary(samples))
@@ -65,8 +69,6 @@ samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
-samples %>% ggs() %>% filter(Parameter %in% c("gamma_kappa_raw","rho_kappa_raw")) %>% ggs_traceplot() + ylim(0,10)
-samples %>% ggs() %>% filter(Parameter %in% c("gamma_phi_raw","rho_phi_raw")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
 
 n <- 332

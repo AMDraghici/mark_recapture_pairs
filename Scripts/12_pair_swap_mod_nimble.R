@@ -13,6 +13,18 @@ anyMatch <- nimbleFunction(
     return(output)}
 )
 
+doubleMatch <- nimbleFunction(
+  run = function(x = double(0),
+                 y = double(0)){
+    returnType(double(0))
+    
+    output <- 1*(x==y)
+    return(output)
+  }
+    
+)
+
+
 # Produce vector of 1s and 0s to check for matching value in an existing vector
 vectorMatch <- nimbleFunction(
   
@@ -25,114 +37,45 @@ vectorMatch <- nimbleFunction(
     
     return(output)}
 )
-# 
-# # Pair-Swap random assignment distribution function
-# dpaircat <- nimbleFunction(
-#   run = function(x = double(1), 
-#                  psi_cond = double(2), 
-#                  nf = integer(0),
-#                  nm = integer(0), 
-#                  log = integer(0, default = 1)){
-#     
-#     possible_mates <- rep(0,nf)
-#     psi_cond2 <- matrix(value = 0, nrow = nf, ncol = nm + 1)
-#     
-#     returnType(double(0))
-#     
-#     psi_cond2[1, 1:(nm+1)] <- c(psi_cond[1,1:nm],equals(sum(psi_cond[1,1:nm]),0))
-#     possible_mates[1] <- sum(psi_cond2[1,])
-#     
-#     for(i in 2:nf){
-#       
-#       # Remove Formed Pairs
-#       for(j in 1:nm){
-#         psi_cond2[i,j] <- psi_cond[i,j]*(1-1*any(j == x[1:(i-1)]))
-#       }
-#       
-#       #Add case in which no pairs are available 
-#       psi_cond2[i,(nm+1)] <- equals(sum(psi_cond2[i,1:nm]),0)
-#       
-#       possible_mates[i] <- sum(psi_cond2[i,])
-#     }
-#     
-#     logProb <- sum(log(1.0/possible_mates))
-#     
-#     if(log) return(logProb)
-#     else return(exp(logProb))
-#   }
-# )
-# 
-# # Pair-Swap random assignment random value generator function
-# rpaircat <- nimbleFunction(
-#   run = function(n = integer(0),psi_cond = double(2), nf = integer(0), nm = integer(0)){
-#     
-#     x <- rep(0,nf)
-#     psi_cond2 <- matrix(value = 0, nrow = nf, ncol = nm + 1)
-#     
-#     returnType(double(1))
-#     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
-#     
-#     psi_cond2[1, 1:(nm+1)] <- c(psi_cond[1,1:nm],equals(sum(psi_cond[1,1:nm]),0))
-#     x[1] <- rcat(n=1, prob = psi_cond2[1, 1:(nm+1)])
-#     
-#     for(i in 2:nf){
-#       
-#       # Remove Formed Pairs
-#       for(j in 1:nm){
-#         psi_cond2[i,j] <- psi_cond[i,j]*(1-1*any(j == x[1:(i-1)]))
-#       }
-#       
-#       #Add case in which no pairs are available 
-#       psi_cond2[i,(nm+1)] <- equals(sum(psi_cond2[i,1:nm]),0)
-#       
-#       # Find mate for i 
-#       x[i] <- rcat(n=1, prob = psi_cond2[i, 1:(nm+1)])
-#       
-#     }
-#     
-#     return(x)
-#   }
-# )
 
-
-# Experiment with arrival dpaircat
+# Arrival dpaircat
 
 # Pair-Swap random assignment distribution function
 dpaircat <- nimbleFunction(
   run = function(x = double(1), 
-                 psi_cond = double(2), 
-                 amating_f = double(1),
-                 amating_m = double(1),
+                 available_mates = double(2), 
+                 mating_f = double(1),
+                 mating_m = double(1),
                  nf = integer(0),
                  nm = integer(0), 
                  log = integer(0, default = 1)){
     
 
-    psi_cond2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
+    available_mates2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
     
     returnType(double(0))
     
     # How many available males and females
-    mating_females <- sum(amating_f)
-    mating_males  <- sum(amating_m)
+    mating_females <- sum(mating_f) + 1
+    mating_males  <- sum(mating_m) + 1
     osr <- mating_females/mating_males
     
     if(osr <= 1){
       possible_mates <- rep(0,nf)
-      psi_cond2[1, 1:(nm+1)] <- c(psi_cond[1,1:nm],equals(sum(psi_cond[1,1:nm]),0))
-      possible_mates[1] <- sum(psi_cond2[1,])
+      available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm],equals(sum(available_mates[1,1:nm]),0))
+      possible_mates[1] <- sum(available_mates2[1,])
       
       for(i in 2:nf){
         
         # Remove Formed Pairs
         for(j in 1:nm){
-          psi_cond2[i,j] <- psi_cond[i,j]*(1-1*any(j == x[1:(i-1)]))
+          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(j == x[1:(i-1)]))
         }
         
         #Add case in which no pairs are available 
-        psi_cond2[i,(nm+1)] <- equals(sum(psi_cond2[i,1:nm]),0)
+        available_mates2[i,(nm+1)] <- equals(sum(available_mates2[i,1:nm]),0)
         
-        possible_mates[i] <- sum(psi_cond2[i,])
+        possible_mates[i] <- sum(available_mates2[i,])
       }
     } else {
       y <- rep(0, nm)
@@ -141,33 +84,38 @@ dpaircat <- nimbleFunction(
       # Build vector of male pairs
       # Need base likelihood on these values
       for(j in 1:nm){
+        # Find which is your mate
         for(i in 1:nf){
           if(x[i] == j){
             y[j] <- i
-          } else {
-            y[j] <- nf+1
-          }
+          } 
         }
+        
+        # If no mate set to single state
+        if(y[j]==0){
+          y[j] <- nf+1
+        }
+        
       }
       
       
       # Apply mating selection for first male
-      psi_cond2[1:(nf+1), 1] <- c(psi_cond[1:nf,1],equals(sum(psi_cond[1:nf,1]),0))
-      possible_mates[1] <- sum(psi_cond2[,1])
+      available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1],equals(sum(available_mates[1:nf,1]),0))
+      possible_mates[1] <- sum(available_mates2[,1])
       
       # Iterate over remaining males
       for(j in 2:nm){
         
         # Remove Formed Pairs
         for(i in 1:nf){
-          psi_cond2[i,j] <- psi_cond[i,j]*(1-1*any(i == y[1:(j-1)]))
+          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(i == y[1:(j-1)]))
         }
         
         #Add case in which no pairs are available 
-        psi_cond2[(nf+1),j] <- equals(sum(psi_cond2[1:nf,j]),0)
+        available_mates2[(nf+1),j] <- equals(sum(available_mates2[1:nf,j]),0)
         
         # Find mate for i 
-        possible_mates[j] <- sum(psi_cond2[,j])
+        possible_mates[j] <- sum(available_mates2[,j])
         
       }
       
@@ -184,42 +132,42 @@ dpaircat <- nimbleFunction(
 # Pair-Swap random assignment random value generator function
 rpaircat <- nimbleFunction(
   run = function(n = integer(0),
-                 psi_cond = double(2),
-                 amating_f = double(1),
-                 amating_m = double(1),
+                 available_mates = double(2),
+                 mating_f = double(1),
+                 mating_m = double(1),
                  nf = integer(0),
                  nm = integer(0)){
     
     x <- rep(0,nf)
-    psi_cond2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
+    available_mates2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
     
     returnType(double(1))
     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
     
     # How many available males and females
-    mating_females <- sum(amating_f)
-    mating_males  <- sum(amating_m)
+    mating_females <- sum(mating_f) + 1
+    mating_males  <- sum(mating_m) + 1
     osr <- mating_females/mating_males
     
     # If operating sex ratio is balanced or in favor of females 
     # Iterate across female
     if(osr <= 1){
       
-      psi_cond2[1, 1:(nm+1)] <- c(psi_cond[1,1:nm],equals(sum(psi_cond[1,1:nm]),0))
-      x[1] <- rcat(n=1, prob = psi_cond2[1, 1:(nm+1)])
+      available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm],equals(sum(available_mates[1,1:nm]),0))
+      x[1] <- rcat(n=1, prob = available_mates2[1, 1:(nm+1)])
       
       for(i in 2:nf){
         
         # Remove Formed Pairs
         for(j in 1:nm){
-          psi_cond2[i,j] <- psi_cond[i,j]*(1-1*any(j == x[1:(i-1)]))
+          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(j == x[1:(i-1)]))
         }
         
         #Add case in which no pairs are available 
-        psi_cond2[i,(nm+1)] <- equals(sum(psi_cond2[i,1:nm]),0)
+        available_mates2[i,(nm+1)] <- equals(sum(available_mates2[i,1:nm]),0)
         
         # Find mate for i 
-        x[i] <- rcat(n=1, prob = psi_cond2[i, 1:(nm+1)])
+        x[i] <- rcat(n=1, prob = available_mates2[i, 1:(nm+1)])
         
       }
       
@@ -228,22 +176,22 @@ rpaircat <- nimbleFunction(
       y <- rep(0,nm)
       
       # Apply mating selection for first male
-      psi_cond2[1:(nf+1), 1] <- c(psi_cond[1:nf,1],equals(sum(psi_cond[1:nf,1]),0))
-      y[1] <- rcat(n = 1, prob = psi_cond2[1:(nf+1),1])
+      available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1],equals(sum(available_mates[1:nf,1]),0))
+      y[1] <- rcat(n = 1, prob = available_mates2[1:(nf+1),1])
       
       # Iterate over remaining males
       for(j in 2:nm){
         
         # Remove Formed Pairs
         for(i in 1:nf){
-          psi_cond2[i,j] <- psi_cond[i,j]*(1-1*any(i == y[1:(j-1)]))
+          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(i == y[1:(j-1)]))
         }
         
         #Add case in which no pairs are available 
-        psi_cond2[(nf+1),j] <- equals(sum(psi_cond2[1:nf,j]),0)
+        available_mates2[(nf+1),j] <- equals(sum(available_mates2[1:nf,j]),0)
         
         # Find mate for i 
-        y[j] <- rcat(n= 1, prob = psi_cond2[1:(nf+1), j])
+        y[j] <- rcat(n= 1, prob = available_mates2[1:(nf+1), j])
         
       }
       
@@ -252,9 +200,12 @@ rpaircat <- nimbleFunction(
         for(j in 1:nm){
           if(y[j] == i){
             x[i] <- j
-          } else {
-            x[i] <- nm+1
-          }
+          } 
+        }
+
+        #If not mates set to single
+        if(x[i]==0){
+          x[i] <- nm+1
         }
       }
       
@@ -267,7 +218,25 @@ rpaircat <- nimbleFunction(
 
 
 # Pair-Swap random assignment random value generator function
-
+# k <- 4
+# rpaircat(n=1,
+#          psi_cond = jags_data$psi[,,k],
+#          amating_f = jags_data$mating_f[,k], 
+#          amating_m = jags_data$mating_m[,k], 
+#          nf = 8,
+#          nm = 8) -> x
+# 
+# 
+# dpaircat(x=x,
+#          psi_cond = jags_data$psi[,,k],
+#          amating_f = jags_data$mating_f[,k], 
+#          amating_m = jags_data$mating_m[,k], 
+#          nf = 8,
+#          nm = 8) -> lp
+# 
+# print( (sum(jags_data$mating_f[,k])+1)/(sum(jags_data$mating_m[,k])+1))
+# print(x)
+# print(lp)
 
 # BUGS/JAGS Code
 nimble_ps_model <- nimbleCode({
@@ -329,7 +298,7 @@ nimble_ps_model <- nimbleCode({
   for(i in 1:nf){
     # Flat likelihood of mating conditional on decision to mate
     for(j in 1:nm){
-      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1]  
+      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1] #* equals(zf[i], zm[j])
     }
   }
   
@@ -382,7 +351,7 @@ nimble_ps_model <- nimbleCode({
       # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
         psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t]) * (1-male_taken_jt[j,t-1]) + 
-                                arepartner[i,t] * equals(apairs_f[i,t-1],j))  
+                                arepartner[i,t] * equals(apairs_f[i,t-1],j)) #* equals(zf[i], zm[j]) 
       }
     }
     
@@ -636,7 +605,7 @@ generate_nimble_init_pairs <- function(jags_data){
   beta0 <- rnorm(1, 0, 1/4)
   beta1 <- rnorm(1, 0, 1/4)
   
-  xi <- rbeta(1,0.1,1)
+  xi <- rbeta(1,0.3,1)
   
   # Missing Data Simulation --------------------------------------------------------
   
@@ -649,22 +618,26 @@ generate_nimble_init_pairs <- function(jags_data){
   
   # Sample augmentation female
   for(i in 1:nf){
-    zf[i] <- ifelse(is.na(zf[i]), rbinom(1, 1, xi),zf[i])
+    zf[i] <- ifelse(is.na(zf[i]), rbinom(1, 1, xi), zf[i])
   }
   
   
   # Sample augmentation male
   for(j in 1:nm){
-    zm[j] <- ifelse(is.na(zm[j]), rbinom(1, 1, xi),zm[j])
+    zm[j] <- ifelse(is.na(zm[j]), rbinom(1, 1, xi), zm[j])
   }
   
   
   # Recruitment
   # Female Recruitment
   for(i in 1:nf){
-    recruit_f[i,1] <- ifelse(is.na(recruit_f[i,1]), rbinom(1, 1, eps[1]),recruit_f[i,1])
+    recruit_f[i,1] <- ifelse(is.na(recruit_f[i,1]),
+                             rbinom(1, 1, eps[1]),
+                             recruit_f[i,1])
     for(t in 2:(k-1)){
-      recruit_f[i,t] <- ifelse(is.na(recruit_f[i,t]), rbinom(1, 1, (recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])),recruit_f[i,t])
+      recruit_f[i,t] <- ifelse(is.na(recruit_f[i,t]), 
+                               rbinom(1, 1, (recruit_f[i,t-1] + (1-recruit_f[i,t-1]) * eps[t])),
+                               recruit_f[i,t])
     }
   }
   
@@ -713,7 +686,7 @@ generate_nimble_init_pairs <- function(jags_data){
     if(t > 1){
       # Choose to re-form pairs
       for(i in 1:nf){
-        prob_repartner[i,t-1] <- inv.logit(beta0 + beta1*histories[i, apairs_f[i,t-1] , t]) * psi[i, apairs_f[i,t-1], t]
+        prob_repartner[i,t-1] <- inv.logit(beta0 + beta1*histories[i, apairs_f[i,t-1] , t]) * psi[i, apairs_f[i,t-1], t]  
         arepartner[i,t] <- ifelse(is.na(arepartner[i,t]), 
                                   rbinom(1,1,prob_repartner[i,t-1] * amating_f[i,t] * amating_m[apairs_f[i,t-1],t]),
                                   arepartner[i,t])
@@ -733,10 +706,10 @@ generate_nimble_init_pairs <- function(jags_data){
       # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
         if(t == 1){
-          psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t]) 
+          psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t]) #* equals(zf[i],zm[j])  
         } else {
           psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t]) * (1-male_taken_jt[j,t-1]) + 
-                                  arepartner[i,t] * equals(apairs_f[i,t-1],j))  
+                                  arepartner[i,t] * equals(apairs_f[i,t-1],j)) #* equals(zf[i],zm[j])  
         }
       }
     }
@@ -789,7 +762,8 @@ generate_nimble_init_pairs <- function(jags_data){
       # Marginal Survival Event for Males in the Population (P[Y^M_T])---------------------------------------------
       for(j in 1:nm){
         if(is.na(am[j,t])){
-          am[j,t] <- rbinom(1,1,PhiM * am[j,t-1] * recruit_m[j,t] + (1-recruit_m[j,t]))
+          # am[j,t] <- rbinom(1,1,PhiM * am[j,t-1] * recruit_m[j,t] + (1-recruit_m[j,t]))
+          am[j,t] <- rbinom(1,1, PhiM * am[j,t-1] * recruit_m[j,t] + (1-recruit_m[j,t]))
         }
       }
       
@@ -804,6 +778,7 @@ generate_nimble_init_pairs <- function(jags_data){
         
         # Draw Survival Event
         if(is.na(af[i,t])){
+          # af[i, t] <- rbinom(1,1, phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
           af[i, t] <- rbinom(1,1, phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
         }
       }
@@ -924,10 +899,10 @@ compile_pair_swap_nimble <- function(jags_data,
   
   registerDistributions(list(
     dpaircat = list(
-      BUGSdist = "dpaircat(psi_cond, amating_f, amating_m, nf, nm)",
-      Rdist = "dpaircat(psi_cond, amating_f, amating_m, nf, nm)",
-      discrete = T,
-      types = c('value = double(1)', 'psi_cond = double(2)','amating_f = double(1)','amating_m = double(1)','nf = integer(0)', 'nm = integer(0)'),
+      BUGSdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
+      Rdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
+      discrete = TRUE,
+      types = c('value = double(1)', 'available_mates = double(2)','mating_f = double(1)','mating_m = double(1)','nf = integer(0)', 'nm = integer(0)'),
       pqAvail = FALSE)
   ))
   
