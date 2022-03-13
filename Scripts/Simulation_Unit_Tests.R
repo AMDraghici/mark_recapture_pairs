@@ -19,12 +19,12 @@ for(t in 1:jags_data$k){
 
 # mating check
 for(t in 1:jags_data$k){
-  index <- which(!is.na(jags_data$amating_f[,t]))
+  index <- which(!is.na(jags_data$amating_f[1:jags_data$nf,t]))
   print(all(jags_data$amating_f[index,t] == jags_data$mating_f[index,t]))
 } 
 
 for(t in 1:jags_data$k){
-  index <- which(!is.na(jags_data$amating_m[,t]))
+  index <- which(!is.na(jags_data$amating_m[1:jags_data$nm,t]))
   print(all(jags_data$amating_m[index,t] == jags_data$mating_m[index,t]))
 } 
 
