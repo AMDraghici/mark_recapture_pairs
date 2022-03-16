@@ -725,10 +725,21 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
       sf[i,time] <- 1
     }
     
-    # Conditional Probability of survival given pair status
-    prob_cond_f <- single_check * phi.f[time] + 
-      (1-single_check) * (sm[j,time] * joint_surv_pmf$prob.mf/phi.m[time]  + 
-                            (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
+    if(phi.m[time]==0){
+      # Conditional Probability of survival given pair status
+      prob_cond_f <- single_check * phi.f[time] + 
+        (1-single_check) * (joint_surv_pmf$prob.f0/(1-phi.m[time]))
+    } else if(phi.m[time]==1){
+      # Conditional Probability of survival given pair status
+      prob_cond_f <- single_check * phi.f[time] + 
+        (1-single_check) * (joint_surv_pmf$prob.mf/phi.m[time])
+    } else {
+      # Conditional Probability of survival given pair status
+      prob_cond_f <- single_check * phi.f[time] + 
+        (1-single_check) * (sm[j,time] * joint_surv_pmf$prob.mf/phi.m[time]  + 
+                              (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
+      
+    }
     
     sf[i,time] <- rbinom(1,1, prob = prob_cond_f * sf[i,time-1] * recruit_f[i,time] + (1-recruit_f[i,time]))
     
@@ -1178,9 +1189,19 @@ simulate_recapture <- function(recap_f,
       # Find partner info
       j <- pairs_f[i, t]
       single_check <- (j == (nm + 1))
-      recap_prob_cond_f <- single_check * p.f[t] + 
-        (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
-                              (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
+      if(p.m[t]==0){
+        recap_prob_cond_f <- single_check * p.f[t] + 
+          (1-single_check) * (joint_recap_pmf$prob.f0/(1-p.m[t]))
+      } else if(p.m[t]==1){
+        recap_prob_cond_f <- single_check * p.f[t] + 
+          (1-single_check) * (joint_recap_pmf$prob.mf/p.m[t])
+      } else {
+        
+        recap_prob_cond_f <- single_check * p.f[t] + 
+          (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+                                (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
+      }
+      
       
       recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t] * recruit_f[i,t])
     }
@@ -1197,9 +1218,19 @@ simulate_recapture <- function(recap_f,
         # Find partner info
         j <- pairs_f[i, t]
         single_check <- (j == (nm + 1))
-        recap_prob_cond_f <- single_check * p.f[t] + 
-          (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
-                                (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
+        
+        if(p.m[t]==0){
+          recap_prob_cond_f <- single_check * p.f[t] + 
+            (1-single_check) * (joint_recap_pmf$prob.f0/(1-p.m[t]))
+        } else if(p.m[t]==1){
+          recap_prob_cond_f <- single_check * p.f[t] + 
+            (1-single_check) * (joint_recap_pmf$prob.mf/p.m[t])
+        } else {
+          
+          recap_prob_cond_f <- single_check * p.f[t] + 
+            (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+                                  (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
+        }
         
         recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t] * recruit_f[i,t])
       }
@@ -1404,7 +1435,8 @@ simulate_cr_data <- function(n,
                              betas, 
                              rand_init = T,
                              init = NULL,
-                             show_unmated){
+                             show_unmated,
+                             data_aug){
   
   # Make sure the number of individuals simulated is even
   if(!n %% 2 == 0){
@@ -1587,6 +1619,13 @@ simulate_cr_data <- function(n,
   apairs_m <- apairs_list[["apairs_m"]]
   psi <- apairs_list[["psi"]]
   
+  # nf and nm
+  sex_counts <- table(sex)
+  nf <- sex_counts[1]
+  nm <- sex_counts[2]
+  
+  if(data_aug){
+    
   # FOR TESTING
   psi_check <- psi 
   
@@ -1623,13 +1662,13 @@ simulate_cr_data <- function(n,
   zm <- data_augmented_list[["zm"]]
   psi <- data_augmented_list[["psi"]]
   
-  
-  # Check if data augmentation is working
-  sex_counts <- table(sex)
-  nf <- sex_counts[1]
-  nm <- sex_counts[2]
-  
   if(!all.equal(psi[1:nf,1:nm,1:k], psi_check[1:nf,1:nm,1:k])) browser()
+  } else {
+   
+    zf <- rep(1,nf)
+    zm <- rep(1,nm)
+    
+  }
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(

@@ -51,8 +51,8 @@ dpaircat <- nimbleFunction(
                  log = integer(0, default = 1)){
     
 
-    available_mates2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
-    
+    available_mates2 <- matrix( 0, nrow = nf+1, ncol = nm + 1)
+
     returnType(double(0))
     
     # How many available males and females
@@ -61,9 +61,10 @@ dpaircat <- nimbleFunction(
     osr <- mating_females/mating_males
     
     if(osr <= 1){
-      possible_mates <- rep(0,nf)
+      ll <- rep(0, nf)
+      # possible_mates <- rep(0,nf)
       available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm],equals(sum(available_mates[1,1:nm]),0))
-      possible_mates[1] <- sum(available_mates2[1,])
+      ll[1] <- dcat(x[1],available_mates2[1,],log)
       
       for(i in 2:nf){
         
@@ -75,11 +76,11 @@ dpaircat <- nimbleFunction(
         #Add case in which no pairs are available 
         available_mates2[i,(nm+1)] <- equals(sum(available_mates2[i,1:nm]),0)
         
-        possible_mates[i] <- sum(available_mates2[i,])
+        ll[i] <- dcat(x[i],available_mates2[i,],log)
       }
     } else {
       y <- rep(0, nm)
-      possible_mates <- rep(0,nm)
+      ll <- rep(0,nm)
       
       # Build vector of male pairs
       # Need base likelihood on these values
@@ -101,7 +102,7 @@ dpaircat <- nimbleFunction(
       
       # Apply mating selection for first male
       available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1],equals(sum(available_mates[1:nf,1]),0))
-      possible_mates[1] <- sum(available_mates2[,1])
+      ll[1] <- dcat(y[1],available_mates2[,1],log)
       
       # Iterate over remaining males
       for(j in 2:nm){
@@ -115,14 +116,14 @@ dpaircat <- nimbleFunction(
         available_mates2[(nf+1),j] <- equals(sum(available_mates2[1:nf,j]),0)
         
         # Find mate for i 
-        possible_mates[j] <- sum(available_mates2[,j])
+        ll[j] <- dcat(y[j],available_mates2[,j],log)
         
       }
       
       
     }
     
-    logProb <- sum(log(1.0/possible_mates))
+    logProb <- sum(ll)
     
     if(log) return(logProb)
     else return(exp(logProb))
@@ -148,7 +149,7 @@ rpaircat <- nimbleFunction(
     mating_females <- sum(mating_f) + 1
     mating_males  <- sum(mating_m) + 1
     osr <- mating_females/mating_males
-    
+
     # If operating sex ratio is balanced or in favor of females 
     # Iterate across female
     if(osr <= 1){
@@ -272,6 +273,16 @@ nimble_ps_model <- nimbleCode({
     } 
   }
   
+  # Dummy vals
+  for(t in 1:k){
+    recruit_f[(nf+1),t] ~ dbern(1)
+    recruit_m[(nm+1),t] ~ dbern(1)
+  }
+  
+  for(i in 1:nf){
+    arepartner[i,1] ~ dbern(0)
+  }
+  
   # Initialize History Array (All Zero at time 1)
   for(i in 1:(nf)){
     for(j in 1:(nm+1)){
@@ -290,9 +301,13 @@ nimble_ps_model <- nimbleCode({
     amating_f[i,1] ~ dbern(recruit_f[i,1] * delta)
   }
   
+  amating_f[(nf+1),1] ~ dbern(0)
+  
   for(j in 1:nm){
     amating_m[j,1] ~ dbern(recruit_m[j,1] * delta)
   }
+  
+  amating_m[(nm+1),1] ~ dbern(0)
   
   # Build Homogeneous Partnership probabilities 
   for(i in 1:nf){
@@ -313,6 +328,16 @@ nimble_ps_model <- nimbleCode({
     }
   }
   
+  # Dummy stuff
+  for(j in 1:(nm+1)){
+    am[j,1] ~ dbern(1)
+  }
+ 
+  for(i in 1:(nf+1)){
+    af[i,1] ~ dbern(1)
+  }
+
+  
   # Time 2-k
   for(t in 2:k){
     
@@ -324,10 +349,14 @@ nimble_ps_model <- nimbleCode({
       amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta)
     }
     
+    amating_f[(nf+1),t] ~ dbern(0)
+    
     # # Male Mating Choice at time t
     for(j in 1:nm){
       amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta)
     }
+    
+    amating_m[(nm+1),t] ~ dbern(0)
     
     # Choose to re-form pairs
     for(i in 1:nf){
@@ -382,6 +411,10 @@ nimble_ps_model <- nimbleCode({
       # Draw Survival Event
       af[i, t] ~ dbern(phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
     }
+    
+    # Dummy stuff
+    am[(nm+1),t] ~ dbern(1)
+    af[(nf+1),t] ~ dbern(1)
   }
   
   # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
@@ -403,6 +436,10 @@ nimble_ps_model <- nimbleCode({
       # Draw Recapture Probability
       recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t] * recruit_f[i,t] * zf[i])
     }
+    
+    # Dummy stuff
+    recap_m[(nm+1),t] ~ dbern(0)
+    recap_f[(nf+1),t] ~ dbern(0)
   }
   
   
@@ -902,6 +939,7 @@ compile_pair_swap_nimble <- function(jags_data,
       BUGSdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
       Rdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
       discrete = TRUE,
+      range = c(1, (jags_data$nm+1)),
       types = c('value = double(1)', 'available_mates = double(2)','mating_f = double(1)','mating_m = double(1)','nf = integer(0)', 'nm = integer(0)'),
       pqAvail = FALSE)
   ))
@@ -964,12 +1002,15 @@ compile_pair_swap_nimble <- function(jags_data,
                          data       = nimble_ps_dat,
                          dimensions = nimble_dims)
   
+  psModel$simulate()
+  psModel$calculate()
+  
   cat("Compiling Graphical Model in C++ (SLOW)...", "\n")
   compile_ps <- compileNimble(psModel, showCompilerOutput = TRUE)
   
   
   cat("Configuring Markov Chain Monte Carlo Process (SLOW)...", "\n")
-  psConf  <- configureMCMC(psModel, print = TRUE)
+  psConf  <- configureMCMC(psModel, print = TRUE, multivariateNodesAsScalars = T, onlySlice = T)
   psConf$addMonitors(nimble_params)
   psMCMC  <- buildMCMC(psConf)
   
