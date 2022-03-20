@@ -17,15 +17,15 @@ source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 3
-n = 10
+k = 8
+n = 50
 
 set.seed(42)
 param_list <- list(
   n = n,
   k = k,
-  lf = 0,
-  lm = 0,
+  lf = 25,
+  lm = 25,
   prop.female = 0.5,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
@@ -38,28 +38,16 @@ param_list <- list(
   rand_init = F,
   init = sample(1, n, TRUE),
   show_unmated = T,
-  data_aug = F
+  data_aug = T
 )
 
 #7:14am
 
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl")
-
-nimble_params <- c("amating_f","amating_m","af","am","arepartner","apairs_f","single_female","p.totalF","phi.totalF","prob_repartner","psi_cond")
-
-
-  jags_data <- sim_dat(param_list)
-  # View(samples[,c(49,232)])
-
-
-jags_data$apairs_f <- matrix(NA, 
-                             nrow=nrow(jags_data$apairs_f), 
-                             ncol =ncol(jags_data$apairs_f))
-# js_data
-
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "Nf", "Nm")
+jags_data <- sim_dat(param_list)
 
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 250,nburnin = 0, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e4,nburnin = 5e3, thin = 5)
 
 gather_posterior_summary(samples)
 plot_caterpillar(gather_posterior_summary(samples))

@@ -373,7 +373,6 @@ initialize_partner_status <- function(n, pairs, mating_f, mating_m, initial_entr
       prob_mate[i,j] <- mating_f[i,time] * mating_m[j,time]
     }
   }
-
   
   females_mating <- sum(mating_f[1:nf,time])
   males_mating <- sum(mating_m[1:nm,time])
@@ -692,7 +691,6 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
   nf <- nrow(pairs_f)
   nm <- nrow(pairs_m)
   
-  
   # Joint density 
   joint_surv_pmf <- compute_jbin_cjs(phi.f[time],phi.m[time],gam[time])
   
@@ -709,8 +707,6 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
     if(first_j == time){
       sm[j,time] <- 1
     }
-    
-    
   }
   
   # Sample conditional females next 
@@ -1343,7 +1339,6 @@ add_data_augmentation <- function(lf,
   psi2 <- array(NA,dim = c(nf+lf,nm+lm+1,k))
   psi2[,(nm+1):(nm+lm),1:k] <- 1 # aug males
   psi2[(nf+1):(nf+lf),,1:k] <- 1 # aug females
-  #psi2[(nf+1):(nf+lf),(nm+1):(nm+lm),1:k] <- 0 # no aug overlap for now
   psi2[,(nm+lm+1),1:k] <- 0 # dummy entry
   psi2[1:nf,1:nm,1:k] <- psi
   
@@ -1361,11 +1356,7 @@ add_data_augmentation <- function(lf,
         
         if(apairs_f[i,t] == (nm+lm+1)){ # are they not able to find a partner(seen alone) 
           psi2[i,,t] <- 0 
-          # vs
-          # psi2[i,1:nm,t] <- 0
-          # apairs_f[i,t] <- NA # allow them to match with data aug
           if(arepartner[i,t]==1) browser()
-          # arepartner[i,t] <- NA
         } else{
           psi2[i,,t] <- 0
           psi2[i,apairs_f[i,t],t] <- 1
@@ -1387,11 +1378,6 @@ add_data_augmentation <- function(lf,
         
         if(apairs_m[j,t] == (nf+lf+1)){ # are they not able to find a partner(seen alone) 
           psi2[,j,t] <- 0 
-          #vs
-          # 
-          
-          # psi2[1:nf,j,t] <- 0
-          # apairs_m[j,t] <- NA # allow them to match with data aug
         } else{
           psi2[,j,t] <- 0
           psi2[apairs_m[j,t],j,t] <- 1 # only their partner
@@ -1670,14 +1656,17 @@ simulate_cr_data <- function(n,
     
   }
   
+  nf <- length(sex[sex == "F"]) + lf
+  nm <- length(sex[sex == "M"]) + lm
+  
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     
     # Known data 
     n = n + lf + lm, # Number of animals sampled
     k = k, # Number of occasions
-    nf = length(sex[sex == "F"]) + lf, # Number of females
-    nm = length(sex[sex == "M"]) + lm, # Number of males
+    nf = nf, # Number of females
+    nm = nm, # Number of males
     sex = sex, # Sex of sampled individuals
     initial_entry = initial_entry, # When did they enter the population
     
@@ -1695,19 +1684,21 @@ simulate_cr_data <- function(n,
     # Observed /Inferred states (Missing Values are possible)
     zf = zf,
     zm = zm,
-    recruit_f = recruit_f, 
-    recruit_m = recruit_m,
+    recruit_f = recruit_f[1:nf,1:k], 
+    recruit_m = recruit_m[1:nm,1:k],
     psi = psi, # Pairs that may exist (not excluded due to already formed pairs)
-    af = af,  # Female Survival with missing values
-    am = am,  # Male Survival with missing values
+    af = af[1:nf,1:k],  # Female Survival with missing values
+    am = am[1:nm,1:k],  # Male Survival with missing values
     apairs  = apairs, # Joint Pairs Matrices (array across time)
-    apairs_f = apairs_f,
-    apairs_m = apairs_m,
-    arepartner = arepartner, # repartner with inferred states 
-    amating_f = amating_f, # Mating Status Females at T
-    amating_m = amating_m,  # Mating Status Males at T
-    recap_f = recap_f, # Observed Recapture of Females
-    recap_m = recap_m # Observed Recapture of Males
+    apairs_f =  matrix(NA, 
+                       nrow=nrow(apairs_f), 
+                       ncol =ncol(apairs_f)), # Information lives in psi (nimble doesnt accept MV mixed with NA)
+    apairs_m = apairs_m[1:nm, 1:k],
+    arepartner = arepartner[,2:(k)], # repartner with inferred states 
+    amating_f = amating_f[1:nf,1:k], # Mating Status Females at T
+    amating_m = amating_m[1:nm,1:k],  # Mating Status Males at T
+    recap_f = recap_f[1:nf,1:k], # Observed Recapture of Females
+    recap_m = recap_m[1:nm,1:k] # Observed Recapture of Males
   )
   
   #Return Model object
