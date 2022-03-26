@@ -18,14 +18,14 @@ source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
 k = 8
-n = 50
+n = 200
 
 set.seed(42)
 param_list <- list(
   n = n,
   k = k,
-  lf = 25,
-  lm = 25,
+  lf = 20,
+  lm = 20,
   prop.female = 0.5,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
@@ -43,16 +43,17 @@ param_list <- list(
 
 #7:14am
 
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "Nf", "Nm")
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
 jags_data <- sim_dat(param_list)
 
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e4,nburnin = 5e3, thin = 5)
-
-gather_posterior_summary(samples)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e3,nburnin = 5e2, thin = 1)
+summary(samples)
+# gather_posterior_summary(samples)
 plot_caterpillar(gather_posterior_summary(samples))
 
-# 
+# TRY CHANGING TO BINARY SAMPLER>>>>
+
 # saveRDS(samples, "long_run_332_28.rds")
 library(ggmcmc)
 samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)

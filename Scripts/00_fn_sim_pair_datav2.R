@@ -1694,7 +1694,7 @@ simulate_cr_data <- function(n,
                        nrow=nrow(apairs_f), 
                        ncol =ncol(apairs_f)), # Information lives in psi (nimble doesnt accept MV mixed with NA)
     apairs_m = apairs_m[1:nm, 1:k],
-    arepartner = arepartner[,2:(k)], # repartner with inferred states 
+    arepartner = arepartner[,2:k], # repartner with inferred states 
     amating_f = amating_f[1:nf,1:k], # Mating Status Females at T
     amating_m = amating_m[1:nm,1:k],  # Mating Status Males at T
     recap_f = recap_f[1:nf,1:k], # Observed Recapture of Females
