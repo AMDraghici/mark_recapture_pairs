@@ -871,6 +871,36 @@ compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
   return(state_list)
 }
 
+
+filter_impossible_matchs <- function(psi,
+                                     apairs_f,
+                                     k,
+                                     recap_f,
+                                     recap_m,
+                                     nf,
+                                     nm){
+  for(t in 1:k){
+    for(i in 1:nf){
+      for(j in 1:nm){
+        if(recap_f[i,t]==1 & recap_m[j,t]==1 & is.na(apairs_f[i,t])){
+          
+          sum_i <- sum(psi[i,,t])
+          sum_j <- sum(psi[,j,t])
+          
+          if((sum_i==1|sum_j==1) & psi[i,j,t]==1) browser()
+          
+          psi[i,j,t] <- 0
+          
+        }  
+      }
+    }
+  }
+  
+  
+  return(psi)
+  
+}
+
 compute_hidden_pairs <- function(pairs_f, pairs_m, recap_f, recap_m, k, sex, repartner, mating_f, mating_m, show_unmated = F){
   
   # Number of females and males 
@@ -922,7 +952,13 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, recap_f, recap_m, k, sex, rep
             
             # If both seen last time, 
             if(recap_m[j,t-1] == 1 & recap_f[i,t-1] == 1){
-              arepartner[i,t] <- repartner[i,t]
+              pairs_f_na <- is.na(apairs_f[i,t-1])
+              pairs_m_na <- (recap_f[pairs_m[j,t-1],t-1] == 0)  
+              if(pairs_f_na & pairs_m_na) arepartner[i,t] <- NA
+              if(pairs_f_na & !pairs_m_na) arepartner[i,t] <- 0
+              if(!pairs_f_na){
+                if(apairs_f[i,t-1] == j) arepartner[i,t] <- 1
+              }
             } 
             
            
@@ -942,7 +978,13 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, recap_f, recap_m, k, sex, rep
           
           # If both seen last time, 
           if(recap_m[j,t-1] == 1 & recap_f[i,t-1] == 1){
-            arepartner[i,t] <- repartner[i,t]
+            pairs_f_na <- is.na(apairs_f[i,t-1])
+            pairs_m_na <- (recap_f[pairs_m[j,t-1],t-1] == 0)  
+            if(pairs_f_na & pairs_m_na) arepartner[i,t] <- NA
+            if(pairs_f_na & !pairs_m_na) arepartner[i,t] <- 0
+            if(!pairs_f_na){
+              if(apairs_f[i,t-1] == j) arepartner[i,t] <- 1
+            }
           } 
         } 
       }
@@ -1128,6 +1170,17 @@ compute_hidden_pairs <- function(pairs_f, pairs_m, recap_f, recap_m, k, sex, rep
     psi_array[,,t] <- cbind(psi[,,t],rep(0,nf))
   }
   
+  if(show_unmated){
+    psi_array <- filter_impossible_matchs(psi = psi_array,
+                                          apairs_f = apairs_f,
+                                          k = k,
+                                          recap_f = recap_f,
+                                          recap_m = recap_m,
+                                          nf = nf,
+                                          nm = nm)
+  }
+  
+  
   # Store results in a list
   pairs_list <- list(apairs_m = apairs_m,
                      apairs_f = apairs_f,
@@ -1178,6 +1231,7 @@ simulate_recapture <- function(recap_f,
  
   # Generate female History
   for(i in 1:nf){
+    
     for(t in 1:k){
       # Joint density 
       joint_recap_pmf <- compute_jbin_cjs(p.f[t],p.m[t],rho[t])
@@ -1185,16 +1239,12 @@ simulate_recapture <- function(recap_f,
       # Find partner info
       j <- pairs_f[i, t]
       single_check <- (j == (nm + 1))
-      if(p.m[t]==0){
-        recap_prob_cond_f <- single_check * p.f[t] + 
-          (1-single_check) * (joint_recap_pmf$prob.f0/(1-p.m[t]))
-      } else if(p.m[t]==1){
-        recap_prob_cond_f <- single_check * p.f[t] + 
-          (1-single_check) * (joint_recap_pmf$prob.mf/p.m[t])
+      
+      if(single_check|p.m[t]==0|p.m[t]==1){
+        recap_prob_cond_f <- p.f[t]
       } else {
         
-        recap_prob_cond_f <- single_check * p.f[t] + 
-          (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+        recap_prob_cond_f <- (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
                                 (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
       }
       
@@ -1215,18 +1265,14 @@ simulate_recapture <- function(recap_f,
         j <- pairs_f[i, t]
         single_check <- (j == (nm + 1))
         
-        if(p.m[t]==0){
-          recap_prob_cond_f <- single_check * p.f[t] + 
-            (1-single_check) * (joint_recap_pmf$prob.f0/(1-p.m[t]))
-        } else if(p.m[t]==1){
-          recap_prob_cond_f <- single_check * p.f[t] + 
-            (1-single_check) * (joint_recap_pmf$prob.mf/p.m[t])
+        if(single_check|p.m[t]==0|p.m[t]==1){
+          recap_prob_cond_f <- p.f[t]
         } else {
           
-          recap_prob_cond_f <- single_check * p.f[t] + 
-            (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+          recap_prob_cond_f <- (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
                                   (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
         }
+        
         
         recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t] * recruit_f[i,t])
       }
@@ -1237,6 +1283,8 @@ simulate_recapture <- function(recap_f,
               recap_m = recap_m))
   
 }
+
+
 
 add_data_augmentation <- function(lf,
                                   lm,
@@ -1690,6 +1738,7 @@ simulate_cr_data <- function(n,
     af = af[1:nf,1:k],  # Female Survival with missing values
     am = am[1:nm,1:k],  # Male Survival with missing values
     apairs  = apairs, # Joint Pairs Matrices (array across time)
+    apf = apairs_f,
     apairs_f =  matrix(NA, 
                        nrow=nrow(apairs_f), 
                        ncol =ncol(apairs_f)), # Information lives in psi (nimble doesnt accept MV mixed with NA)

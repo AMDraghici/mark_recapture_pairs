@@ -238,12 +238,8 @@ compute_prob_condF <- nimbleFunction(
     out <- numeric(nf)
     
     for(i in 1:nf){
-      if(is_single_female[i]==1|current_pairs_f[i]>=(nm+1)){
+      if(is_single_female[i]==1|current_pairs_f[i]>=(nm+1)|ProbM==0|ProbM == 1){
         out[i] <- ProbF
-      } else if(ProbM == 0){
-        out[i] <- Probf0
-      } else if(ProbM == 1){
-        out[i] <- Probfm
       } else {
         out[i] <- (current_male_state[current_pairs_f[i]] * (Probfm/ProbM) + # Male mated and female surived
                      (1 - current_male_state[current_pairs_f[i]]) * (Probf0/(1-ProbM)))
@@ -823,6 +819,10 @@ generate_nimble_init_pairs <- function(jags_data){
         arepartner[i,t-1] <- ifelse(is.na(arepartner[i,t-1]), 
                                     rbinom(1,1,prob_repartner[i,t-1]),
                                     arepartner[i,t-1])
+        
+        lp <- dbinom(arepartner[i,t-1],1,prob_repartner[i,t-1],log=T)
+        if(lp == -Inf) browser()
+        
       }
       
       # Is Male j taken at time t based on re-partnership? 

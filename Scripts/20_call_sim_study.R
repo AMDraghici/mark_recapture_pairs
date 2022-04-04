@@ -17,10 +17,11 @@ source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 8
+k = 10
 n = 200
 
 set.seed(42)
+set.seed(1e4)
 param_list <- list(
   n = n,
   k = k,
@@ -30,10 +31,10 @@ param_list <- list(
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0.7, k),
+  gam = rep(0.6, k),
   p.f = rep(0.9, k),
   p.m = rep(0.9, k),
-  rho = rep(0.6, k),
+  rho = rep(0.7, k),
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_init = F,
   init = sample(1, n, TRUE),
@@ -46,11 +47,23 @@ param_list <- list(
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
 jags_data <- sim_dat(param_list)
 
+start <- Sys.time()
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e3,nburnin = 5e2, thin = 1)
+end <- Sys.time()
+print(start-end)
+
+start <- Sys.time()
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 10)
+end <- Sys.time()
+print(start-end)
+
 summary(samples)
 # gather_posterior_summary(samples)
 plot_caterpillar(gather_posterior_summary(samples))
+
+# Need to exclude pairs that were seen apart at time t (cant be together in prob_cond)
+# Maybe keep recap of zero observations in the data and do away w/ DA for simulation
+
 
 # TRY CHANGING TO BINARY SAMPLER>>>>
 
