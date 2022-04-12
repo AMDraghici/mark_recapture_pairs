@@ -376,18 +376,18 @@ nimble_ps_model <- nimbleCode({
   
   # If they've been recruited do they mate at this time step
   for(i in 1:nf){
-    amating_f[i,1] ~ dbern(recruit_f[i,1] * delta * zf[i])
+    amating_f[i,1] ~ dbern(recruit_f[i,1] * delta)
   }
   
   for(j in 1:nm){
-    amating_m[j,1] ~ dbern(recruit_m[j,1] * delta * zm[j])
+    amating_m[j,1] ~ dbern(recruit_m[j,1] * delta)
   }
   
   # Build Homogeneous Partnership probabilities 
   for(i in 1:nf){
     # Flat likelihood of mating conditional on decision to mate
     for(j in 1:nm){
-      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1]
+      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1] * equals(zf[i], zm[j])
     }
   }
   
@@ -409,12 +409,12 @@ nimble_ps_model <- nimbleCode({
     
     # Female Mating Choice at time t
     for(i in 1:nf){
-      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta * zf[i])
+      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta )
     }
     
     # Male Mating Choice at time t
     for(j in 1:nm){
-      amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta * zm[j])
+      amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta )
     }
     
     prob_repartner[1:nf,t-1] <- compute_pr_repartner(beta0,
@@ -449,7 +449,7 @@ nimble_ps_model <- nimbleCode({
       for(j in 1:nm){
         psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t] *
                                 (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) +
-                                arepartner[i,t-1] * equals(apairs_f[i,t-1],j)) 
+                                arepartner[i,t-1] * equals(apairs_f[i,t-1],j))  * equals(zf[i], zm[j])
       }
     }
     
@@ -776,11 +776,11 @@ generate_nimble_init_pairs <- function(jags_data){
     for(i in 1:nf){
       if(t == 1){
         amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), 
-                                 rbinom(1, 1, recruit_f[i,t] * delta * zf[i]), 
+                                 rbinom(1, 1, recruit_f[i,t] * delta), 
                                  amating_f[i,t])
       } else {
         amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),
-                                 rbinom(1, 1, af[i,t-1] * recruit_f[i,t] * delta * zf[i]), 
+                                 rbinom(1, 1, af[i,t-1] * recruit_f[i,t] * delta), 
                                  amating_f[i,t])
       }
       
@@ -790,11 +790,11 @@ generate_nimble_init_pairs <- function(jags_data){
     for(j in 1:nm){
       if(t == 1){
         amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),
-                                 rbinom(1, 1, recruit_m[j,t] * delta * zm[j]), 
+                                 rbinom(1, 1, recruit_m[j,t] * delta), 
                                  amating_m[j,t])
       } else {
         amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),
-                                 rbinom(1, 1, am[j,t-1] * recruit_m[j,t] * delta * zm[j]),  
+                                 rbinom(1, 1, am[j,t-1] * recruit_m[j,t] * delta),  
                                  amating_m[j,t])
       }
       
@@ -805,7 +805,7 @@ generate_nimble_init_pairs <- function(jags_data){
     if(t > 1){
 
       # Probability of re-forming 
-      prob_repartner[1:nf, t-1] <- compute_pr_repartner(intercept       = beta0,
+      prob_repartner[1:nf, t-1] <- compute_pr_repartner(intercept      = beta0,
                                                         slope          = beta1,
                                                         history        = histories[1:nf, 1:(nm+1), t],
                                                         psi_uncond     = psi[1:nf, 1:nm, t],
@@ -839,11 +839,11 @@ generate_nimble_init_pairs <- function(jags_data){
       # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
         if(t == 1){
-          psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t])  
+          psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t])  * equals(zf[i], zm[j])
         } else {
           psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * 
                                   (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) + 
-                                  arepartner[i,t-1] * equals(apairs_f[i,t-1],j))  
+                                  arepartner[i,t-1] * equals(apairs_f[i,t-1],j))  * equals(zf[i], zm[j])
         }
       }
     }
