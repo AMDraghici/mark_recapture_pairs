@@ -16,7 +16,7 @@ script_dir <- proj_dir %+% "/Scripts/"
 out_dir <- proj_dir %+% "/Simulation/"
 
 # Source code
-source(script_dir %+% "00_fn_sim_pair_data.R")
+source(script_dir %+% "00_fn_sim_pair_datav2.R")
 source(script_dir %+% "01_fn_model_code.R")
 
 # Simulation Settings -------------------------------------
