@@ -14,7 +14,7 @@ proj_dir <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_sw
 script_dir <- proj_dir %+% "/Scripts/"
 
 # Pull Custom Code
-source(script_dir %+% "00_fn_sim_pair_data.R")
+source(script_dir %+% "00_fn_sim_pair_datav2.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- proj_dir %+% "/Simulation/Output/"
@@ -27,13 +27,8 @@ args <- commandArgs(trailingOnly = TRUE)
 k <- as.numeric(args[1])
 pars_mat_name <- args[2]
 
-if(k <= 75){
-  par_index <- 1
-} else {
-  par_index <- 3
-}
 
-# par_index <- (k >= 1)*1 + (k > 25)*1 + (k > 50)*1 + (k > 75)*1 + (k > 100)*1 + (k > 125)*1 + (k > 150)*1 
+par_index <- (k >= 1)*1 + (k > 50)*1 + (k > 100)*1 + (k > 150)*1 
 
 cat(k,"\n")
 cat(par_index, "\n")
@@ -85,7 +80,7 @@ js_run <- run_jags(jags_data    = js_data,
 saveRDS(js_run, out_dir %+% "js_run_" %+% k %+% ".rds")
 
 # RUN 3 PAIR-SWAP JS MODEL -------------------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","Nf","Nm","xi")
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","NF","NM","xi")
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, params = nimble_params)
 ps_run <- run_nimble(CpsMCMC_List$CpsMCMC,
                      niter   = par_settings$`n.iter` + (par_settings$`n.adapt` + par_settings$`n.burn`),

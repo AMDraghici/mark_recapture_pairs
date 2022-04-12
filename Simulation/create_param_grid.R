@@ -24,20 +24,22 @@ k = 10
 n = 200
 
 # Baseline Parameters that do not vary
-to_vary <- list("phi.f" = c(0.8,0.8,1.0),
-                "phi.m"= c(0.8,0.8,1.0),
-                "p.f" = c(0.9,0.9, 1.0),
-                "p.m" = c(0.9,0.9, 1.0),
-                "gam" = c(0.7,0,0),
-                "rho" = c(0.7,0,0),
+to_vary <- list("phi.f" = c(0.8,0.8),
+                "phi.m"= c(0.8,0.8),
+                "p.f" = c(0.9,0.9),
+                "p.m" = c(0.9,0.9),
+                "gam" = c(0.7,0),
+                "rho" = c(0.7,0),
                 "n" = c(n)) 
 parameter_grid <-list()
 
 ik <- 1
-for(i in 1:3){
+for(i in 1:2){
   for(j in 1:2){
     parameter_grid[[ik]] <- list(n = n,
                                  k = k,
+                                 lf = 20,
+                                 lm = 20,
                                  prop.female = 0.5,
                                  delta = rep(0.9, k),
                                  phi.f = rep(to_vary$phi.f[i], k),
@@ -49,7 +51,8 @@ for(i in 1:3){
                                  betas = list(beta0 = 1.0, beta1 = 1.5),
                                  rand_init = F,
                                  init = sample(1, n, TRUE),
-                                 show_unmated = ifelse(j == 1, T, F))
+                                 show_unmated = ifelse(j == 1, T, F),
+                                 data_aug = T)
     ik <- ik+1
   }
 }
