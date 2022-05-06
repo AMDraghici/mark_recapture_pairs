@@ -51,3 +51,36 @@ data.frame(pairs_f = jags_data$pairs_f[i,],
            mating_f = jags_data$mating_f[i,],
            recruit_f = jags_data$recruit_f[i,],
            time = 1:k)
+
+\nf <-jags_data$nf
+nm <-jags_data$nm
+k <-jags_data$k
+
+
+for(i in 1:nf){
+  for(t in 1:k){
+    if(is.na(jags_data$apf[i,t])) next
+    if(jags_data$apf[i,t] == nm+1) next
+    
+    j <- jags_data$apf[i,t]
+    
+    if(j != which(jags_data$psi[i,,t]==1)) print(paste0("Bug at female", i, "time ", t))
+    
+    if(j != nim_inits$apairs_f[i,t]) print(paste0("Init Bug at female", i, "time ", t))
+    
+  }
+}
+
+
+for(i in 1:nf){
+  for(t in 1:(k-1)){
+    if(is.na(jags_data$arepartner[i,t])) next
+    
+    if(jags_data$arepartner[i,t] != nim_inits$arepartner[i,t]) print(paste0("Bug at female", i, "time ", t))
+    
+    
+  }
+}
+
+
+

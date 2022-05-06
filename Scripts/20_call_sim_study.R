@@ -17,11 +17,11 @@ source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 10
-n = 200
+k = 6
+n = 100
 
 set.seed(42)
-set.seed(1e4)
+# set.seed(1e4)
 param_list <- list(
   n = n,
   k = k,
@@ -31,10 +31,10 @@ param_list <- list(
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
   phi.m = rep(0.8, k),
-  gam = rep(0.6, k),
+  gam = rep(0, k),
   p.f = rep(0.9, k),
   p.m = rep(0.9, k),
-  rho = rep(0.7, k),
+  rho = rep(0, k),
   betas = list(beta0 = 1.0, beta1 = 1.5),
   rand_init = F,
   init = sample(1, n, TRUE),
@@ -46,6 +46,13 @@ param_list <- list(
 
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
 jags_data <- sim_dat(param_list)
+cjs_data <- format_to_cjs(jags_data)
+js_data <- format_to_js(jags_data)
+
+DIM <- function(x){return(c(NROW(x),NCOL(x)))}
+
+x <- lapply(1:length(jags_data), function(x) DIM(jags_data[[x]]))
+names(x) <- names(jags_data)
 
 start <- Sys.time()
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
@@ -53,7 +60,7 @@ end <- Sys.time()
 print(start-end)
 
 start <- Sys.time()
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 10)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 end <- Sys.time()
 print(start-end)
 
@@ -70,17 +77,19 @@ plot_caterpillar(gather_posterior_summary(samples))
 # saveRDS(samples, "long_run_332_28.rds")
 library(ggmcmc)
 samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
-samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() + ylim(0.70,0.95)
+samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.65,0.99)
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
 
-n <- 332
+n <- 314
 k <- 28
 param_list <- list(
   n = n,
   k = k,
+  lf = 20,
+  lm = 20,
   prop.female = 0.4652568,
   delta = rep(0.55, k),
   phi.f = rep(0.8, k),
@@ -92,7 +101,8 @@ param_list <- list(
   betas = list(beta0 = 1, beta1 = 1.5),
   rand_init = F,
   init = sample(k-1, n, TRUE),
-  show_unmated = T
+  show_unmated = T,
+  data_aug = T
 )
 
 
@@ -114,17 +124,48 @@ cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_
   add_last_capture() %>% 
   clean_filtered() 
 
-drop_id_yr_filter <- cap.data %>% group_by(animal_id) %>% summarize(num = sum(recapture_individual)) %>% filter(num < 1) %>% pull(animal_id)
+drop_id_yr_filter <- cap.data %>%
+  group_by(animal_id) %>%
+  summarize(num = sum(recapture_individual)) %>% 
+  filter(num < 1) %>%
+  pull(animal_id)
 
-cap.data <- cap.data %>% filter(!(animal_id %in% drop_id_yr_filter)) %>% 
+
+
+cap.data <- cap.data %>%
+  filter(!(animal_id %in% c(24,drop_id_yr_filter)), time > 1, initial_entry < 11) %>% 
   assign_ids_bysex()
 
+cap.data <- cap.data %>% mutate(time = time - 1,
+                    initial_entry = initial_entry-1)
 
-cap.data <- cap.data %>% filter(initial_entry < 28)
-jags_data <- build_jags_data(cap.data)
+cap.data <- cap.data %>% filter(initial_entry < 11 & time < 11)
+k <- 11
+
+
+jags_data <- build_jags_data(cap.data, data_aug = T, lf = 20, lm = 20)
 cjs_data <- format_to_cjs(jags_data)
 js_data <- format_to_js(jags_data)
 
+
+generate_nimble_init_pairs(jags_data) -> nim_inits
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
+start <- Sys.time()
+CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
+end <- Sys.time()
+print(start-end)
+
+start <- Sys.time()
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 500,nburnin = 1, thin = 1)
+end <- Sys.time()
+print(start-end)
+
+# jid 138
+# aid 558
+# pid 453
+
+y <- lapply(1:length(jags_data2), function(y) DIM(jags_data2[[y]]))
+names(y) <- names(jags_data2)
 
 # # 
 # # animal1cap <- cap.data %>%

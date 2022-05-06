@@ -376,18 +376,18 @@ nimble_ps_model <- nimbleCode({
   
   # If they've been recruited do they mate at this time step
   for(i in 1:nf){
-    amating_f[i,1] ~ dbern(recruit_f[i,1] * delta)
+    amating_f[i,1] ~ dbern(recruit_f[i,1] * delta *  zf[i])
   }
   
   for(j in 1:nm){
-    amating_m[j,1] ~ dbern(recruit_m[j,1] * delta)
+    amating_m[j,1] ~ dbern(recruit_m[j,1] * delta  * zm[j])
   }
   
   # Build Homogeneous Partnership probabilities 
   for(i in 1:nf){
     # Flat likelihood of mating conditional on decision to mate
     for(j in 1:nm){
-      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1] * equals(zf[i], zm[j])
+      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1] #* equals(zf[i], zm[j])
     }
   }
   
@@ -409,12 +409,12 @@ nimble_ps_model <- nimbleCode({
     
     # Female Mating Choice at time t
     for(i in 1:nf){
-      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta )
+      amating_f[i,t] ~ dbern(af[i,t-1] * recruit_f[i,t] * delta * zf[i])
     }
     
     # Male Mating Choice at time t
     for(j in 1:nm){
-      amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta )
+      amating_m[j,t] ~ dbern(am[j,t-1] * recruit_m[j,t] * delta * zm[j])
     }
     
     prob_repartner[1:nf,t-1] <- compute_pr_repartner(beta0,
@@ -432,7 +432,7 @@ nimble_ps_model <- nimbleCode({
       arepartner[i,t-1] ~ dbern(prob_repartner[i,t-1]) 
     }
     
-    # Is Male j taken at time t based on re-partnership? 
+    # Is Male j from t-1taken at time t based on re-partnership? 
     # we need Exclude Males who are now unavailable from the catalog of non-repairing individuals
     for(j in 1:nm){
       male_taken_jt[j,t-1] <- sum(vectorMatch(apairs_f[1:nf,t-1],j)*arepartner[1:nf,t-1])
@@ -449,7 +449,7 @@ nimble_ps_model <- nimbleCode({
       for(j in 1:nm){
         psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t] *
                                 (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) +
-                                arepartner[i,t-1] * equals(apairs_f[i,t-1],j))  * equals(zf[i], zm[j])
+                                arepartner[i,t-1] * equals(apairs_f[i,t-1],j))#  * equals(zf[i], zm[j])
       }
     }
     
@@ -473,7 +473,7 @@ nimble_ps_model <- nimbleCode({
     
     # Marginal Survival Event for Males in the Population (P[Y^M_T])
     for(j in 1:nm){
-      am[j,t] ~ dbern(PhiM * am[j,t-1] * recruit_m[j,t]  + (1-recruit_m[j,t]))
+      am[j,t] ~ dbern(PhiM * am[j,t-1] * recruit_m[j,t] * zm[j]  + (1-recruit_m[j,t])* zm[j])
     }
     
     # Marginal Recapture Event for Females in the Population (P[X^F_T|X^M_T]) given males 
@@ -489,7 +489,7 @@ nimble_ps_model <- nimbleCode({
     
     # Draw conditional Survival Event
     for(i in 1:nf){
-      af[i, t] ~ dbern(phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
+      af[i, t] ~ dbern(phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t]* zf[i] + (1-recruit_f[i,t])* zf[i])
     }
   }
   
@@ -776,11 +776,11 @@ generate_nimble_init_pairs <- function(jags_data){
     for(i in 1:nf){
       if(t == 1){
         amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), 
-                                 rbinom(1, 1, recruit_f[i,t] * delta), 
+                                 rbinom(1, 1, recruit_f[i,t] * delta * zf[i]), 
                                  amating_f[i,t])
       } else {
         amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),
-                                 rbinom(1, 1, af[i,t-1] * recruit_f[i,t] * delta), 
+                                 rbinom(1, 1, af[i,t-1] * recruit_f[i,t] * delta * zf[i]), 
                                  amating_f[i,t])
       }
       
@@ -790,11 +790,11 @@ generate_nimble_init_pairs <- function(jags_data){
     for(j in 1:nm){
       if(t == 1){
         amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),
-                                 rbinom(1, 1, recruit_m[j,t] * delta), 
+                                 rbinom(1, 1, recruit_m[j,t] * delta * zm[j]), 
                                  amating_m[j,t])
       } else {
         amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),
-                                 rbinom(1, 1, am[j,t-1] * recruit_m[j,t] * delta),  
+                                 rbinom(1, 1, am[j,t-1] * recruit_m[j,t] * delta * zm[j]),  
                                  amating_m[j,t])
       }
       
@@ -839,11 +839,11 @@ generate_nimble_init_pairs <- function(jags_data){
       # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
         if(t == 1){
-          psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t])  * equals(zf[i], zm[j])
+          psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t])
         } else {
           psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t] * 
                                   (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) + 
-                                  arepartner[i,t-1] * equals(apairs_f[i,t-1],j))  * equals(zf[i], zm[j])
+                                  arepartner[i,t-1] * equals(apairs_f[i,t-1],j)) 
         }
       }
     }
@@ -887,7 +887,7 @@ generate_nimble_init_pairs <- function(jags_data){
       # Marginal Survival Event for Males in the Population (P[Y^M_T])---------------------------------------------
       for(j in 1:nm){
         if(is.na(am[j,t])){
-          am[j,t] <- rbinom(1,1, PhiM * am[j,t-1] * recruit_m[j,t] + (1-recruit_m[j,t]))
+          am[j,t] <- rbinom(1,1, PhiM * am[j,t-1] * recruit_m[j,t] * zm[j] + (1-recruit_m[j,t]) * zm[j])
         }
       }
       
@@ -905,7 +905,7 @@ generate_nimble_init_pairs <- function(jags_data){
       for(i in 1:nf){
         # Draw Survival Event
         if(is.na(af[i,t])){
-          af[i, t] <- rbinom(1,1, phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
+          af[i, t] <- rbinom(1,1, phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t] * zf[i] + (1-recruit_f[i,t]) * zf[i])
         }
       }
     }
@@ -1119,6 +1119,21 @@ compile_pair_swap_nimble <- function(jags_data,
     }
 
   }
+
+  # cat("..also changing recap_f and recap_m be binary...", "\n")
+  # psConf$removeSampler("recap_m",print = F)
+  # psConf$removeSampler("recap_f",print = F)
+  # for(t in 1:jags_data$k){
+  #   for(j in 1:jags_data$nm){
+  #     temp_name_recap_m <- "recap_m[" %+% j %+% "," %+% t %+% "]"
+  #     psConf$addSampler(target = temp_name_recap_m, type = "sampler_binary", print  = F)
+  #   }
+  #   
+  #   for(i in 1:jags_data$nf){
+  #     temp_name_recap_f <- "recap_f[" %+% i %+% "," %+% t %+% "]"
+  #     psConf$addSampler(target = temp_name_recap_f, type = "sampler_binary", print  = F)
+  #   }
+  # }
 
   print(psConf)
 

@@ -13,7 +13,7 @@ dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
-out_dir <- getwd() %+% "/Simulation/Output/"
+out_dir <- getwd() %+% "/Simulation/Study1/Output/"
 
 
 # Read in parameter data
@@ -24,7 +24,7 @@ js_sim_list <- list()
 ps_sim_list <- list()
 files <- list.files(out_dir)
 n.failed <- 0
-for(i in 1:150){
+for(i in 1:200){
   
   # File names 
   param_file <-"parameter_list_" %+% i %+% ".rds"
@@ -52,26 +52,30 @@ for(i in 1:150){
 
 
 ps_results  <-  process_simulation_data(ps_sim_list,param_sim_list) %>%  mutate(scenario = 1 +
-                                                                                  #(iteration > 25) + 
-                                                                                  #(iteration > 50)  + 
-                                                                                  (iteration > 75)*2) #+ 
-                                                                                  #(iteration > 100) +
-                                                                                  #(iteration > 125) +
-                                                                                  #(iteration > 150))
-js_results  <-  process_simulation_data(js_sim_list,param_sim_list) %>%  mutate(scenario = 1 +
-                                                                                  #(iteration > 25) + 
-                                                                                  #(iteration > 50)  + 
-                                                                                  (iteration > 75)*2) #+ 
-#(iteration > 100) +
-#(iteration > 125) +
-#(iteration > 150))
+                                                                                  (iteration > 50) + 
+                                                                                  (iteration > 100)  + 
+                                                                                  (iteration > 150))
+
+js_results  <-  process_simulation_data(js_sim_list,param_sim_list) %>% mutate(scenario = 1 +
+                                                                                 (iteration > 50) + 
+                                                                                 (iteration > 100)  + 
+                                                                                 (iteration > 150))
+
 cjs_results <-  process_simulation_data(cjs_sim_list,param_sim_list) %>% mutate(scenario = 1 +
-                                                                                  #(iteration > 25) + 
-                                                                                  #(iteration > 50)  + 
-                                                                                  (iteration > 75)*2) #+ 
-#(iteration > 100) +
-#(iteration > 125) +
-#(iteration > 150))
+                                                                                  (iteration > 50) + 
+                                                                                  (iteration > 100)  + 
+                                                                                  (iteration > 150))
+
+
+# saveRDS(samples, "long_run_332_28.rds")
+library(ggmcmc)
+ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
+ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.65,0.99)
+ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
+ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+
 
 
 ps_results %>% 
@@ -82,7 +86,7 @@ ps_results %>%
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>%
-  filter(scenario == 3) #%>% 
+  filter(scenario == 1) #%>% 
   # View() #%>%
  # filter(Parameter == "PhiF")
 
@@ -106,13 +110,17 @@ cjs_results %>%
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>% filter(scenario ==1)# %>% View() #%>%
 
-p1 <- ps_results %>% filter(Parameter == "PM", scenario == 1) %>%
+p1 <- ps_results %>% filter(Parameter == "PF", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +
   geom_line(aes(x = iteration, y = Mean)) +
+  geom_point(aes(x = iteration, y = Mean)) +
   geom_line(aes(x = iteration, y = true_vals),col = "red") 
   
+p1
+
+
 p2 <- js_results %>% filter(Parameter == "phiM", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 

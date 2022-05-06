@@ -1801,6 +1801,9 @@ format_to_cjs <- function(model_data){
       }
     }
     
+  } else {
+    nf2 <- nf
+    nm2 <- nm
   }
   
   # Store results in list
