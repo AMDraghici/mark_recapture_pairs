@@ -52,11 +52,11 @@ saveRDS(js_data, out_dir %+% "js_data_test_" %+% k %+% ".rds")
 # RUN MODELS ------------------------------------------------------------------------------------------------
 
 # Number of iterations is universal to all three runs
-par_settings <- list(`n.iter` = 1e5,
+par_settings <- list(`n.iter` = 5e4,
                      `n.thin` = 50,
-                     `n.burn` = 5e4,
+                     `n.burn` = 5e4/2,
                      `n.chains` = 1,
-                     `n.adapt` = 5e4)
+                     `n.adapt` = 5e4/2)
 
 # RUN 1 CJS MODEL
 cjs_jags_params <- c("pF","pM", "phiF", "phiM")
@@ -83,9 +83,9 @@ saveRDS(js_run, out_dir %+% "js_run_" %+% k %+% ".rds")
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","NF","NM","xi")
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, params = nimble_params)
 ps_run <- run_nimble(CpsMCMC_List$CpsMCMC,
-                     niter   = par_settings$`n.iter` + (par_settings$`n.adapt` + par_settings$`n.burn`),
-                     nburnin = par_settings$`n.burn` + (par_settings$`n.adapt`), 
-                     thin    = par_settings$`n.thin`)#,
-                     # seed = F)
+                     niter   = 1e5,
+                     nburnin = 5e4, 
+                     thin    = par_settings$`n.thin`)
+
 saveRDS(ps_run, out_dir %+% "ps_run_" %+% k %+% ".rds")
 
