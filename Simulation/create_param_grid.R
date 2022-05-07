@@ -28,7 +28,7 @@ to_vary <- list("phi.f" = c(0.8,0.8),
                 "phi.m"= c(0.8,0.8),
                 "p.f" = c(0.9,0.9),
                 "p.m" = c(0.9,0.9),
-                "gam" = c(0.7,0),
+                "gam" = c(0.6,0),
                 "rho" = c(0.7,0),
                 "n" = c(n)) 
 parameter_grid <-list()
