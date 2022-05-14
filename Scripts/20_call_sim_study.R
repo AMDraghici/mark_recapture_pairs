@@ -15,6 +15,7 @@ source(script_dir %+% "00_fn_sim_pair_datav2.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
+source(script_dir %+% "12_jolly_seber_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
 k = 6
@@ -22,11 +23,13 @@ n = 100
 
 set.seed(42)
 # set.seed(1e4)
+# set.seed(4)
+# set.seed(1e5)
 param_list <- list(
   n = n,
   k = k,
-  lf = 20,
-  lm = 20,
+  lf = 10,
+  lm = 10,
   prop.female = 0.5,
   delta = rep(0.9, k),
   phi.f = rep(0.8, k),
@@ -44,7 +47,7 @@ param_list <- list(
 
 #7:14am
 
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
+nimble_params <- c("PF","PM","rho","rho_raw","gamma_raw","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
 jags_data <- sim_dat(param_list)
 cjs_data <- format_to_cjs(jags_data)
 js_data <- format_to_js(jags_data)
@@ -60,28 +63,55 @@ end <- Sys.time()
 print(start-end)
 
 start <- Sys.time()
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 50)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 end <- Sys.time()
 print(start-end)
 
 summary(samples)
+
+start <- Sys.time()
+CjsMCMC_List <- compile_jolly_seber_nimble(js_data)
+end <- Sys.time()
+print(start-end)
+
+start <- Sys.time()
+samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
+end <- Sys.time()
+print(start-end)
+
+summary(samples2)
 # gather_posterior_summary(samples)
-plot_caterpillar(gather_posterior_summary(samples))
+plot_caterpillar(gather_posterior_summary(samples2))
 
 # Need to exclude pairs that were seen apart at time t (cant be together in prob_cond)
 # Maybe keep recap of zero observations in the data and do away w/ DA for simulation
+
+
+
+samples[1000,]
+
+
+
+jags_data$recap_f
+
+
+
+
 
 
 # TRY CHANGING TO BINARY SAMPLER>>>>
 
 # saveRDS(samples, "long_run_332_28.rds")
 library(ggmcmc)
-samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
-samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.65,0.99)
-samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot()# + ylim(-0.5,0.1)
+samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
+samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() #+ ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
-samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() #+ ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("v.pf","v.phif")) %>% ggs_density() #+ ylim(0,1)
+
+samples %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ ylim(0,1)
 
 n <- 314
 k <- 28
@@ -133,14 +163,16 @@ drop_id_yr_filter <- cap.data %>%
 
 
 cap.data <- cap.data %>%
-  filter(!(animal_id %in% c(24,drop_id_yr_filter)), time > 1, initial_entry < 11) %>% 
+  # filter(!(animal_id %in% c(24,drop_id_yr_filter)), time > 1, initial_entry < 11) %>% 
+  filter(!(animal_id %in% c(drop_id_yr_filter))) %>% 
   assign_ids_bysex()
+# 
+# cap.data <- cap.data %>% mutate(time = time - 1,
+#                     initial_entry = initial_entry-1)
 
-cap.data <- cap.data %>% mutate(time = time - 1,
-                    initial_entry = initial_entry-1)
-
-cap.data <- cap.data %>% filter(initial_entry < 11 & time < 11)
-k <- 11
+cap.data <- cap.data %>% 
+  # filter(initial_entry < 11 & time < 11) %>% 
+  filter(initial_entry < 28)
 
 
 jags_data <- build_jags_data(cap.data, data_aug = T, lf = 20, lm = 20)

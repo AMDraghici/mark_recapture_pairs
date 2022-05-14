@@ -54,6 +54,8 @@ softmax <- function(par){
 
 #Extract joint binomial parameters
 compute_jbin_param_cjs <- function(prob.f,prob.m){
+  
+  
   #Compute Components
   prob.prod <- prob.m * prob.f
   sig.prob.f <- sqrt(prob.f*(1-prob.f))
@@ -74,11 +76,10 @@ compute_jbin_param_cjs <- function(prob.f,prob.m){
 
 #Generate Derived Probabilities
 compute_jbin_cjs <- function(prob.f,prob.m,corr){
-  #Extract Parameters
+ 
   parameters <- compute_jbin_param_cjs(prob.f,prob.m)
-  cor_upper_bound <- round(parameters[["cor_upper_bound"]],3)
-  cor_lower_bound <- round(parameters[["cor_lower_bound"]],3)
-  corr <- round(corr, 3)
+  cor_upper_bound <- parameters[["cor_upper_bound"]]
+  cor_lower_bound <- parameters[["cor_lower_bound"]]
   sig.prob.f <- parameters[["sig.prob.f"]]
   sig.prob.m <- parameters[["sig.prob.m"]]
   
@@ -90,7 +91,7 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
   cor_upper_bound[boundary] <- 0
   cor_lower_bound[boundary] <- 0
   
-  if(any(corr > cor_upper_bound) || any(corr < cor_lower_bound)){
+  if(any(round(corr,3) > round(cor_upper_bound,3)) || any(round(corr,3) < round(cor_lower_bound,3))){
     stop("Correlation " %+% corr %+% " is outside of the bounds [" %+% 
            as.character(cor_lower_bound) %+% " , " %+%
            as.character(cor_upper_bound) %+% "]")
@@ -100,7 +101,7 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
   prob.mf <- corr * sig.prob.m * sig.prob.f + (prob.f*prob.m)
   prob.f0 <- prob.f - prob.mf
   prob.m0 <- prob.m - prob.mf
-  prob.00 <- 1 - prob.f0 - prob.m0 - prob.mf 
+  prob.00 <- 1 - prob.f0 - prob.m0 - prob.mf
   
   #List of parameters
   out <- list(prob.mf = prob.mf,
@@ -1208,6 +1209,7 @@ simulate_recapture <- function(recap_f,
                                p.m, 
                                rho){
   
+  # browser()
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -1592,7 +1594,6 @@ simulate_cr_data <- function(n,
     if(any(rowSums(sf, na.rm = T) < 1)) browser()
     if(any(rowSums(sm, na.rm = T) < 1)) browser()
   }
-  
 
   # Update animals without observed histories
   recap_ind_list <- simulate_recapture(recap_f = recap_f, 

@@ -6,7 +6,7 @@ model{
   for(i in 1:n){
     z[i] ~ dbern(xi)
   }
-
+  
   ## Compute population size
   N <- sum(z[1:n])
   
@@ -19,16 +19,19 @@ model{
   }
   
   # JS Likelihood -----------------------------------------------------------------------------------
-  for(i in 1:n){
-    ## 1) Survival
-    for(t in 2:k){
+  for(t in 2:k){
+    for(i in 1:n){
+      ## 1) Survival
       a[i,t] ~ dbern(phi[i] * a[i,t-1] * recruit[i,t]+ (1 - recruit[i,t]))
     }
-    
-    for(t in 1:k){
+  }
+  
+  for(t in 1:k){
+    for(i in 1:n){
       x[i,t] ~ dbern(p[i] * a[i,t] * recruit[i,t] * z[i])
     }
   }
+  
   
   # Priors--------------------------------------------------------------------------------------------
   
@@ -39,8 +42,8 @@ model{
   }
   
   # # Data augmentation
-  xi ~ dbeta(1.0,1.0)
-
+  xi ~ dbeta(0.1,1.0)
+  
   # Survival by sex
   phiF ~ dbeta(1,1)
   phiM ~ dbeta(1,1)

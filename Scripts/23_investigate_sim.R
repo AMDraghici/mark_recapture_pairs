@@ -13,7 +13,7 @@ dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
-out_dir <- getwd() %+% "/Simulation/Study1/Output/"
+out_dir <- getwd() %+% "/Simulation/Output/"
 
 
 # Read in parameter data
@@ -69,12 +69,12 @@ cjs_results <-  process_simulation_data(cjs_sim_list,param_sim_list) %>% mutate(
 
 # saveRDS(samples, "long_run_332_28.rds")
 library(ggmcmc)
-ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
-ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.65,0.99)
-ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
-ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
-ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
-ps_sim_list[[50]] %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[11]] %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-5,5)
+ps_sim_list[[11]] %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.65,0.99)
+ps_sim_list[[11]] %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[11]] %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
+ps_sim_list[[11]] %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
+ps_sim_list[[11]] %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() + ylim(0,1)
 
 
 
@@ -99,7 +99,7 @@ js_results %>%
             avg_range_95 = mean(Range_95),
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>% 
-  filter(scenario == 1) #%>% View() #%>%
+  filter(scenario == 4) #%>% View() #%>%
 
 cjs_results %>% 
   group_by(Parameter, scenario) %>% 
@@ -110,7 +110,7 @@ cjs_results %>%
             avg_bias = mean(Bias),
             avg_cv = mean(coef_var)) %>% filter(scenario ==1)# %>% View() #%>%
 
-p1 <- ps_results %>% filter(Parameter == "PF", scenario == 1) %>%
+p1 <- ps_results %>% filter(Parameter == "PhiF", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +
@@ -121,7 +121,7 @@ p1 <- ps_results %>% filter(Parameter == "PF", scenario == 1) %>%
 p1
 
 
-p2 <- js_results %>% filter(Parameter == "phiM", scenario == 1) %>%
+p2 <- js_results %>% filter(Parameter == "xi", scenario == 1) %>%
   ggplot() +
   geom_line(aes(x = iteration, y = `2.5%`),linetype = "dashed") + 
   geom_line(aes(x = iteration, y = `97.5%`),linetype = "dashed") +
@@ -144,10 +144,10 @@ param_sim_list[[301]]$rho
 param_sim_list[[301]]$gam
 
 ps_summary %>% filter(Parameter == "PhiM") %>%   ggplot() +
- # geom_hline(yintercept = 0.95, col = "blue") +
-#  geom_hline(yintercept = 0.5, col = "red") +
-  #geom_point(aes(x = scenario, y = avg_bias), col = "blue") #+
- # geom_point(aes(x = scenario, y = coverage_50), col = "red")
+geom_hline(yintercept = 0.95, col = "blue") +
+ geom_hline(yintercept = 0.5, col = "red") +
+geom_point(aes(x = scenario, y = avg_bias), col = "blue") +
+geom_point(aes(x = scenario, y = coverage_50), col = "red")
 
 library(ggmcmc)
 cjs_sim_list[[1]] %>% ggs() %>% filter(Parameter %in% c("pM","pF","phiF","phiM")) %>% ggs_traceplot() + ylim(0,1)
