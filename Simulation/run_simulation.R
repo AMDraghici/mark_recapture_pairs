@@ -40,7 +40,7 @@ saveRDS(parameter_list, out_dir %+% "parameter_list_" %+% k %+% ".rds")
 
 # Generate a Pair-Swap Dataset and format into Jolly-Seber------------------------------------------------------------------
 ps_data <- sim_dat(parameter_list)
-js_data <- format_to_js(jags_data)
+js_data <- format_to_js(ps_data)
 
 # RUN MODELS ---------------------------------------------------------------------------------------------------------------
 
