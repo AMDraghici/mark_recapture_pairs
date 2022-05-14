@@ -1,5 +1,4 @@
-# Prep Code -----------------------------------------------------------------------------------------------
-
+# Prep Code ------------------------------------------------------------------------------------------------------------------
 # Grab Libraries
 library(parallel)
 library(tidyverse)
@@ -14,19 +13,19 @@ proj_dir <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_sw
 script_dir <- proj_dir %+% "/Scripts/"
 
 # Pull Custom Code
-source(script_dir %+% "00_fn_sim_pair_datav2.R")
-source(script_dir %+% "01_fn_model_code.R")
-source(script_dir %+% "12_pair_swap_mod_nimble.R")
+source(script_dir   %+% "00_fn_sim_pair_data.R")
+source(script_dir   %+% "01_fn_model_code.R")
+source(script_dir   %+% "11_jolly_seber_mod_nimble.R")
+source(script_dir   %+% "12_pair_swap_mod_nimble.R")
 out_dir <- proj_dir %+% "/Simulation/Output/"
 
 ## Options (ECHO FOR LOGS)
 options(echo = TRUE)
 
-## Read command line arguments----------------------------------------------------------------------------
+## Read command line arguments----------------------------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 k <- as.numeric(args[1])
 pars_mat_name <- args[2]
-
 
 par_index <- (k >= 1)*1 + (k > 50)*1 + (k > 100)*1 + (k > 150)*1 
 
@@ -34,58 +33,64 @@ cat(k,"\n")
 cat(par_index, "\n")
 cat(pars_mat_name,"\n")
 
-## Load parameter matrix ---------------------------------------------------------------------------------
+## Load parameter matrix ---------------------------------------------------------------------------------------------------
 pars_list <- readRDS(pars_mat_name)
 parameter_list <- pars_list[[par_index]]
 saveRDS(parameter_list, out_dir %+% "parameter_list_" %+% k %+% ".rds")
 
-# Generate a Dataset and Format to Pair-Swap, CJS, and JS --------------------------------------------------
-jags_data <- sim_dat(parameter_list)
-cjs_data  <- format_to_cjs(jags_data)
-js_data   <- format_to_js(jags_data)
+# Generate a Pair-Swap Dataset and format into Jolly-Seber------------------------------------------------------------------
+ps_data <- sim_dat(parameter_list)
+js_data <- format_to_js(jags_data)
 
-# Store Data
-saveRDS(jags_data, out_dir %+% "jags_data_test_" %+% k %+% ".rds")
-saveRDS(cjs_data, out_dir %+% "cjs_data_test_" %+% k %+% ".rds")
-saveRDS(js_data, out_dir %+% "js_data_test_" %+% k %+% ".rds")
+# RUN MODELS ---------------------------------------------------------------------------------------------------------------
 
-# RUN MODELS ------------------------------------------------------------------------------------------------
+# Jolly-Seber MODEL --------------------------------------------------------------------------------------------------------
+js_params <- c("PF","PM","PhiF","PhiM", "eps","xi")
 
-# Number of iterations is universal to all three runs
-par_settings <- list(`n.iter` = 5e4,
-                     `n.thin` = 50,
-                     `n.burn` = 5e4/2,
-                     `n.chains` = 1,
-                     `n.adapt` = 5e4/2)
+# COMPILE NIMBLE JOLLY-SEBER MODEL
+start <- Sys.time()
+CjsMCMC_List <- compile_jolly_seber_nimble(js_data = js_data, params = js_params)
+end <- Sys.time()
+print(start-end)
 
-# RUN 1 CJS MODEL
-cjs_jags_params <- c("pF","pM", "phiF", "phiM")
-cjs_jags_model <- script_dir %+% "/10_cjs_mod_standard.R"
-cjs_run <- run_jags(jags_data = cjs_data,
-                    jags_model = cjs_jags_model,
-                    jags_params = cjs_jags_params, 
-                    par_settings = par_settings, 
-                    debug = F)
-saveRDS(cjs_run, out_dir %+% "cjs_run_" %+% k %+% ".rds")
+# RUN MODEL AND STORE RESULTS
+start <- Sys.time()
+js_samples <- run_nimble(CmdlMCMC = CjsMCMC_List$CjsMCMC,
+                         niter    = 1e5,
+                         nburnin  = 5e4,
+                         thin     = 10)
+end <- Sys.time()
+print(start-end)
 
+# Build output list 
+js_run <- list(data        = js_data,
+               compilation = CjsMCMC_List,
+               samples     = js_samples)
 
-# RUN 2 JS MODEL ----------------------------------------------------------------------------------------------
-js_jags_params <- c("pF","pM", "phiF", "phiM", "eps", "N", "xi")
-js_jags_model <- script_dir %+% "/10_js_mod_standard.R"
-js_run <- run_jags(jags_data    = js_data,
-                   jags_model   = js_jags_model,
-                   jags_params  = js_jags_params, 
-                   par_settings = par_settings, 
-                   debug        = F)
+# Store kth iter 
 saveRDS(js_run, out_dir %+% "js_run_" %+% k %+% ".rds")
 
-# RUN 3 PAIR-SWAP JS MODEL -------------------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","NF","NM","xi")
-CpsMCMC_List <- compile_pair_swap_nimble(jags_data, params = nimble_params)
-ps_run <- run_nimble(CpsMCMC_List$CpsMCMC,
-                     niter   = 1e5,
-                     nburnin = 5e4, 
-                     thin    = par_settings$`n.thin`)
+# RUN 3 PAIR-SWAP JS MODEL -------------------------------------------------------------------------------------------------
+ps_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","NF","NM","xi")
+
+start <- Sys.time()
+CpsMCMC_List <- compile_pair_swap_nimble(ps_data = ps_data, params = ps_params)
+end <- Sys.time()
+print(start-end)
+
+# RUN MODEL AND STORE RESULTS
+start <- Sys.time()
+ps_samples <- run_nimble(CmdlMCMC = CpsMCMC_List$CpsMCMC,
+                         niter    = 1e5,
+                         nburnin  = 5e4, 
+                         thin     = 10)
+end <- Sys.time()
+print(start-end)
+
+# Build output list 
+ps_run <- list(data        = ps_data,
+               compilation = CpsMCMC_List,
+               samples     = ps_samples)
 
 saveRDS(ps_run, out_dir %+% "ps_run_" %+% k %+% ".rds")
-
+#--------------------------------------------------------------------------------------------------------------------------

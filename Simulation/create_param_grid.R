@@ -20,8 +20,8 @@ source(script_dir %+% "00_fn_sim_pair_datav2.R")
 source(script_dir %+% "01_fn_model_code.R")
 
 # Simulation Settings -------------------------------------
-k = 10
-n = 200
+k = 8
+n = 100
 
 # Baseline Parameters that do not vary
 to_vary <- list("phi.f" = c(0.8,0.8),

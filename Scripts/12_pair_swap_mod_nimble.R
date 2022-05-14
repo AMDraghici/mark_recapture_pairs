@@ -711,27 +711,27 @@ nimble_ps_model <- nimbleCode({
 
 
 # Generating Initial Values
-generate_nimble_init_pairs <- function(jags_data){
+generate_nimble_init_pairs <- function(ps_data){
   
   #Unpack Variables -----------------------------------------------------------------
   # Indexes
-  k <- jags_data$k
-  nf <- jags_data$nf
-  nm <- jags_data$nm
-  psi <- jags_data$psi # index who is taken
+  k <- ps_data$k
+  nf <- ps_data$nf
+  nm <- ps_data$nm
+  psi <- ps_data$psi # index who is taken
   
   # CR data with missing components
-  zf <- jags_data$zf
-  zm <- jags_data$zm
-  recruit_f <- jags_data$recruit_f
-  recruit_m <- jags_data$recruit_m
-  amating_f <- jags_data$amating_f
-  amating_m <- jags_data$amating_m
-  arepartner <- jags_data$arepartner
-  apairs_f <-  jags_data$apairs_f
-  af <- jags_data$af
-  am <- jags_data$am
-  recap_m <- jags_data$recap_m
+  zf <- ps_data$zf
+  zm <- ps_data$zm
+  recruit_f <- ps_data$recruit_f
+  recruit_m <- ps_data$recruit_m
+  amating_f <- ps_data$amating_f
+  amating_m <- ps_data$amating_m
+  arepartner <- ps_data$arepartner
+  apairs_f <-  ps_data$apairs_f
+  af <- ps_data$af
+  am <- ps_data$am
+  recap_m <- ps_data$recap_m
   
   # Define local fn equals to emulate jags code
   # Equals call (1 if T; 0 if F)
@@ -868,7 +868,7 @@ generate_nimble_init_pairs <- function(jags_data){
     }
   }
   
-  # Intermediate objects defined within JAGS
+  # Intermediate objects defined within NIMBLE
   histories <- array(0, dim = c(nf, nm+1, k+1))
   single_female <- matrix(NA, nrow = nf, ncol = k)
   prob_repartner <- matrix(NA, nrow = nf, ncol = k-1)
@@ -1033,51 +1033,51 @@ generate_nimble_init_pairs <- function(jags_data){
                                             nm                 = nm) 
   }
   
-  # Update Initial Values to follow JAGS structure -----------------------------------------------------------------
+  # Update Initial Values to follow NIMBLE structure -----------------------------------------------------------------
   
   # Fn to Replace known values with NA and NA values with initial values
-  build_NA_mat <- function(mat, jags_mat){
+  build_NA_mat <- function(mat, ps_mat){
     mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
-    mat_final[is.na(jags_mat)] <- mat[is.na(jags_mat)]
+    mat_final[is.na(ps_mat)] <- mat[is.na(ps_mat)]
     return(mat_final)
   }
   
-  build_NA_vec <- function(vec, jags_vec){
-    vec_final <- rep(NA, length(jags_vec))
-    vec_final[is.na(jags_vec)] <- vec[is.na(jags_vec)]
+  build_NA_vec <- function(vec, ps_vec){
+    vec_final <- rep(NA, length(ps_vec))
+    vec_final[is.na(ps_vec)] <- vec[is.na(ps_vec)]
     return(vec_final)
   }
   
   #Female Recruitment
-  recruit_f <- build_NA_mat(recruit_f, jags_data$recruit_f)
+  recruit_f <- build_NA_mat(recruit_f, ps_data$recruit_f)
   
   # Male Recruitment
-  recruit_m <- build_NA_mat(recruit_m, jags_data$recruit_m)
+  recruit_m <- build_NA_mat(recruit_m, ps_data$recruit_m)
   
   # Female Survival
-  af <- build_NA_mat(af, jags_data$af)
+  af <- build_NA_mat(af, ps_data$af)
   
   # Female Mating Status
-  amating_f <- build_NA_mat(amating_f, jags_data$amating_f)
+  amating_f <- build_NA_mat(amating_f, ps_data$amating_f)
   
   # Male Survival
-  am <- build_NA_mat(am, jags_data$am)
+  am <- build_NA_mat(am, ps_data$am)
   
   # Male Mating Status
-  amating_m <- build_NA_mat(amating_m, jags_data$amating_m)
+  amating_m <- build_NA_mat(amating_m, ps_data$amating_m)
   
   # Pair index (female perspective)
-  apairs_f <- build_NA_mat(apairs_f, jags_data$apairs_f)
+  apairs_f <- build_NA_mat(apairs_f, ps_data$apairs_f)
   
   # Repartner index (female perspective)
-  arepartner <- build_NA_mat(arepartner, jags_data$arepartner)
+  arepartner <- build_NA_mat(arepartner, ps_data$arepartner)
   
-  zf <- build_NA_vec(zf, jags_data$zf)
-  zm <- build_NA_vec(zm, jags_data$zm)
+  zf <- build_NA_vec(zf, ps_data$zf)
+  zm <- build_NA_vec(zm, ps_data$zm)
   # Return Results ------------------------------------------------------------------
   
   # Store in object
-  jags_inits <- list(
+  ps_inits <- list(
     PF = PF,
     PM = PM,
     v.pf   = v.pf,
@@ -1111,11 +1111,11 @@ generate_nimble_init_pairs <- function(jags_data){
   )
   
   # Return Initial Values for a single chain
-  return(jags_inits)
+  return(ps_inits)
 }
 
 # Compile Model
-compile_pair_swap_nimble <- function(jags_data,
+compile_pair_swap_nimble <- function(ps_data,
                                      params = NULL){
   
   # Registering Random Pair-Swap Distribution
@@ -1126,7 +1126,7 @@ compile_pair_swap_nimble <- function(jags_data,
       BUGSdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
       Rdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
       discrete = TRUE,
-      range = c(1, (jags_data$nm+1)),
+      range = c(1, (ps_data$nm+1)),
       types = c('value = double(1)', 'available_mates = double(2)','mating_f = double(1)','mating_m = double(1)','nf = integer(0)', 'nm = integer(0)'),
       pqAvail = FALSE),
     dmvbern = list(
@@ -1140,30 +1140,30 @@ compile_pair_swap_nimble <- function(jags_data,
   
   # Generating Initial Values
   cat("Generating Initial Values...", "\n")
-  nimble_inits <- generate_nimble_init_pairs(jags_data)
+  nimble_inits <- generate_nimble_init_pairs(ps_data)
   
   # Construct Nimble Objects 
   cat("Organizing Data for Nimble...", "\n")
   nimble_ps_constants <- list(
-    nf = jags_data$nf,
-    nm = jags_data$nm,
-    k = jags_data$k
+    nf = ps_data$nf,
+    nm = ps_data$nm,
+    k = ps_data$k
   )
   
   nimble_ps_dat <- list(
-    zf = jags_data$zf,
-    zm = jags_data$zm,
-    recruit_f = jags_data$recruit_f,
-    recruit_m = jags_data$recruit_m,
-    amating_f = jags_data$amating_f,
-    amating_m = jags_data$amating_m,
-    psi = jags_data$psi,
-    af = jags_data$af,
-    am = jags_data$am,
-    apairs_f = jags_data$apairs_f,
-    arepartner = jags_data$arepartner, 
-    recap_f = jags_data$recap_f,
-    recap_m = jags_data$recap_m
+    zf = ps_data$zf,
+    zm = ps_data$zm,
+    recruit_f = ps_data$recruit_f,
+    recruit_m = ps_data$recruit_m,
+    amating_f = ps_data$amating_f,
+    amating_m = ps_data$amating_m,
+    psi = ps_data$psi,
+    af = ps_data$af,
+    am = ps_data$am,
+    apairs_f = ps_data$apairs_f,
+    arepartner = ps_data$arepartner, 
+    recap_f = ps_data$recap_f,
+    recap_m = ps_data$recap_m
   )
   
   if(!is.null(params)){
@@ -1222,21 +1222,21 @@ compile_pair_swap_nimble <- function(jags_data,
   
   psConf$removeSampler("apairs_f", print = F)
   
-  for(t in 1:jags_data$k){
-    temp_name_cat <- "apairs_f[1:" %+% jags_data$nf %+% "," %+% t %+% "]"
+  for(t in 1:ps_data$k){
+    temp_name_cat <- "apairs_f[1:" %+% ps_data$nf %+% "," %+% t %+% "]"
     psConf$addSampler(target = temp_name_cat, type = "sampler_pairs", print = T)
   }
   
   # cat("..also changing recap_f and recap_m be binary...", "\n")
   psConf$removeSampler("recap_m",print = F)
   psConf$removeSampler("recap_f",print = F)
-  # for(t in 1:jags_data$k){
-  #   for(j in 1:jags_data$nm){
+  # for(t in 1:ps_data$k){
+  #   for(j in 1:ps_data$nm){
   #     temp_name_recap_m <- "recap_m[" %+% j %+% "," %+% t %+% "]"
   #     psConf$addSampler(target = temp_name_recap_m, type = "sampler_binary", print  = F)
   #   }
   #   
-  #   for(i in 1:jags_data$nf){
+  #   for(i in 1:ps_data$nf){
   #     temp_name_recap_f <- "recap_f[" %+% i %+% "," %+% t %+% "]"
   #     psConf$addSampler(target = temp_name_recap_f, type = "sampler_binary", print  = F)
   #   }
@@ -1262,14 +1262,14 @@ compile_pair_swap_nimble <- function(jags_data,
 }
 
 # Get Samples from Model
-run_nimble <- function(CpsMCMC, 
+run_nimble <- function(CmdlMCMC, 
                        niter,
                        nburnin,
                        thin,
                        seed = F){
   
   cat("MCMC Sampling from Model...","\n")
-  samples <- runMCMC(CpsMCMC,
+  samples <- runMCMC(CmdlMCMC,
                      niter = niter,
                      nburnin = nburnin, 
                      thin = thin, 

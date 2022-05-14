@@ -60,19 +60,19 @@ nimble_js_model <- nimbleCode({
 })
 
 
-generate_init_js <- function(jags_data){
+generate_init_js <- function(js_data){
   
   #Unpack Variables -----------------------------------------------------------------
   
   # Known data and indices 
-  k <- jags_data$k # Number of capture occasions
-  n <- jags_data$n # Number of animals 
-  female <- jags_data$female # Sex
-  x <- jags_data$x # Recapture 
-  z <- jags_data$z
+  k <- js_data$k # Number of capture occasions
+  n <- js_data$n # Number of animals 
+  female <- js_data$female # Sex
+  x <- js_data$x # Recapture 
+  z <- js_data$z
   # CR data with missing components
-  a <- jags_data$a  # Survival
-  recruit <- jags_data$recruit # Recruitment
+  a <- js_data$a  # Survival
+  recruit <- js_data$recruit # Recruitment
   
   # Recapture Prob and Survival Prob -------------------------------------------------
   PF <- rbeta(1,1,1)
@@ -110,28 +110,28 @@ generate_init_js <- function(jags_data){
   }
   
   # Add unknown status 
-  build_NA_mat <- function(mat, jags_mat){
+  build_NA_mat <- function(mat, js_mat){
     mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
-    mat_final[is.na(jags_mat)] <- mat[is.na(jags_mat)]
+    mat_final[is.na(js_mat)] <- mat[is.na(js_mat)]
     return(mat_final)
   }
   
-  build_NA_vec <- function(vec, jags_vec){
-    vec_final <- rep(NA, length(jags_vec))
-    vec_final[is.na(jags_vec)] <- vec[is.na(jags_vec)]
+  build_NA_vec <- function(vec, js_vec){
+    vec_final <- rep(NA, length(js_vec))
+    vec_final[is.na(js_vec)] <- vec[is.na(js_vec)]
     return(vec_final)
   }
   # Recruit init
-  recruit <- build_NA_mat(recruit, jags_data$recruit)
+  recruit <- build_NA_mat(recruit, js_data$recruit)
   
   # Survival Init
-  a <- build_NA_mat(a, jags_data$a)
+  a <- build_NA_mat(a, js_data$a)
   
-  z <- build_NA_vec(z, jags_data$z)
+  z <- build_NA_vec(z, js_data$z)
   # Return Results ------------------------------------------------------------------
   
   # Store in object
-  jags_inits <- list(
+  js_inits <- list(
     PF      = PF,
     PM      = PM,
     PhiF    = PhiF,
@@ -146,34 +146,34 @@ generate_init_js <- function(jags_data){
   )
   
   # Return Initial Values for a single chain
-  return(jags_inits)
+  return(js_inits)
   
 }
 
 # Compile Model
-compile_jolly_seber_nimble <- function(jags_data,
+compile_jolly_seber_nimble <- function(js_data,
                                        params = NULL){
   
  
   # Generating Initial Values
   cat("Generating Initial Values...", "\n")
-  nimble_inits <- generate_init_js(jags_data)
+  nimble_inits <- generate_init_js(js_data)
   
   # Construct Nimble Objects 
   cat("Organizing Data for Nimble...", "\n")
   
   nimble_js_constants <- list(
-    n      = jags_data$n,
-    k      = jags_data$k,
-    female = jags_data$female
+    n      = js_data$n,
+    k      = js_data$k,
+    female = js_data$female
   )
   
   
   nimble_js_dat <- list(
-    z       = jags_data$z,
-    recruit = jags_data$recruit,
-    a       = jags_data$a,
-    x       = jags_data$x
+    z       = js_data$z,
+    recruit = js_data$recruit,
+    a       = js_data$a,
+    x       = js_data$x
   )
   
   if(!is.null(params)){

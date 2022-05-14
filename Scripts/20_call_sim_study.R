@@ -11,15 +11,15 @@ setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_rec
 script_dir <- getwd() %+% "/Scripts/"
 dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 
-source(script_dir %+% "00_fn_sim_pair_datav2.R")
+source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
 source(script_dir %+% "12_pair_swap_mod_nimble.R")
-source(script_dir %+% "12_jolly_seber_mod_nimble.R")
+source(script_dir %+% "11_jolly_seber_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
 k = 6
-n = 100
+n = 20
 
 set.seed(42)
 # set.seed(1e4)
@@ -63,7 +63,7 @@ end <- Sys.time()
 print(start-end)
 
 start <- Sys.time()
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e4,nburnin = 5e3, thin = 1)
 end <- Sys.time()
 print(start-end)
 
@@ -103,8 +103,8 @@ jags_data$recap_f
 
 # saveRDS(samples, "long_run_332_28.rds")
 library(ggmcmc)
-samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot()# + ylim(-0.5,0.1)
-samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
+samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-1,2)
+samples2 %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() #+ ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
