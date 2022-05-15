@@ -64,7 +64,7 @@ print(start-end)
 
 # Build output list 
 js_run <- list(data        = js_data,
-               compilation = CjsMCMC_List,
+               inits       = CjsMCMC_List$nimble_inits,
                samples     = js_samples)
 
 # Store kth iter 
@@ -89,7 +89,7 @@ print(start-end)
 
 # Build output list 
 ps_run <- list(data        = ps_data,
-               compilation = CpsMCMC_List,
+               inits       = CpsMCMC_List$nimble_inits,
                samples     = ps_samples)
 
 saveRDS(ps_run, out_dir %+% "ps_run_" %+% k %+% ".rds")
