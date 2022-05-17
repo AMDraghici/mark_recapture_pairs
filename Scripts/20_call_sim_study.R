@@ -1,3 +1,5 @@
+# Load Libraries and Custom Fns
+
 library(parallel)
 library(dclone)
 library(tidyverse)
@@ -18,100 +20,115 @@ source(script_dir %+% "12_pair_swap_mod_nimble.R")
 source(script_dir %+% "11_jolly_seber_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
-k = 6
+# TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
+# Set number of occasions and animals
+k = 5
 n = 20
 
-set.seed(42)
+# Seeds for Testing
+# set.seed(42)
 # set.seed(1e4)
 # set.seed(4)
-# set.seed(1e5)
+set.seed(1e5)
+
+# Parameter Grid 
 param_list <- list(
-  n = n,
-  k = k,
-  lf = 10,
-  lm = 10,
-  prop.female = 0.5,
-  delta = rep(0.9, k),
-  phi.f = rep(0.8, k),
-  phi.m = rep(0.8, k),
-  gam = rep(0.6, k),
-  p.f = rep(0.9, k),
-  p.m = rep(0.9, k),
-  rho = rep(0.7, k),
-  betas = list(beta0 = 1.0, beta1 = 1.5),
-  rand_init = F,
-  init = sample(1, n, TRUE),
-  show_unmated = T,
-  data_aug = T
+  n            = n, # Number of Animals 
+  k            = k, # Occasions 
+  lf           = 10, # Data Augmentation for Females (M_F)
+  lm           = 10, # Data Augmentation for Males (M_M)
+  prop.female  = 0.5, # Proportion of simulated individuals to be female 
+  delta        = rep(0.9, k), # Probability that mating is attempted 
+  phi.f        = rep(0.8, k), # Marginal Prob of Female Survival
+  phi.m        = rep(0.8, k), # Marginal Prob of Male Survival
+  gam          = rep(0.2, k), # Correlation in Survival Prob of Mates
+  p.f          = rep(0.9, k), # Marginal Prob of Female Recapture
+  p.m          = rep(0.9, k), # Marginal Prob of Male Recapture 
+  rho          = rep(0.6, k), # Correlation in male survival rates 
+  betas        = list(beta0 = 90, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
+  rand_init    = F, # Randomize Initial Entry (just leave as F) 
+  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
+  show_unmated = T, # Include unmated observations in attempt to mate step
+  data_aug     = T  # Add individuals to data augmentation 
 )
 
-#7:14am
+# Generate One set of Data
+ps_data <- sim_dat(param_list) # pair-swap data
+js_data <- format_to_js(ps_data) # jolly-seber data 
 
-nimble_params <- c("PF","PM","rho","rho_raw","gamma_raw","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
-jags_data <- sim_dat(param_list)
-cjs_data <- format_to_cjs(jags_data)
-js_data <- format_to_js(jags_data)
+# Parameters of Interest for Nimble 
+nimble_params <- c("PF","PM","rho",
+                   "rho_raw","gamma_raw",
+                   "PhiF","PhiM","gamma",
+                   "delta","beta0","beta1",
+                   "eps", "gl", "gu", "ru", "rl", 
+                   "NF", "NM")
 
-DIM <- function(x){return(c(NROW(x),NCOL(x)))}
-
-x <- lapply(1:length(jags_data), function(x) DIM(jags_data[[x]]))
-names(x) <- names(jags_data)
-
+# PAIR SWAP 
+# Compile Nimble Model for Pair-Swap 
 start <- Sys.time()
-CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
+CpsMCMC_List <- compile_pair_swap_nimble(ps_data, nimble_params)
 end <- Sys.time()
 print(start-end)
 
+# Run Pair-Swap Model 
 start <- Sys.time()
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e4,nburnin = 5e3, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 end <- Sys.time()
 print(start-end)
 
+# Check Summary and Marginals (PF,PM,Phif,PhiM)
 summary(samples)
+plot_caterpillar(gather_posterior_summary(samples)) + ylim(c(0,1.0))
 
+
+# JOLLY - SEBER 
+
+# Compile nimble for Jolly-Seber Model 
 start <- Sys.time()
 CjsMCMC_List <- compile_jolly_seber_nimble(js_data)
 end <- Sys.time()
 print(start-end)
 
+# Run Jolly-Seber Model 
 start <- Sys.time()
-samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
+samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 1e5,nburnin = 1e4, thin = 10)
 end <- Sys.time()
 print(start-end)
 
 summary(samples2)
-# gather_posterior_summary(samples)
-plot_caterpillar(gather_posterior_summary(samples2))
+plot_caterpillar(gather_posterior_summary(samples2))  + ylim(c(0.5,1.0))
 
-# Need to exclude pairs that were seen apart at time t (cant be together in prob_cond)
-# Maybe keep recap of zero observations in the data and do away w/ DA for simulation
-
-
-
-samples[1000,]
-
-
-
-jags_data$recap_f
-
-
-
-
-
-
-# TRY CHANGING TO BINARY SAMPLER>>>>
-
-# saveRDS(samples, "long_run_332_28.rds")
+# Look at Traceplots and Densities
 library(ggmcmc)
-samples %>% ggs() %>% filter(Parameter %in% c("beta0","beta1")) %>% ggs_traceplot() + ylim(-1,2)
-samples2 %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
+samples %>% ggs() %>% filter(Parameter %in% c("beta0")) %>% ggs_traceplot() #+ ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() #+ ylim(0,1)
-samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:jags_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
+samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:ps_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() #+ ylim(0,1)
-samples %>% ggs() %>% filter(Parameter %in% c("v.pf","v.phif")) %>% ggs_density() #+ ylim(0,1)
-
 samples %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ ylim(0,1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# HDUCK EXPERIMENTS-----------------------------------------------------------------------------------------------------------
 
 n <- 314
 k <- 28
@@ -136,18 +153,13 @@ param_list <- list(
 )
 
 
+
+DIM <- function(x){return(c(NROW(x),NCOL(x)))}
+
+x <- lapply(1:length(jags_data), function(x) DIM(jags_data[[x]]))
+names(x) <- names(jags_data)
+
 #HDUCK Data
-# cap.data <- gather_hq_data(dat_dir) %>% 
-#   build_cr_df() %>% 
-#   populate_missing_mate_data() %>% 
-#   populate_missing_mate_data() %>%
-#   add_implied_states() %>%
-#   add_last_capture() %>% 
-#   clean_filtered() %>% 
-#   assign_ids_bysex()
-
-
-
 cap.data <- gather_hq_data(dat_dir) %>% build_cr_df() %>% populate_missing_mate_data() %>%
   populate_missing_mate_data() %>% 
   add_implied_states() %>%
@@ -180,7 +192,6 @@ cjs_data <- format_to_cjs(jags_data)
 js_data <- format_to_js(jags_data)
 
 
-generate_nimble_init_pairs(jags_data) -> nim_inits
 nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl", "NF", "NM")
 start <- Sys.time()
 CpsMCMC_List <- compile_pair_swap_nimble(jags_data, nimble_params)
@@ -296,274 +307,3 @@ names(y) <- names(jags_data2)
 #   index <- which(!is.na(jags_data$af[,t]))
 #   print(all(jags_data$sf[index,t] == jags_data$af[index,t]))
 # } 
-
-
-#SIM DATA
-
-k = 10
-n = 100
-
-#set.seed(42)
-param_list <- list(
-  n = n,
-  k = k,
-  prop.female = 0.5,#0.4652568,
-  delta = rep(0.9, k),
-  phi.f = rep(0.9, k),
-  phi.m = rep(0.9, k),
-  gam = rep(0.7, k),
-  p.f = rep(0.8, k),
-  p.m = rep(0.8, k),
-  rho = rep(0.7, k),
-  betas = list(beta0 = 1.5, beta1 = 2),
-  rand_init = F,
-  init = sample(k-1, n, TRUE)
-)
-
-# attach(param_list)
-
-# # # # # Pull individual dataset
-
-jags_data <- sim_dat(param_list)
-
-cjs_data <- format_to_cjs(jags_data)
-js_data <- format_to_js(jags_data)
-# # Multiple Datasets using parallel
-data_list <- sim_cr_dat(parameter_list = param_list, iterations =  100)
-# shuffled_list <- replicate_shuffled_data(jags_data, 4)
-# 
-
-# # Run JAGS
-#jags_data <- sim_cr_dat(parameter_list = param_list, iterations =  100)
-# 
-# ## MCMC parameters  
-par_settings <- list('n.iter' = 1e5,
-                     'n.thin' = 1,
-                     'n.burn' = 1e5/2,
-                     'n.chains' = 1,
-                    'n.adapt' = 1e5/2)
-
-# Vaillancourt 
-# ## Jags parameters and model script
-# 
-# # Run standard Model
-# # 
-jags_params <- c("pF", "pM", "phiF", "phiM", "eps")
-jags_model <- script_dir %+% "/10_js_mod_standard.R"
-
-z <- list()
-
-for(i in 1:100){
-  z[[i]] <- run_jags(jags_data = js_data,
-                jags_model  = jags_model,
-                jags_params = jags_params,
-                par_settings = par_settings,
-                debug = F)
-}
-
-
-z <- run_jags(jags_data = js_data,
-              jags_model  = jags_model,
-              jags_params = jags_params,
-              par_settings = par_settings,
-              debug = F)
-
-results <- process_simulation_data(z, param_list)
-
-results %>% group_by(Parameter) %>% summarize(coverage_50 = mean(In_50),
-                                              coverage_95 = mean(In_95),
-                                              avg_range_50 = mean(Range_50),
-                                              avg_range_95 = mean(Range_95),
-                                              avg_bias = mean(Bias),
-                                              avg_cv = mean(coef_var))
-
-
-jags_params <- c("pF", "pM", "phiF", "phiM")
-jags_model <- script_dir %+% "10_cjs_mod_standard.R"
-
-
-y <- run_jags(jags_data = cjs_data,
-              jags_model  = jags_model,
-              jags_params = jags_params,
-              par_settings = par_settings,
-              debug = F)
-
-
-jags_data$n <- NULL
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
-jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
-
-x <- run_jags(jags_data = jags_data,
-              jags_model  = jags_model,
-              jags_params = jags_params,
-              par_settings = par_settings,
-              debug = F)
-
-
-
-
-#STARTED AT 8:00pm monday
-
-jags_samples <- run_jags_parallel(cjs_data,
-                                  jags_model,
-                                  jags_params,
-                                  par_settings,
-                                  out_dir,
-                                  save = F,
-                                  outname = "T1_CJS_STD")
-
-
-# TEST DATA WITH PROGRAM MARK TO SEE RESULTS 
-# ADD FLEXIBLE INIT FOR CJS RUNS
-
-# Run Full Model + No Groups
-## MCMC parameters  
-par_settings <- list('n.iter' = 10,
-                     'n.thin' = 1,
-                     'n.burn' = 10,
-                     'n.chains' = 1,
-                     'n.adapt' = 10)
-
-
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")
-jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
-
-x <- run_jags(jags_data = jags_data,
-              jags_model  = jags_model,
-              jags_params = jags_params,
-              par_settings = par_settings,
-              debug = F)
-
-
-# jags_samples2 <- run_jags_parallel(jags_data,
-#                                    jags_model,
-#                                    jags_params,
-#                                    par_settings,
-#                                    out_dir,
-#                                    outname = "TESTING_MODEL2")
-
-# 
-# # x <- run_jags(jags_data,
-# #          jags_model,
-# #          jags_params, 
-# #          par_settings)
-# 
-gather_posterior_summary(x$jags_samples) %>%
-#add_true_values(param_list) %>% 
-plot_caterpillar(params = jags_params[c(1:7)])# +
-# geom_point(aes(x = Parameter, y = true), size = 3, alpha = 0.75, color = "darkblue")
-
-# To do
-
-## ADD RECRUITMENT LOGIC FOR SIMULATION STUDY
-
-# Update Model Code
-# - Check that the pair-swap sampling makes sense (DONE)
-# - Once pair-swap is reasonable, add histories and repartner logic (DONE) 
-# - Then make sure Hduck data is generated correctly (DONE)
-# - If simulation is reasonable look at 
-# - Data Augementation -> need enough spots for all birds (double check when doing model code) +
-#  - -> sometimes birds observed with unseen mate (MEET w/ Simon to Discuss)
-# - Speedup by optimizing code
-# - Speedup by NIMBLIZING Code
-# - Write base R code to generate simulation study datasets
-# - Write code to sample iteratively for simulation study (MEET w/ Simon First to Discuss)
-# - Code up many time step option (maybe not needed for this study)?
-
-# To do in a while
-# Choose good parameters for simulation study + objective 
-# Deploy simulation study to sharcnet 
-# Write code to build statistics highlighting key aspects of the study
-# Once code is fast enough and tested run hduck data through sharcnet 
-# Maybe do the chat (or  log-likelihood) thing from chapter 1 to suggest correlation exists (do it after running hduck)
-# Pull together results
-# Write 
-
-
-
-# REPARTNER PROCESS and AREPARTNER PROCESS NEED TO BE FIXED (DONE!)
-# NIMBLE WONT COMPILE...EIGENVALUE ERRORS 
-# JAGS RUNS GREAT
-# LARGE DATASETS MAY BE A PROBLEM
-
-# TO DO
-# 1. NEED CODE REVIEW FROM SIMON AFTER I DOCUMENT ALL THE STEPS
-# 2. DO THE HDUCK CONVERSION 
-
-#k=10,n=100, beta = 3, 12k iter + 2 cores = 70 hours
-
-
-#SIM DATA
-
-k = 5
-n = 50
-
-param_list <- list(
-  n = n,
-  k = k,
-  prop.female = 0.5,
-  delta = rep(0.9, k),
-  phi.f = rep(0.8, k),
-  phi.m = rep(0.8, k),
-  gam = rep(0.6, k),
-  p.f = rep(0.75, k),
-  p.m = rep(0.75, k),
-  rho = rep(0.6, k),
-  betas = list(beta0 = 1.0, beta1 = 1.5),
-  rand_sex = F,
-  rand_init = F,
-  init  = rep(1,n)# sample(k-1, n, TRUE)
-)
-
-par_settings <- list('n.iter' = 1e2, 
-                     'n.thin' = 10,
-                     'n.burn' = 1e2,
-                     'n.chains' = 1,
-                     'n.adapt' = 1e2)
-
-jags_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps")# "psi_raw", "psi_cond", "psi_cond2", "male_taken_jt")
-jags_model <- script_dir %+% "/11_mod_pair_swap_notime.R"
-jags_data <- sim_dat(param_list)
-
-
-x <- run_jags(jags_data = jags_data,
-              jags_model  = jags_model,
-              jags_params = jags_params,
-              par_settings = par_settings,
-              debug = F)
-
-
-jags_data_list <- replicate_shuffled_data(jags_data, 100)
-jags_data_list <- sim_cr_dat(param_list, iterations = 100, ncores = 5)
-
-saveRDS(jags_data_list, out_dir %+% "jags_data_list_rep_study.rds")
-
-x <- run_jags_simulation_parallel(jags_data_list = jags_data_list,
-                                  jags_model  = jags_model,
-                                  jags_params = jags_params,
-                                  par_settings = par_settings,
-                                  out_dir = out_dir,
-                                  outname = "test",
-                                  save = F,
-                                  ncores = 6)
-
-
-
-post_summary <- extract_sim_posterior(samples)
-
-plot_sim_caterpillar(posterior_summary = post_summary,
-                     parameter_name = "gamma",
-                     slope = 0,
-                     intercept = param_list$gam[1])
-
-
-plot_sim_caterpillar(posterior_summary = post_summary,
-                     parameter_name = "rho",
-                     slope = 0,
-                     intercept = param_list$rho[1])
-
-plot_sim_caterpillar(posterior_summary = post_summary,
-                     parameter_name = "PhiF",
-                     slope = 0,
-                     intercept = param_list$phi.f[1])
-

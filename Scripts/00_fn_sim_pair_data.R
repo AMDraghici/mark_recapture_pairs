@@ -1482,6 +1482,12 @@ simulate_cr_data <- function(n,
     }
   }
   
+  if(!data_aug){
+    lf <- 0
+    lm <- 0
+  } 
+  
+  
   # Generate SKeleton Data Structures
   sex <- construct_sexes(n = n, prop.female = prop.female)
   initial_entry <- construct_init_entry(n = n, k = k, random = rand_init, init = init) 
@@ -1745,6 +1751,7 @@ simulate_cr_data <- function(n,
                        ncol =ncol(apairs_f)), # Information lives in psi (nimble doesnt accept MV mixed with NA)
     apairs_m = apairs_m[1:nm, 1:k],
     arepartner = arepartner[,2:k], # repartner with inferred states 
+    na_repartner = 1*is.na(arepartner[,2:k]),
     amating_f = amating_f[1:nf,1:k], # Mating Status Females at T
     amating_m = amating_m[1:nm,1:k],  # Mating Status Males at T
     recap_f = recap_f[1:nf,1:k], # Observed Recapture of Females
