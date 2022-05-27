@@ -16,20 +16,23 @@ dat_dir <- getwd() %+% "/Data/RE__Harlequin_duck_data/"
 source(script_dir %+% "00_fn_sim_pair_data.R")
 source(script_dir %+% "01_fn_model_code.R")
 source(script_dir %+% "02_fn_process_hduck_data.R")
-source(script_dir %+% "12_pair_swap_mod_nimble.R")
+# source(script_dir %+% "12_pair_swap_mod_nimble.R")
 source(script_dir %+% "11_jolly_seber_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
+
+# ps1 <- new.env()
+source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
 k = 5
-n = 20
+n = 100
 
 # Seeds for Testing
 # set.seed(42)
-# set.seed(1e4)
+set.seed(1e4)
 # set.seed(4)
-set.seed(1e5)
+# set.seed(1e5)
 
 # Parameter Grid 
 param_list <- list(
@@ -41,10 +44,10 @@ param_list <- list(
   delta        = rep(0.9, k), # Probability that mating is attempted 
   phi.f        = rep(0.8, k), # Marginal Prob of Female Survival
   phi.m        = rep(0.8, k), # Marginal Prob of Male Survival
-  gam          = rep(0.2, k), # Correlation in Survival Prob of Mates
+  gam          = rep(0, k), # Correlation in Survival Prob of Mates
   p.f          = rep(0.9, k), # Marginal Prob of Female Recapture
   p.m          = rep(0.9, k), # Marginal Prob of Male Recapture 
-  rho          = rep(0.6, k), # Correlation in male survival rates 
+  rho          = rep(0, k), # Correlation in male survival rates 
   betas        = list(beta0 = 90, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F) 
   init         = sample(1, n, TRUE), # Initial Entry into population for individual n
@@ -56,11 +59,15 @@ param_list <- list(
 ps_data <- sim_dat(param_list) # pair-swap data
 js_data <- format_to_js(ps_data) # jolly-seber data 
 
+
+
+
 # Parameters of Interest for Nimble 
 nimble_params <- c("PF","PM","rho",
                    "rho_raw","gamma_raw",
                    "PhiF","PhiM","gamma",
-                   "delta","beta0","beta1",
+                   "delta",
+                   #"beta0","beta1",
                    "eps", "gl", "gu", "ru", "rl", 
                    "NF", "NM")
 
@@ -73,7 +80,7 @@ print(start-end)
 
 # Run Pair-Swap Model 
 start <- Sys.time()
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 5000,nburnin = 1, thin = 1)
 end <- Sys.time()
 print(start-end)
 
@@ -92,17 +99,17 @@ print(start-end)
 
 # Run Jolly-Seber Model 
 start <- Sys.time()
-samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 1e5,nburnin = 1e4, thin = 10)
+samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 5000,nburnin = 1, thin = 1)
 end <- Sys.time()
 print(start-end)
 
 summary(samples2)
-plot_caterpillar(gather_posterior_summary(samples2))  + ylim(c(0.5,1.0))
+plot_caterpillar(gather_posterior_summary(samples2))  + ylim(c(0.0,1.0))
 
 # Look at Traceplots and Densities
 library(ggmcmc)
 samples %>% ggs() %>% filter(Parameter %in% c("beta0")) %>% ggs_traceplot() #+ ylim(0,1)
-samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
+samples2 %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() #+ ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:ps_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
