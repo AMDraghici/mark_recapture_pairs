@@ -21,16 +21,17 @@ source(script_dir %+% "11_jolly_seber_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
 # ps1 <- new.env()
-source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
+# source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
+source(script_dir %+% "14_pair_swap_mod_nimble_norepartner_no_corr.R")
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
-k = 5
+k = 8
 n = 100
 
 # Seeds for Testing
-# set.seed(42)
-set.seed(1e4)
+set.seed(42)
+# set.seed(1e4)
 # set.seed(4)
 # set.seed(1e5)
 
@@ -59,9 +60,6 @@ param_list <- list(
 ps_data <- sim_dat(param_list) # pair-swap data
 js_data <- format_to_js(ps_data) # jolly-seber data 
 
-
-
-
 # Parameters of Interest for Nimble 
 nimble_params <- c("PF","PM","rho",
                    "rho_raw","gamma_raw",
@@ -80,7 +78,7 @@ print(start-end)
 
 # Run Pair-Swap Model 
 start <- Sys.time()
-samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 5000,nburnin = 1, thin = 1)
+samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 end <- Sys.time()
 print(start-end)
 
@@ -99,7 +97,7 @@ print(start-end)
 
 # Run Jolly-Seber Model 
 start <- Sys.time()
-samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 5000,nburnin = 1, thin = 1)
+samples2 <- run_nimble(CjsMCMC_List$CjsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 end <- Sys.time()
 print(start-end)
 
@@ -108,13 +106,16 @@ plot_caterpillar(gather_posterior_summary(samples2))  + ylim(c(0.0,1.0))
 
 # Look at Traceplots and Densities
 library(ggmcmc)
-samples %>% ggs() %>% filter(Parameter %in% c("beta0")) %>% ggs_traceplot() #+ ylim(0,1)
-samples2 %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot()#+ ylim(0.01,0.99)
+samples %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() #+ ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("delta")) %>% ggs_traceplot() #+ ylim(0,1)
-samples %>% ggs() %>% filter(Parameter %in% c("eps[" %+% 1:ps_data$k %+% "]")) %>% ggs_traceplot() + ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma","rho")) %>% ggs_traceplot() #+ ylim(-1,1)
 samples %>% ggs() %>% filter(Parameter %in% c("gamma_raw","rho_raw")) %>% ggs_traceplot() #+ ylim(0,1)
 samples %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ ylim(0,1)
+
+samples2 %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() #+ ylim(0,1)
+samples2 %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ ylim(0,1)
+
+
 
 
 

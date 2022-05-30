@@ -229,13 +229,13 @@ compute_pr_repartner <- nimbleFunction(
                  na_repartner = double(1),
                  nf = integer(0),
                  nm = integer(0)){
-
+    
     returnType(double(1))
-
+    
     out <- rep(0,nf)
-
+    
     for(i in 1:nf){
-
+      
       if(former_pairs_f[i]>=(nm+1)){
         out[i] <- 0
       } else if(sum(psi_uncond[i,1:nm]) == 1.0 & psi_uncond[i,former_pairs_f[i]] == 1.0 & na_repartner[i] == 1.0){
@@ -246,7 +246,7 @@ compute_pr_repartner <- nimbleFunction(
           psi_uncond[i,former_pairs_f[i]] * mating_f[i] * mating_m[former_pairs_f[i]]
       }
     }
-
+    
     return(out)
   }
 )
@@ -438,8 +438,8 @@ nimble_ps_model <- nimbleCode({
       # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
         psi_cond[i, j, t] <- psi[i,j,t] * amating_f[i,t] * amating_m[j,t] #*
-                                # (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) +
-                                # arepartner[i,t-1] * equals(apairs_f[i,t-1],j)) 
+        # (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) +
+        # arepartner[i,t-1] * equals(apairs_f[i,t-1],j)) 
       }
     }
     
@@ -494,7 +494,7 @@ nimble_ps_model <- nimbleCode({
     for(j in 1:nm){
       recap_m[j,t] ~ dbern(PM * am[j,t] * recruit_m[j,t] * zm[j])
     }
-     
+    
     # recap_m[1:nm,t] ~ dmvbern(PM * am[1:nm,t] * recruit_m[1:nm,t] * zm[1:nm])
     
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
@@ -549,7 +549,7 @@ nimble_ps_model <- nimbleCode({
   sig.PhiM <- sqrt(PhiM*(1-PhiM))
   
   ##Correlation (with FH bounds)
-  gamma <- (gu - gl)*gamma_raw + gl 
+  gamma <- 0#(gu - gl)*gamma_raw + gl 
   gamma_raw ~ dbeta(1,1)
   
   # Bounds for Correlation
@@ -596,7 +596,7 @@ nimble_ps_model <- nimbleCode({
   sig.PM <- sqrt(PM*(1-PM))
   
   ##Correlation using four parameter beta (with FH bounds)
-  rho <- (ru - rl)*rho_raw + rl 
+  rho <- 0#(ru - rl)*rho_raw + rl 
   rho_raw ~ dbeta(1,1)
   
   # Bounds for Correlation
