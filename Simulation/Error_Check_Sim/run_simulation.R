@@ -16,7 +16,9 @@ script_dir <- proj_dir %+% "/Scripts/"
 source(script_dir   %+% "00_fn_sim_pair_data.R")
 source(script_dir   %+% "01_fn_model_code.R")
 source(script_dir   %+% "11_jolly_seber_mod_nimble.R")
-source(script_dir   %+% "12_pair_swap_mod_nimble.R")
+# source(script_dir   %+% "12_pair_swap_mod_nimble.R")
+source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
+# source(script_dir %+% "14_pair_swap_mod_nimble_norepartner_no_corr.R")
 out_dir <- proj_dir %+% "/Simulation/Output/"
 
 ## Options (ECHO FOR LOGS)

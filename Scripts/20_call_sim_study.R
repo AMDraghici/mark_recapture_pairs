@@ -21,8 +21,8 @@ source(script_dir %+% "11_jolly_seber_mod_nimble.R")
 out_dir <- getwd() %+% "/Output/"
 
 # ps1 <- new.env()
-# source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
-source(script_dir %+% "14_pair_swap_mod_nimble_norepartner_no_corr.R")
+source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
+# source(script_dir %+% "14_pair_swap_mod_nimble_norepartner_no_corr.R")
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
@@ -30,8 +30,8 @@ k = 8
 n = 100
 
 # Seeds for Testing
-set.seed(42)
-# set.seed(1e4)
+# set.seed(42)
+set.seed(1e4)
 # set.seed(4)
 # set.seed(1e5)
 
@@ -76,8 +76,7 @@ CpsMCMC_List <- compile_pair_swap_nimble(ps_data, nimble_params)
 end <- Sys.time()
 print(start-end)
 
-# Run Pair-Swap Model 
-start <- Sys.time()
+# Run Pair-Swap Model start <- Sys.time()
 samples <- run_nimble(CpsMCMC_List$CpsMCMC,niter = 1e5,nburnin = 5e4, thin = 1)
 end <- Sys.time()
 print(start-end)
@@ -115,6 +114,10 @@ samples %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ ylim
 samples2 %>% ggs() %>% filter(Parameter %in% c("PhiF","PhiM","PF","PM")) %>% ggs_traceplot() #+ ylim(0,1)
 samples2 %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ ylim(0,1)
 
+saveRDS(samples, "pair_swap_run_no_repartner.rds")
+saveRDS(samples2, "jolly_seber_run_no_repartner.rds")
+saveRDS(ps_data, "pair_swap_data.rds")
+saveRDS(js_data, "jolly_seber_data.rds")
 
 
 
@@ -122,7 +125,13 @@ samples2 %>% ggs() %>% filter(Parameter %in% c("xi")) %>% ggs_traceplot() #+ yli
 
 
 
+samples <- readRDS("pair_swap_run_no_repartner.rds")
+samples2 <- readRDS("jolly_seber_run_no_repartner.rds")
 
+samples_nc <- readRDS("pair_swap_run_no_repartner_no_corr.rds")
+samples2_nc <- readRDS("jolly_seber_run_no_repartner_no_corr.rds")
+ps_data <- readRDS("pair_swap_data.rds")
+js_data <- readRDS("jolly_seber_data.rds")
 
 
 
