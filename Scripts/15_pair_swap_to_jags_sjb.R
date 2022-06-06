@@ -497,22 +497,22 @@ nimble_ps_model <- nimbleCode({
     
     # recap_m[1:nm,t] ~ dmvbern(PM * am[1:nm,t] * recruit_m[1:nm,t] * zm[1:nm])
     
-    # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
-    p.totalF[1:nf,t] <- compute_prob_condF(single_female[1:nf,t],
-                                           recap_m[1:nm,t],
-                                           apairs_f[1:nf,t],
-                                           PF,
-                                           PM,
-                                           Pfm,
-                                           Pf0,
-                                           nf,
-                                           nm)
-    
-    
     # Draw Recapture Probability
     for(i in 1:nf){
-      recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t] * recruit_f[i,t] * zf[i])
+      recap_f[i, t] ~ dbern(PF[i,t] * af[i,t] * recruit_f[i,t] * zf[i])
     }
+
+    # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
+    ## p.totalF[1:nf,t] <- compute_prob_condF(single_female[1:nf,t],
+    ##                                        recap_m[1:nm,t],
+    ##                                        apairs_f[1:nf,t],
+    ##                                        PF,
+    ##                                        PM,
+    ##                                        Pfm,
+    ##                                        Pf0,
+    ##                                        nf,
+    ##                                        nm)
+    
     
     # recap_f[1:nf, t] ~ dmvbern(p.totalF[1:nf,t] * af[1:nf,t] * recruit_f[1:nf,t] * zf[1:nf])
   }
