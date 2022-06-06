@@ -281,6 +281,39 @@ compute_prob_condF <- nimbleFunction(
 
 # Custom Sampler for dpaircat 
 # Variation on categorical sampler and MH Proposal 
+# sampler_pairs <- nimbleFunction(
+#   name = 'sampler_pairs',
+#   contains = sampler_BASE,
+#   setup = function(model, mvSaved, target, control) {
+#     ## node list generation
+#     targetAsScalar <- model$expandNodeNames(target, returnScalarComponents = TRUE)
+#     calcNodes <- model$getDependencies(target)
+#     calcNodesNoSelf <- model$getDependencies(target, self = FALSE)
+#     isStochCalcNodesNoSelf <- model$isStoch(calcNodesNoSelf)
+#     calcNodesNoSelfDeterm <- calcNodesNoSelf[!isStochCalcNodesNoSelf]
+#     calcNodesNoSelfStoch <- calcNodesNoSelf[isStochCalcNodesNoSelf]
+#     # Vars
+#     nf <- model$getParam(target, 'nf')
+#     nm <- model$getParam(target, 'nm')
+#     amating_m <- model$getParam(target, 'mating_m')
+#     amating_f <- model$getParam(target, 'mating_f')
+#     psi_cond_t <- model$getParam(target, 'available_mates')
+#     ## checks
+#     if(model$getDistribution(target) != 'dpaircat') stop('can only use pair categorical sampler on node with dpaircat distribution')
+#   },
+#   run = function() {
+#     # Simulate new partners
+#     model[[target]] <<- rpaircat(1,psi_cond_t, amating_f, amating_m, nf, nm) # accept target 
+#     model$calculate(calcNodes) # calculate logprobs 
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+#   },
+#   methods = list(
+#     reset = function() { }
+#   )
+# )
+
 sampler_pairs <- nimbleFunction(
   name = 'sampler_pairs',
   contains = sampler_BASE,
@@ -298,16 +331,36 @@ sampler_pairs <- nimbleFunction(
     amating_m <- model$getParam(target, 'mating_m')
     amating_f <- model$getParam(target, 'mating_f')
     psi_cond_t <- model$getParam(target, 'available_mates')
+    logProbs <- numeric(2)
     ## checks
     if(model$getDistribution(target) != 'dpaircat') stop('can only use pair categorical sampler on node with dpaircat distribution')
   },
   run = function() {
+    current_pairs <- model[[target]]
+    logProbs[1] <<- model$getLogProb(calcNodes)
+    if(is.nan(logProbs[1])) logProbs[1] <<- -Inf
     # Simulate new partners
     model[[target]] <<- rpaircat(1,psi_cond_t, amating_f, amating_m, nf, nm) # accept target 
-    model$calculate(calcNodes) # calculate logprobs 
-    nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
-    nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-    nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    logProbs[2] <<- model$calculate(calcNodes) # calculate logprobs 
+    if(is.nan(logProbs[2])) logProbs[2] <<- -Inf
+    
+    logProbs <<- logProbs - max(logProbs)
+    probs <<- exp(logProbs)
+    jump <- rcat(1, probs)
+    
+    if(jump == 2) {
+      model$calculate(calcNodes)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    } else {
+      model[[target]] <<- current_pairs
+      model$calculate(calcNodes)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = target, logProb = TRUE)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    }
+    
   },
   methods = list(
     reset = function() { }
