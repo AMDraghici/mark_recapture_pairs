@@ -10,7 +10,7 @@ nimble_js_model <- nimbleCode({
   
   ## Compute population size
   N <- sum(z[1:n])
-  NF <- innerprod(z[1:n],female[1:n])
+  NF <- inprod(z[1:n],female[1:n])
   NM <- N - NF
   
   # Recruit Likelihood -------------------------------------------------------------------------------
