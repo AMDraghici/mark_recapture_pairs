@@ -10,6 +10,8 @@ nimble_js_model <- nimbleCode({
   
   ## Compute population size
   N <- sum(z[1:n])
+  NF <- innerprod(z[1:n],female[1:n])
+  NM <- N - NF
   
   # Recruit Likelihood -------------------------------------------------------------------------------
   for(i in 1:n){
@@ -184,7 +186,7 @@ compile_jolly_seber_nimble <- function(js_data,
     nimble_params <- params
   } else {
     cat("Params argument is NULL...","\n")
-    nimble_params <- c("PF","PM","PhiF","PhiM", "eps","xi")
+    nimble_params <- c("NF","NM","PF","PM","PhiF","PhiM", "eps","xi")
     cat("Using params := ", "\n")
     cat(nimble_params, "\n")
   }
