@@ -470,7 +470,7 @@ nimble_ps_model <- nimbleCode({
     
     # Draw conditional Survival Event
     for(i in 1:nf){
-      af[i, t] ~ dbern(PhiF[i,t-1] * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
+      af[i, t] ~ dbern(PhiF * af[i,t-1] * recruit_f[i,t] + (1-recruit_f[i,t]))
     }
     
     ## # Marginal Recapture Event for Females in the Population (P[X^F_T|X^M_T]) given males 
@@ -499,7 +499,7 @@ nimble_ps_model <- nimbleCode({
     
     # Draw Recapture Probability
     for(i in 1:nf){
-      recap_f[i, t] ~ dbern(PF[i,t] * af[i,t] * recruit_f[i,t] * zf[i])
+      recap_f[i, t] ~ dbern(PF * af[i,t] * recruit_f[i,t] * zf[i])
     }
 
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
