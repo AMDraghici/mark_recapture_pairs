@@ -1190,8 +1190,6 @@ run_nimble <- function(CmdlMCMC,
                      setSeed = seed,
                      samplesAsCodaMCMC = TRUE)
   
-  cat("Converting to CODA samples...","\n")
-  coda.samples <- as.mcmc(samples)
   cat("Returning Output...","\n")
-  return(coda.samples)
+  return(samples)
 }
