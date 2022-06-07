@@ -1178,13 +1178,15 @@ run_nimble <- function(CmdlMCMC,
                        niter,
                        nburnin,
                        thin,
+                       nchains = 3,
                        seed = F){
   
   cat("MCMC Sampling from Model...","\n")
   samples <- runMCMC(CmdlMCMC,
                      niter = niter,
                      nburnin = nburnin, 
-                     thin = thin, 
+                     thin = thin,
+                     nchains = nchains,
                      setSeed = seed,
                      samplesAsCodaMCMC = TRUE)
   
