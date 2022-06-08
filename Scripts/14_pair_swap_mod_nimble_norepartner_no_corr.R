@@ -1178,6 +1178,7 @@ run_nimble <- function(CmdlMCMC,
                        niter,
                        nburnin,
                        thin,
+                       inits = NULL,
                        nchains=3,
                        seed = F){
   
@@ -1186,6 +1187,7 @@ run_nimble <- function(CmdlMCMC,
                      niter = niter,
                      nburnin = nburnin, 
                      thin = thin,
+                     inits = inits,
                      nchains = nchains,
                      setSeed = seed,
                      samplesAsCodaMCMC = TRUE)
