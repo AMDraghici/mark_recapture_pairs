@@ -245,18 +245,20 @@ run_nimble <- function(CmdlMCMC,
                        niter,
                        nburnin,
                        thin,
+                       inits = NULL,
+                       nchains=3,
                        seed = F){
   
   cat("MCMC Sampling from Model...","\n")
   samples <- runMCMC(CmdlMCMC,
-                     niter             = niter,
-                     nburnin           = nburnin, 
-                     thin              = thin, 
-                     setSeed           = seed,
+                     niter = niter,
+                     nburnin = nburnin, 
+                     thin = thin,
+                     inits = inits,
+                     nchains = nchains,
+                     setSeed = seed,
                      samplesAsCodaMCMC = TRUE)
   
-  cat("Converting to CODA samples...","\n")
-  coda.samples <- as.mcmc(samples)
   cat("Returning Output...","\n")
-  return(coda.samples)
+  return(samples)
 }
