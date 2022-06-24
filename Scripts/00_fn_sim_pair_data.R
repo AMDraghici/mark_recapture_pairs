@@ -720,14 +720,9 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
       sf[i,time] <- 1
     }
     
-    if(phi.m[time]==0){
+    if(phi.m[time]==0|phi.m[time]==1){
       # Conditional Probability of survival given pair status
-      prob_cond_f <- single_check * phi.f[time] + 
-        (1-single_check) * (joint_surv_pmf$prob.f0/(1-phi.m[time]))
-    } else if(phi.m[time]==1){
-      # Conditional Probability of survival given pair status
-      prob_cond_f <- single_check * phi.f[time] + 
-        (1-single_check) * (joint_surv_pmf$prob.mf/phi.m[time])
+      prob_cond_f <- phi.f[time]
     } else {
       # Conditional Probability of survival given pair status
       prob_cond_f <- single_check * phi.f[time] + 
@@ -1312,9 +1307,9 @@ simulate_recapture <- function(recap_f,
       
       # Find partner info
       j <- pairs_f[i, t]
-      single_check <- (j == (nm + 1))
+      single_check <- 1*(j == (nm + 1))
       
-      if(single_check|p.m[t]==0|p.m[t]==1){
+      if(single_check==1|p.m[t]==0|p.m[t]==1){
         recap_prob_cond_f <- p.f[t]
       } else {
         
@@ -1842,7 +1837,7 @@ simulate_cr_data <- function(n,
     true_pop_m     = true_pop_m,
     sample_size_f  = sample_size_f,
     sample_size_m  = sample_size_m,
-    k              = k, # Number of occasions
+    k              = k,  # Number of occasions
     nf             = nf, # Number of females
     nm             = nm, # Number of males
     sex            = sex, # Sex of sampled individuals
@@ -1865,8 +1860,8 @@ simulate_cr_data <- function(n,
     recruit_f      = recruit_f[1:nf,1:k], 
     recruit_m      = recruit_m[1:nm,1:k],
     psi            = psi, # Pairs that may exist (not excluded due to already formed pairs)
-    af             = af[1:nf,1:k],  # Female Survival with missing values
-    am             = am[1:nm,1:k],  # Male Survival with missing values
+    af             = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
+    am             = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
     apairs         = apairs, # Joint Pairs Matrices (array across time)
     apf            = apairs_f,
     apairs_f       = matrix(NA, nrow=nrow(apairs_f), 
@@ -1874,10 +1869,10 @@ simulate_cr_data <- function(n,
     apairs_m       = apairs_m[1:nm, 1:k],
     arepartner     = arepartner[,2:k], # repartner with inferred states 
     na_repartner   = 1*is.na(arepartner[,2:k]),
-    amating_f      = amating_f[1:nf,1:k], # Mating Status Females at T
-    amating_m      = amating_m[1:nm,1:k],  # Mating Status Males at T
-    recap_f        = recap_f[1:nf,1:k], # Observed Recapture of Females
-    recap_m        = recap_m[1:nm,1:k] # Observed Recapture of Males
+    amating_f      = rbind(amating_f[1:nf,1:k],rep(0,k)), # Mating Status Females at T
+    amating_m      = rbind(amating_m[1:nm,1:k],rep(0,k)),  # Mating Status Males at T
+    recap_f        = rbind(recap_f[1:nf,1:k],rep(0,k)), #recap_f[1:nf,1:k], # Observed Recapture of Females
+    recap_m        = rbind(recap_m[1:nm,1:k],rep(0,k))  # Observed Recapture of Males
   )
   
   #Return Model object

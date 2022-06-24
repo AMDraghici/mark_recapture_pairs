@@ -299,6 +299,7 @@ sampler_pairs <- nimbleFunction(
     amating_f <- model$getParam(target, 'mating_f')
     psi_cond_t <- model$getParam(target, 'available_mates')
     logProbs <- numeric(2)
+    probs <- numeric(2)
     ## checks
     if(model$getDistribution(target) != 'dpaircat') stop('can only use pair categorical sampler on node with dpaircat distribution')
   },

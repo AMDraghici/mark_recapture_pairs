@@ -16,8 +16,8 @@ script_dir <- proj_dir %+% "/Scripts/"
 source(script_dir   %+% "00_fn_sim_pair_data.R")
 source(script_dir   %+% "01_fn_model_code.R")
 source(script_dir   %+% "11_jolly_seber_mod_nimble.R")
-# source(script_dir   %+% "12_pair_swap_mod_nimble.R")
-source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
+source(script_dir   %+% "13_pair_swap_mod_nimble.R")
+# source(script_dir %+% "13_pair_swap_mod_nimble_norepartner.R")
 # source(script_dir %+% "14_pair_swap_mod_nimble_norepartner_no_corr.R")
 out_dir <- proj_dir %+% "/Simulation/Output/"
 
@@ -44,6 +44,12 @@ saveRDS(parameter_list, out_dir %+% "parameter_list_" %+% k %+% ".rds")
 ps_data <- sim_dat(parameter_list)
 js_data <- format_to_js(ps_data)
 
+niter   <- 1e4
+nburnin <- 5e3
+thin    <- 10
+nchains <- 5
+
+
 # RUN MODELS ---------------------------------------------------------------------------------------------------------------
 
 # Jolly-Seber MODEL --------------------------------------------------------------------------------------------------------
@@ -57,23 +63,27 @@ print(start-end)
 
 # RUN MODEL AND STORE RESULTS
 start <- Sys.time()
+inits_js <- lapply(1:nchains, function(i) generate_init_js(js_data))
 js_samples <- run_nimble(CmdlMCMC = CjsMCMC_List$CjsMCMC,
-                         niter    = 1e5,
-                         nburnin  = 5e4,
-                         thin     = 10)
+                         niter    = niter,
+                         nburnin  = nburnin,
+                         thin     = thin,
+                         inits    = inits_js,
+                         nchains  = nchains)
 end <- Sys.time()
 print(start-end)
 
 # Build output list 
 js_run <- list(data        = js_data,
-               inits       = CjsMCMC_List$nimble_inits,
+               inits1      = CjsMCMC_List$nimble_inits,
+               inits2      = inits_js,
                samples     = js_samples)
 
 # Store kth iter 
 saveRDS(js_run, out_dir %+% "js_run_" %+% k %+% ".rds")
 
 # RUN 3 PAIR-SWAP JS MODEL -------------------------------------------------------------------------------------------------
-ps_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0","beta1", "eps", "gl", "gu", "ru", "rl","NF","NM","xi")
+ps_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta","beta0", "eps", "gl", "gu", "ru", "rl","NF","NM","xi")
 
 start <- Sys.time()
 CpsMCMC_List <- compile_pair_swap_nimble(ps_data = ps_data, params = ps_params)
@@ -82,16 +92,20 @@ print(start-end)
 
 # RUN MODEL AND STORE RESULTS
 start <- Sys.time()
+inits_ps <- lapply(1:nchains, function(i) generate_nimble_init_pairs(ps_data))
 ps_samples <- run_nimble(CmdlMCMC = CpsMCMC_List$CpsMCMC,
-                         niter    = 1e5,
-                         nburnin  = 5e4, 
-                         thin     = 10)
+                         niter    = niter,
+                         nburnin  = nburnin,
+                         thin     = thin,
+                         inits    = inits_ps,
+                         nchains  = nchains)
 end <- Sys.time()
 print(start-end)
 
 # Build output list 
 ps_run <- list(data        = ps_data,
-               inits       = CpsMCMC_List$nimble_inits,
+               inits1      = CpsMCMC_List$nimble_inits,
+               inits2      = inits_ps, 
                samples     = ps_samples)
 
 saveRDS(ps_run, out_dir %+% "ps_run_" %+% k %+% ".rds")
