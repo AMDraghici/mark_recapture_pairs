@@ -25,7 +25,7 @@ nimble_js_model <- nimbleCode({
   for(t in 2:k){
     for(i in 1:n){
       ## 1) Survival
-      a[i,t] ~ dbern(phi[i] * a[i,t-1] * recruit[i,t]+ (1 - recruit[i,t]))
+      a[i,t] ~ dbern(phi[i] * a[i,t-1] * recruit[i,t-1]+ (1 - recruit[i,t-1]))
     }
   }
   
@@ -106,7 +106,7 @@ generate_init_js <- function(js_data){
     phi <- PhiF * sexF + PhiM * (1-sexF) 
     for(t in 2:k){
       if(is.na(a[i, t])){
-        a[i, t] <- rbinom(1, 1, phi * a[i, t-1] * recruit[i,t] + (1-recruit[i,t]))
+        a[i, t] <- rbinom(1, 1, phi * a[i, t-1] * recruit[i,t-1] + (1-recruit[i,t-1]))
       }
     }
   }

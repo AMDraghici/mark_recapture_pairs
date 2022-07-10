@@ -41,8 +41,8 @@ generalized_dtbeta <- function(x, par1, par2, b, a, lb, ub){
   
 }
 
-par1 <- 10
-par2 <- 10
+par1 <- 2
+par2 <- 2
 b <- 1
 a <- -1
 lb <- -0.09615 #-1/9 
@@ -51,7 +51,7 @@ x <- seq(-1,1,0.001)
 
 
 plot((generalized_dtbeta(x,par1,par2,b,a, lb, ub)), x = x, type = "l", col = "red", lty = 2)
-lines((generalized_dtbeta(x,par1 = 3,par2 = 3,b,a, lb, ub)), x = x, type = "l", col = "blue", lty = 2)
+lines((generalized_dtbeta(x,par1 = 10,par2 = 10,b,a, lb, ub)), x = x, type = "l", col = "blue", lty = 2)
 
 
 lines((generalized_dbeta(x,par1,par2,b,a)), x = x, type = "l")
