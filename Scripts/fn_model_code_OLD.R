@@ -920,54 +920,127 @@ run_simulation <- function(grid_data,
 # 4. Investigate Results for a Single Run (live data for example)-------------------------------------------------------------------
 
 # Grab Summary statistics 
-gather_posterior_summary <- function(fit){
+# gather_posterior_summary <- function(fit){
+#   
+#   # Summarize Results
+#   summ <- summary(fit)
+#   
+#   # Put results into dataframe
+#   summ_stats <- as.data.frame(summ$statistics) %>% rownames_to_column(var = "Parameter")
+#   summ_quant <- as.data.frame(summ$quantiles) %>% rownames_to_column(var = "Parameter")
+#   post_stats <- inner_join(summ_stats, summ_quant, by = "Parameter") %>% 
+#     mutate(Parameter_Name = gsub("[[]","",gsub("[[0-9]]+","",inner_join(summ_stats, summ_quant, by = "Parameter")$Parameter))) # add unique par name
+#   
+#   # Return Results
+#   return(post_stats)
+# }
+# 
+# add_true_values <- function(post, param_list){
+#   
+#   true_vals <- c(param_list$p.f[1],
+#                  param_list$p.m[1],
+#                  param_list$phi.f[1],
+#                  param_list$phi.m[1],
+#                  param_list$delta[1],
+#                  # param_list$betas$beta0[1],
+#                  #param_list$betas$beta1[1],
+#                  c(1,rep(0,param_list$k-1)),
+#                  param_list$rho[1],
+#                  param_list$gam[1]
+#   )
+#   
+#   true_names <- c("PF","PM","PhiF","PhiM","delta",
+#                   "eps[" %+% 1:param_list$k %+% "]","rho","gamma")
+#   
+#   true_df <- data.frame("Parameter" = true_names, "true" = true_vals)
+#   
+#   # Join values together
+#   post2 <- post %>% inner_join(true_df, by = "Parameter")
+#   return(post2)
+# }
+# 
+# # Create Caterpillar Plot of Estimates
+# plot_caterpillar <- function(post_stats, 
+#                              params = c("PhiF","PhiM", "PF","PM"), 
+#                              yrange = NULL, 
+#                              title = "Caterpillar Plot of Posterior Estimates"
+# ){
+#   p1 <- post_stats %>% 
+#     filter(Parameter_Name %in% params) %>% 
+#     mutate(Parameter = fct_reorder(Parameter,Mean)) %>% 
+#     ggplot() + 
+#     geom_linerange(aes(x = Parameter, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
+#     geom_linerange(aes(x = Parameter, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
+#     geom_point(aes(x = Parameter, y = Mean), size = 5, alpha = 0.75, color = "lightblue") +
+#     labs(x = "Parameter", y = "Posterior Values", title = title) +
+#     theme(plot.title = element_text(hjust = 0.5))
+#   
+#   if(!is.null(yrange)){
+#     p1 <- p1 +  coord_cartesian(ylim = yrange)
+#   }
+#   
+#   return(p1)
+# }
+
+
+# Grab Summary statistics 
+gather_posterior_summary <- function(fit, nchains){
   
   # Summarize Results
   summ <- summary(fit)
+  # nchains <- length(fit)
+  
+  if(nchains > 1){
+    niter   <- nrow(fit[[1]])
+  } else {
+    niter <- nrow(fit)
+  }
+  
   
   # Put results into dataframe
-  summ_stats <- as.data.frame(summ$statistics) %>% rownames_to_column(var = "Parameter")
-  summ_quant <- as.data.frame(summ$quantiles) %>% rownames_to_column(var = "Parameter")
+  summ_stats <- as.data.frame(summ$statistics) %>% tibble::rownames_to_column(var = "Parameter")
+  summ_quant <- as.data.frame(summ$quantiles)  %>% tibble::rownames_to_column(var = "Parameter")
+  
+  if(nchains > 1){
+    rhat <- gelman.diag(fit)
+    rhat_df <- rhat$psrf %>% 
+      as.data.frame() %>% tibble::rownames_to_column(var = "Parameter") %>% 
+      rename("rhat" = "Point est.", rhat_upper = "Upper C.I.")
+  }
+  
+  effective_vector <- effectiveSize(fit) 
+  effective_df <- data.frame(Parameter = names(effective_vector), n_eff = unname(effective_vector)) %>% 
+    mutate(normalized_n_eff = n_eff/(nchains * niter))
+  
+  summ_stats <- as.data.frame(summ$statistics) %>% tibble::rownames_to_column(var = "Parameter")
+  summ_quant <- as.data.frame(summ$quantiles)  %>% tibble::rownames_to_column(var = "Parameter")
   post_stats <- inner_join(summ_stats, summ_quant, by = "Parameter") %>% 
-    mutate(Parameter_Name = gsub("[[]","",gsub("[[0-9]]+","",inner_join(summ_stats, summ_quant, by = "Parameter")$Parameter))) # add unique par name
+    mutate(unique_pars      = as.factor(gsub(Parameter, pattern = "\\[.*]", replacement = "")),
+           par_index        = convert_na(as.double(sub("^.*\\[(.*?)\\]","\\1",Parameter)))) %>% 
+    inner_join(effective_df, by = "Parameter") %>%
+    mutate(mcse_n_eff = SD/sqrt(n_eff)) %>% 
+    rename(mcse = "Naive SE",
+           mcse_ts = "Time-series SE")
+  
+  if(nchains > 1){
+    post_stats <- post_stats %>% 
+      inner_join(rhat_df, by = "Parameter")
+  }
   
   # Return Results
   return(post_stats)
 }
 
-add_true_values <- function(post, param_list){
-  
-  true_vals <- c(param_list$p.f[1],
-                 param_list$p.m[1],
-                 param_list$phi.f[1],
-                 param_list$phi.m[1],
-                 param_list$delta[1],
-                 # param_list$betas$beta0[1],
-                 #param_list$betas$beta1[1],
-                 c(1,rep(0,param_list$k-1)),
-                 param_list$rho[1],
-                 param_list$gam[1]
-  )
-  
-  true_names <- c("PF","PM","PhiF","PhiM","delta",
-                  "eps[" %+% 1:param_list$k %+% "]","rho","gamma")
-  
-  true_df <- data.frame("Parameter" = true_names, "true" = true_vals)
-  
-  # Join values together
-  post2 <- post %>% inner_join(true_df, by = "Parameter")
-  return(post2)
-}
 
 # Create Caterpillar Plot of Estimates
 plot_caterpillar <- function(post_stats, 
-                             params = c("PhiF","PhiM", "PF","PM"), 
+                             params = c("mu_K"), 
                              yrange = NULL, 
                              title = "Caterpillar Plot of Posterior Estimates"
 ){
   p1 <- post_stats %>% 
-    filter(Parameter_Name %in% params) %>% 
-    mutate(Parameter = fct_reorder(Parameter,Mean)) %>% 
+    filter(unique_pars %in% params) %>% 
+    mutate(Parameter = forcats::fct_reorder(Parameter,Mean)) %>% 
     ggplot() + 
     geom_linerange(aes(x = Parameter, ymax = `97.5%`, ymin = `2.5%`), alpha = 0.5, size = 1, color = "skyblue")  +
     geom_linerange(aes(x = Parameter, ymax = `25%`, ymin = `75%`), size = 2.0, alpha = 1, color = "lightblue") + 
@@ -982,6 +1055,24 @@ plot_caterpillar <- function(post_stats,
   return(p1)
 }
 
+plot_diagnostic <- function(post_stats, 
+                            pars = NULL, 
+                            diagnostic = "rhat"){
+  
+  if(is.null(pars)) pars <- unique(post_stats$unique_pars)
+  
+  p1 <- post_stats %>%
+    filter(unique_pars %in% pars) %>%
+    ggplot(aes(x = unique_pars, y = !! sym(diagnostic))) +
+    geom_point() 
+  
+  if(diagnostic == "rhat"){
+    p1 <- p1 +  geom_hline(yintercept = 1.1, col = "red", lty = 2)
+  }
+  
+  return(p1)
+  
+}
 
 # Simulation Study Functions-----------------------------------------------------------------------------------------------------------------
 

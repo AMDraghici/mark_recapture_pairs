@@ -125,11 +125,11 @@ construct_sexes <- function(n, prop.female = 0.5, random = F){
     sex <- sort(ifelse(rbinom(n,1,prop.female)==1,"F","M"))
   } else { 
     # Exactly 100 - prop.female*100% of population is male and prop.female*100% is female
-    sex <- sort(c(rep("F",n * prop.female), rep("M", n * prop.male)))
+    sex <- c(rep("F",ceiling(n * prop.female)), rep("M", floor(n * prop.male)))
   }
   
   # Return vector of sex designations
-  return(sex)
+  return(sort(sex))
 }
 
 construct_init_entry <- function(n, k, random = F, inits = NULL){
@@ -217,7 +217,9 @@ construct_pairs <- function(sex,k){
   #Pair Identities
   pairs   <- array(NA, dim = c(nf+1, nm+1, k))
   # List of objects
-  pairs_list <- list(pairs_f = pairs_f, pairs_m = pairs_m, pairs = pairs)
+  pairs_list <- list(pairs_f = pairs_f, 
+                     pairs_m = pairs_m, 
+                     pairs   = pairs)
   return(pairs_list)
 }
 
@@ -256,8 +258,8 @@ construct_survival <- function(sex, k){
   sm[nm+1,1:k] <- 1 # dummy spots for single pair
   
   # Group into list and return data object
-  surv_matrices <- list(sf    = sf,
-                        sm    = sm)
+  surv_matrices <- list(sf  = sf,
+                        sm  = sm)
   return(surv_matrices)
 }
 

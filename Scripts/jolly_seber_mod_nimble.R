@@ -153,10 +153,10 @@ generate_init_js <- function(js_data){
 }
 
 # Compile Model
-compile_jolly_seber_nimble <- function(js_data,
-                                       params = NULL){
+compile_js_nimble <- function(js_data,
+                              params = NULL){
   
- 
+  
   # Generating Initial Values
   cat("Generating Initial Values...", "\n")
   nimble_inits <- generate_init_js(js_data)
@@ -220,7 +220,7 @@ compile_jolly_seber_nimble <- function(js_data,
                                             onlySlice = F))
   
   jsConf$removeSampler("x",print = F)
- 
+  
   print(jsConf)
   
   cat("Adding Monitors and Constructing MCMC...", "\n")
@@ -228,17 +228,18 @@ compile_jolly_seber_nimble <- function(js_data,
   jsMCMC  <- buildMCMC(jsConf)
   
   cat("Compiling MCMC Samplers (SLOW)...", "\n")
-  CjsMCMC <- compileNimble(jsMCMC, project = jsModel)
+  CmdlMCMC <- compileNimble(jsMCMC, project = jsModel)
   
   cat("Project Defined, MCMC and Model are compiled...", "\n")
   
   cat("Returning Model Object...", "\n")
   
-  return(list(CjsMCMC = CjsMCMC, 
+  return(list(CmdlMCMC = CmdlMCMC, 
               nimble_inits = nimble_inits))
   
   
 }
+
 
 # Get Samples from Model
 run_nimble <- function(CmdlMCMC, 
@@ -250,15 +251,91 @@ run_nimble <- function(CmdlMCMC,
                        seed = F){
   
   cat("MCMC Sampling from Model...","\n")
-  samples <- runMCMC(CmdlMCMC,
-                     niter = niter,
-                     nburnin = nburnin, 
-                     thin = thin,
-                     inits = inits,
-                     nchains = nchains,
-                     setSeed = seed,
+  samples <- runMCMC(mcmc              = CmdlMCMC,
+                     niter             = niter,
+                     nburnin           = nburnin, 
+                     thin              = thin,
+                     inits             = inits,
+                     nchains           = nchains,
+                     setSeed           = seed,
                      samplesAsCodaMCMC = TRUE)
   
   cat("Returning Output...","\n")
   return(samples)
+}
+
+# Run compilation/initialization/sampling in one call 
+# Dummy function intended for parallelization but can be used in serial as well
+execute_js_nimble_pipeline <- function(seed, 
+                                       data, 
+                                       params, 
+                                       niter, 
+                                       nthin,
+                                       nburnin, 
+                                       nchains){
+  
+  nimble_complied <- compile_js_nimble(data, params)
+  inits <- generate_init_js(data)
+  samples <- run_nimble(CmdlMCMC = nimble_complied$CmdlMCMC,
+                        niter    = niter,
+                        thin     = nthin,
+                        nburnin  = nburnin,
+                        nchains  = nchains,
+                        inits    = inits,
+                        seed     = seed) 
+  return(list(samples = samples,
+              inits   = inits))
+  
+}
+
+run_js_nimble_parallel <- function(data, params, niter, nthin, nburnin, ncores){
+  
+  # Build cluster
+  ncores <- min(ncores, detectCores()-2)
+  
+  if(ncores == 1){
+    cat("Only one core specified, not bothering with parallelization. Set ncores > 1 if so desired.")
+    samples <- execute_js_nimble_pipeline(F, data, params, niter, nthin, nburnin, 1)
+    return(samples)
+  }
+  
+  cat(paste0("Building cluster with ",ncores , " sockets...", "\n"))
+  cl <- makeCluster(ncores)
+  
+  # Load packages necessary
+  cat(paste0("Loading custom functions onto cluster...", "\n"))
+  clusterEvalQ(cl, {
+    #  Load Libraries
+    libs <- c("boot", "ggplot2", "nimble", "coda", "ggmcmc", "tidyverse")
+    lapply(libs,require, character.only = T)
+    source(paste0(getwd(), "/Scripts/jolly_seber_mod_nimble.R"))
+    `%+%` <- function(a, b) paste0(a, b)
+  })
+  
+  seeds <-  sample(.Machine$integer.max,ncores)
+  
+  cat(paste0("Running MCMC in Parallel (SLOW) ...", "\n"))
+  out_list <- parLapply(cl      = cl,
+                        X       = seeds, 
+                        fun     = execute_js_nimble_pipeline, 
+                        data    = data,
+                        params  = params,
+                        niter   = niter,
+                        nthin   = nthin,
+                        nburnin = nburnin,
+                        nchains = 1)
+  
+  cat(paste0("Success, closing cluster ...", "\n"))
+  
+  # Pass Nimble Functions 
+  stopCluster(cl)
+  
+  cat(paste0("Formatting and Returning output ...", "\n"))
+  samples <- as.mcmc.list(lapply(1:nchains, function(x) out_list[[x]]$samples))
+  inits   <- lapply(1:nchains, function(x) out_list[[x]]$inits)
+  
+  return(list(samples = samples,
+              inits   = inits,
+              seed    = seeds))
+  
 }
