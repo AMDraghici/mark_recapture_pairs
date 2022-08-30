@@ -102,8 +102,7 @@ generate_init_js <- function(js_data){
   
   # Sample Survival
   for(i in 1:n){
-    sexF <- female[i]
-    phi <- PhiF * sexF + PhiM * (1-sexF) 
+    phi <- PhiF * female[i] + PhiM * (1-female[i]) 
     for(t in 2:k){
       if(is.na(a[i, t])){
         a[i, t] <- rbinom(1, 1, phi * a[i, t-1] * recruit[i,t-1] + (1-recruit[i,t-1]))
@@ -242,24 +241,24 @@ compile_js_nimble <- function(js_data,
 
 
 # Get Samples from Model
-run_nimble <- function(CmdlMCMC, 
+run_nimble <- function(CmdlMCMC,
                        niter,
                        nburnin,
                        thin,
-                       inits = NULL,
+                       # inits = NULL,
                        nchains=3,
                        seed = F){
-  
+
   cat("MCMC Sampling from Model...","\n")
   samples <- runMCMC(mcmc              = CmdlMCMC,
                      niter             = niter,
-                     nburnin           = nburnin, 
+                     nburnin           = nburnin,
                      thin              = thin,
-                     inits             = inits,
+                     # inits             = inits,
                      nchains           = nchains,
                      setSeed           = seed,
                      samplesAsCodaMCMC = TRUE)
-  
+
   cat("Returning Output...","\n")
   return(samples)
 }
@@ -275,16 +274,16 @@ execute_js_nimble_pipeline <- function(seed,
                                        nchains){
   
   nimble_complied <- compile_js_nimble(data, params)
-  inits <- generate_init_js(data)
+  # inits <- generate_init_js(data)
   samples <- run_nimble(CmdlMCMC = nimble_complied$CmdlMCMC,
                         niter    = niter,
                         thin     = nthin,
                         nburnin  = nburnin,
                         nchains  = nchains,
-                        inits    = inits,
+                        # inits    = inits,
                         seed     = seed) 
   return(list(samples = samples,
-              inits   = inits))
+              inits   = nimble_complied$nimble_inits))
   
 }
 

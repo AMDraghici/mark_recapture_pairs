@@ -422,7 +422,7 @@ initialize_partner_status <- function(n, pairs, mating_f, mating_m, initial_entr
       if(sum(probj[1:nf])==0){ 
         probj[nf+1] <- 1
       } else {
-        probj[nf +1] <- 0
+        probj[nf+1] <- 0
       }
       
       # Draw partnership
@@ -1343,8 +1343,8 @@ add_data_augmentation <- function(lf,
   if(lf < unobs_f){
     # this case should never happen lf needs to be a big number for this to make sense
     lf <- 0 
-    
-    warning("Expanding Female Data AUgmentation by " %+% unobs_f-lf %+% " individuals. \n Consider increasing lf for this simulation and re-running.")
+
+    warning("Expanding Female Data AUgmentation by " %+% as.character(unobs_f-lf) %+% " individuals. Consider increasing lf for this simulation and re-running.")
   } else if(lf >= unobs_f){
     # take out all the "augmented" individuals we have organically
     lf <- lf - unobs_f
@@ -1355,7 +1355,7 @@ add_data_augmentation <- function(lf,
     # this case should never happen lm needs to be a big number for this to make sense
     lm <- 0 
     
-    warning("Expanding Male Data AUgmentation by " %+% unobs_m - lm %+% " individuals. \n Consider increasing lf for this simulation and re-running.")
+    warning("Expanding Male Data AUgmentation by " %+% as.character(unobs_m - lm) %+% " individuals. \n Consider increasing lf for this simulation and re-running.")
   } else if(lm >= unobs_m){
     # take out all the "augmented" individuals we have organically
     lm <- lm - unobs_m 
@@ -1695,6 +1695,9 @@ simulate_cr_data <- function(n,
                                              recap_f   = recap_f,
                                              recap_m   = recap_m)
   # Now they have can NAs
+  recruit_f_true <- recruit_f
+  recruit_m_true <- recruit_m
+  
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m <- recruit_list[["recruit_m"]]
   
@@ -1809,6 +1812,8 @@ simulate_cr_data <- function(n,
     zm             = zm,
     recruit_f      = recruit_f[1:nf,1:k], 
     recruit_m      = recruit_m[1:nm,1:k],
+    recruit_f_true = recruit_f_true,
+    recruit_m_true = recruit_m_true,
     psi            = psi, # Pairs that may exist (not excluded due to already formed pairs)
     af             = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
     am             = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
@@ -1816,6 +1821,7 @@ simulate_cr_data <- function(n,
     apf            = apairs_f,
     apairs_f       = matrix(NA, nrow=nrow(apairs_f), 
                                 ncol =ncol(apairs_f)), # Information lives in psi (nimble doesnt accept MV mixed with NA)
+    arrivals       = matrix(NA, nrow = nf, ncol = k),
     apairs_m       = apairs_m[1:nm, 1:k],
     arepartner     = arepartner[,2:k], # repartner with inferred states 
     na_repartner   = 1*is.na(arepartner[,2:k]),

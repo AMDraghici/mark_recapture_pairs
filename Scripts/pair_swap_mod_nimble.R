@@ -12,177 +12,115 @@ vectorMatch <- nimbleFunction(
     
     return(output)}
 )
-# Arrival dpaircat
 
-# Pair-Swap random assignment distribution function
-dpaircat <- nimbleFunction(
-  run = function(x = double(1), 
-                 available_mates = double(2), 
+
+# Randomly sample order of distribution for arrival at mating site
+darrivalcat <- nimbleFunction(
+  run = function(x = double(1),
                  mating_f = double(1),
-                 mating_m = double(1),
                  nf = integer(0),
-                 nm = integer(0), 
                  log = integer(0, default = 1)){
     
-    
-    available_mates2 <- matrix( 0, nrow = nf+1, ncol = nm + 1)
-    # 
     returnType(double(0))
-    # 
-    # # How many available males and females
-    mating_females <- sum(mating_f) + 1
-    mating_males  <- sum(mating_m) + 1
-    osr <- mating_females/mating_males
-
-    if(osr <= 1){
-      ll <- rep(0, nf)
-      # possible_mates <- rep(0,nf)
-      available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm], equals(sum(available_mates[1,1:nm]),0))
-      ll[1] <- dcat(x[1],available_mates2[1,1:(nm+1)],log = TRUE)
-
-      for(i in 2:nf){
-
-        # Remove Formed Pairs
-        for(j in 1:nm){
-          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(j == x[1:(i-1)]))
-        }
-
-        #Add case in which no pairs are available
-        available_mates2[i,(nm+1)] <-  equals(sum(available_mates[i,1:nm]),0)
-
-        ll[i] <- dcat(x[i],available_mates2[i,1:(nm+1)],log = TRUE)
-      }
-    } else {
-      y <- rep(0, nm)
-      ll <- rep(0,nm)
-
-      # Build vector of male pairs
-      # Need base likelihood on these values
-      for(j in 1:nm){
-        # Find which is your mate
-        for(i in 1:nf){
-          if(is.nan(x[i])|is.na(x[i])) x[i] <- nm+1
-          if(x[i] == j){
-            y[j] <- i
-          }
-        }
-
-        # If no mate set to single state
-        if(y[j]==0){
-          y[j] <- nf+1
-        }
-
-      }
-
-
-      # Apply mating selection for first male
-      available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1], equals(sum(available_mates[1:nf,1]),0))
-      ll[1] <- dcat(y[1],available_mates2[1:(nf+1),1],log = TRUE)
-
-      # Iterate over remaining males
-      for(j in 2:nm){
-
-        # Remove Formed Pairs
-        for(i in 1:nf){
-          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(i == y[1:(j-1)]))
-        }
-
-        #Add case in which no pairs are available
-        available_mates2[(nf+1),j] <- equals(sum(available_mates[1:nf,j]),0)
-
-        # Find mate for i
-        ll[j] <- dcat(y[j],available_mates2[1:(nf+1),j],log = TRUE)
-
-      }
-    }
-    # 
-    logProb <- sum(ll)
+    
+    n_females_mating <- sum(mating_f[1:nf]) + 1
+    
+    indicies <- seq(0,n_females_mating-1,1)
+    logProb <- -sum(log(n_females_mating-indicies)) 
+    
     if(log) return(logProb)
     else return(exp(logProb))
   }
 )
 
 
-# Pair-Swap random assignment random value generator function
+rarrivalcat <- nimbleFunction(
+  run = function(n = integer(0),
+                 mating_f = double(1),
+                 nf = integer(0)){
+    
+    returnType(double(1))
+    if(n != 1) print("rarrivalcat only allows n = 1; using n = 1.")
+    
+    prob <- rep(1, nf)
+    x <- rep(0, nf)
+    for(i in 1:nf){
+      x[i] <- rcat(n = 1, prob = prob)
+      prob[x[i]] <- 0
+    }
+    
+    
+    return(x)
+  }
+  
+)
+
+dpaircat <- nimbleFunction(
+  run = function(x = double(1),
+                 available_mates = double(2),
+                 arrivals = double(1),
+                 nf = integer(0),
+                 nm = integer(0),
+                 log = integer(0, default = 1)){
+    
+    
+    available_mates2 <- available_mates
+    returnType(double(0))
+    
+    ll <- rep(0,nf)
+    i_t <- arrivals[1]
+    
+    if(x[i_t] != (nm+1)){
+      ll[1] <- dcat(x[i_t],available_mates2[i_t,1:nm],log = TRUE)
+      available_mates2[1:nf, x[i_t]] <- 0
+    }
+    
+    for(i in 2:nf){
+      
+      i_t <- arrivals[i]
+      
+      if(x[i_t] != (nm+1)){
+        ll[i] <- dcat(x[i_t],available_mates2[i_t,1:nm],log = TRUE)
+        available_mates2[1:nf, x[i_t]] <- 0
+      }
+    }
+    
+    
+    logProb <- sum(ll)
+    if(log) return(logProb)
+    else return(exp(logProb))
+  }
+)
+
 rpaircat <- nimbleFunction(
   run = function(n = integer(0),
                  available_mates = double(2),
-                 mating_f = double(1),
-                 mating_m = double(1),
+                 arrivals = double(1),
                  nf = integer(0),
                  nm = integer(0)){
     
-    x <- rep(0,nf)
-    available_mates2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
     
     returnType(double(1))
     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
     
-    # How many available males and females
-    mating_females <- sum(mating_f) + 1
-    mating_males  <- sum(mating_m) + 1
-    osr <- mating_females/mating_males
+    x <- rep(nm+1,nf)
+    available_mates2 <- available_mates
+
+    i_t <- arrivals[1]
     
-    # If operating sex ratio is balanced or in favor of females 
-    # Iterate across female
-    if(osr <= 1){
+    if(sum(available_mates2[i_t,1:nm]) != 0){
+      x[i_t] <- rcat(n=1, prob = available_mates2[i_t, 1:nm])
+      available_mates2[1:nf, x[i_t]] <- 0
+    }
+   
+    for(i in 2:nf){
       
-      available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm],equals(sum(available_mates[1,1:nm]),0))
-      x[1] <- rcat(n=1, prob = available_mates2[1, 1:(nm+1)])
+      i_t <- arrivals[i]
       
-      for(i in 2:nf){
-        
-        # Remove Formed Pairs
-        for(j in 1:nm){
-          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(j == x[1:(i-1)]))
-        }
-        
-        #Add case in which no pairs are available 
-        available_mates2[i,(nm+1)] <- equals(sum(available_mates[i,1:nm]),0) 
-        
-        # Find mate for i 
-        x[i] <- rcat(n=1, prob = available_mates2[i, 1:(nm+1)])
-        
+      if(sum(available_mates2[i_t,1:nm]) != 0){
+        x[i_t] <- rcat(n=1, prob = available_mates2[i_t, 1:nm])
+        available_mates2[1:nf, x[i_t]] <- 0
       }
-      
-    } else {
-      # Otherwise OSR favors males so we iterate across their mating pop instead
-      y <- rep(0,nm)
-      
-      # Apply mating selection for first male
-      available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1], equals(sum(available_mates[1:nf,1]),0)) 
-      y[1] <- rcat(n = 1, prob = available_mates2[1:(nf+1),1])
-      
-      # Iterate over remaining males
-      for(j in 2:nm){
-        
-        # Remove Formed Pairs
-        for(i in 1:nf){
-          available_mates2[i,j] <- available_mates[i,j]*(1-1*any(i == y[1:(j-1)]))
-        }
-        
-        #Add case in which no pairs are available 
-        available_mates2[(nf+1),j] <- equals(sum(available_mates[1:nf,j]),0) 
-        
-        # Find mate for i 
-        y[j] <- rcat(n= 1, prob = available_mates2[1:(nf+1), j])
-        
-      }
-      
-      # Mapping male choices back to the female vector
-      for(i in 1:nf){
-        for(j in 1:nm){
-          if(y[j] == i){
-            x[i] <- j
-          } 
-        }
-        
-        #If not mates set to single
-        if(x[i]==0){
-          x[i] <- nm+1
-        }
-      }
-      
     }
     
     return(x)
@@ -230,19 +168,63 @@ compute_prob_condF <- nimbleFunction(
     
     returnType(double(1))
     out <- numeric(nf)
-    for(i in 1:nf){
-      out[i]  <- is_single_female[i] * ProbF +
-        (1- is_single_female[i]) * (current_male_state[current_pairs_f[i]] * (Probfm/ProbM) +
-                                      (1- current_male_state[current_pairs_f[i]]) * (Probf0/(1-ProbM)))
-    }
-   
     
+    out <- is_single_female     * ProbF + 
+      (1-is_single_female) * (current_male_state[current_pairs_f]        * (Probfm/ProbM) +
+                                (1- current_male_state[current_pairs_f]) * (Probf0/(1-ProbM)))
     return(out)
   }
 )
 
 # Custom Sampler for dpaircat
 # Variation on categorical sampler and MH Proposal
+
+sampler_arrivals <- nimbleFunction(
+  name = 'sampler_arrivals',
+  contains = sampler_BASE,
+  setup = function(model, mvSaved, target, control) {
+    ## node list generation
+    targetAsScalar <- model$expandNodeNames(target, returnScalarComponents = TRUE)
+    calcNodes <- model$getDependencies(target)
+    calcNodesNoSelf <- model$getDependencies(target, self = FALSE)
+    isStochCalcNodesNoSelf <- model$isStoch(calcNodesNoSelf)
+    calcNodesNoSelfDeterm <- calcNodesNoSelf[!isStochCalcNodesNoSelf]
+    calcNodesNoSelfStoch <- calcNodesNoSelf[isStochCalcNodesNoSelf]
+    # Vars
+    nf <- model$getParam(target, 'nf')
+    amating_f <- model$getParam(target, 'mating_f')
+    logProbs <- numeric(2)
+    probs <- numeric(2)
+    ## checks
+    if(model$getDistribution(target) != 'darrivalcat') stop('can only use pair categorical sampler on node with darrivalcat distribution')
+  },
+  run = function() {
+    current_pairs <- model[[target]]
+    logProbs[1] <<- model$getLogProb(calcNodes)
+    if(is.nan(logProbs[1])) logProbs[1] <<- -Inf
+    # Simulate new partners
+    model[[target]] <<- rarrivalcat(1,amating_f, nf) # accept target
+    logProbs[2] <<- model$calculate(calcNodes) # calculate logprobs
+    if(is.nan(logProbs[2])) logProbs[2] <<- -Inf
+
+
+    acceptanceProb <- 1/(exp(logProbs[1] - logProbs[2]) + 1)
+    jump <- (!is.nan(acceptanceProb)) & (runif(1,0,1) < acceptanceProb)
+    if(jump) {
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    } else {
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = target, logProb = TRUE)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    }
+  },
+  methods = list(
+    reset = function() { }
+  )
+)
+
 sampler_pairs <- nimbleFunction(
   name = 'sampler_pairs',
   contains = sampler_BASE,
@@ -257,24 +239,68 @@ sampler_pairs <- nimbleFunction(
     # Vars
     nf <- model$getParam(target, 'nf')
     nm <- model$getParam(target, 'nm')
-    amating_m <- model$getParam(target, 'mating_m')
-    amating_f <- model$getParam(target, 'mating_f')
+    arrivals <- model$getParam(target, "arrivals")
     psi_cond_t <- model$getParam(target, 'available_mates')
+    logProbs <- numeric(2)
+    probs <- numeric(2)
     ## checks
     if(model$getDistribution(target) != 'dpaircat') stop('can only use pair categorical sampler on node with dpaircat distribution')
   },
   run = function() {
+    current_pairs <- model[[target]]
+    logProbs[1] <<- model$getLogProb(calcNodes)
+    if(is.nan(logProbs[1])) logProbs[1] <<- -Inf
     # Simulate new partners
-    model[[target]] <<- rpaircat(1,psi_cond_t, amating_f, amating_m, nf, nm) # accept target
-    # logprob <- model$calculate(target) + model$calculate(calcNodesNoSelf) # calculate logprobs
-    nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
-    nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-    nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    model[[target]] <<- rpaircat(1,psi_cond_t,arrivals, nf, nm) # accept target
+    logProbs[2] <<- model$calculate(calcNodes) # calculate logprobs
+    if(is.nan(logProbs[2])) logProbs[2] <<- -Inf
+
+
+    acceptanceProb <- 1/(exp(logProbs[1] - logProbs[2]) + 1)
+    jump <- (!is.nan(acceptanceProb)) & (runif(1,0,1) < acceptanceProb)
+    if(jump) {
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    } else {
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = target, logProb = TRUE)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+    }
   },
   methods = list(
     reset = function() { }
   )
 )
+
+
+# sampler_arrivals <- nimbleFunction(
+#   name = 'sampler_arrivals',
+#   contains = sampler_BASE,
+#   setup = function(model, mvSaved, target, control) {
+#     ## node list generation
+#     targetAsScalar <- model$expandNodeNames(target, returnScalarComponents = TRUE)
+#     calcNodes <- model$getDependencies(target)
+#     calcNodesNoSelf <- model$getDependencies(target, self = FALSE)
+#     isStochCalcNodesNoSelf <- model$isStoch(calcNodesNoSelf)
+#     calcNodesNoSelfDeterm <- calcNodesNoSelf[!isStochCalcNodesNoSelf]
+#     calcNodesNoSelfStoch <- calcNodesNoSelf[isStochCalcNodesNoSelf]
+#     # Vars
+#     nf <- model$getParam(target, 'nf')
+#     amating_f <- model$getParam(target, 'mating_f')
+#     ## checks
+#     if(model$getDistribution(target) != 'darrivalcat') stop('can only use pair categorical sampler on node with darrivalcat distribution')
+#   },
+#   run = function() {
+#     model[[target]] <<- rarrivalcat(1,amating_f, nf) # accept target
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
+#   },
+#   methods = list(
+#     reset = function() { }
+#   )
+# )
 # 
 # sampler_pairs <- nimbleFunction(
 #   name = 'sampler_pairs',
@@ -290,78 +316,16 @@ sampler_pairs <- nimbleFunction(
 #     # Vars
 #     nf <- model$getParam(target, 'nf')
 #     nm <- model$getParam(target, 'nm')
-#     amating_m <- model$getParam(target, 'mating_m')
-#     amating_f <- model$getParam(target, 'mating_f')
+#     arrivals <- model$getParam(target, "arrivals")
 #     psi_cond_t <- model$getParam(target, 'available_mates')
-#     logProbs <- numeric(2)
-#     probs <- numeric(2)
 #     ## checks
 #     if(model$getDistribution(target) != 'dpaircat') stop('can only use pair categorical sampler on node with dpaircat distribution')
 #   },
 #   run = function() {
-#     current_pairs <- model[[target]]
-#     logProbs[1] <<- model$getLogProb(calcNodes)
-#     if(is.nan(logProbs[1])) logProbs[1] <<- -Inf
-#     # Simulate new partners
-#     model[[target]] <<- rpaircat(1,psi_cond_t, amating_f, amating_m, nf, nm) # accept target
-#     logProbs[2] <<- model$calculate(calcNodes) # calculate logprobs
-#     if(is.nan(logProbs[2])) logProbs[2] <<- -Inf
-# 
-# 
-#     acceptanceProb <- 1/(exp(logProbs[1] - logProbs[2]) + 1)
-#     jump <- (!is.nan(acceptanceProb)) & (runif(1,0,1) < acceptanceProb)
-#     if(jump) {
-#       nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
-#       nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-#       nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
-#     } else {
-#       nimCopy(from = mvSaved, to = model, row = 1, nodes = target, logProb = TRUE)
-#       nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-#       nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
-#     }
-#   },
-#   methods = list(
-#     reset = function() { }
-#   )
-# )
-
-# sampler_mv_binary <- nimbleFunction(
-#   name = 'sampler_mv_binary',
-#   contains = sampler_BASE,
-#   setup = function(model, mvSaved, target, control) {
-#     ## node list generation
-#     targetAsScalar <- model$expandNodeNames(target, returnScalarComponents = TRUE)
-#     calcNodes <- model$getDependencies(target)
-#     calcNodesNoSelf <- model$getDependencies(target, self = FALSE)
-#     isStochCalcNodesNoSelf <- model$isStoch(calcNodesNoSelf)   ## should be made faster
-#     calcNodesNoSelfDeterm <- calcNodesNoSelf[!isStochCalcNodesNoSelf]
-#     calcNodesNoSelfStoch <- calcNodesNoSelf[isStochCalcNodesNoSelf]
-#     
-#     ## checks
-#     if(length(targetAsScalar) == 1)  stop('cannot use MV_binary sampler on one target node')
-#   },
-#   run = function() {
-#     
-#     currentLogProb <- model$getLogProb(calcNodes)
-#     model[[target]] <<- rmvbern(1,model$getParam(target, 'prob'))
-#     otherLogProbPrior <- model$calculate(target)
-#     if(otherLogProbPrior == -Inf) {
-#       otherLogProb <- otherLogProbPrior
-#     } else {
-#       otherLogProb <- otherLogProbPrior + model$calculate(calcNodesNoSelf)
-#     }
-#     
-#     acceptanceProb <- 1/(exp(currentLogProb - otherLogProb) + 1)
-#     jump <- (!is.nan(acceptanceProb)) & (runif(1,0,1) < acceptanceProb)
-#     if(jump) {
-#       nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
-#       nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-#       nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
-#     } else {
-#       nimCopy(from = mvSaved, to = model, row = 1, nodes = target, logProb = TRUE)
-#       nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-#       nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
-#     }
+#     model[[target]] <<- rpaircat(1,psi_cond_t,arrivals, nf, nm) # accept target
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
+#     nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
 #   },
 #   methods = list(
 #     reset = function() { }
@@ -408,7 +372,7 @@ nimble_ps_model <- nimbleCode({
       histories[i, j, 1] <- 0
     }
   }
-
+  
   # Conditional Partnership/Survival Steps ----------------------------------------------------------------------------------------
   
   # Model Events from t=1 to k --------------------------------------------------------------------------------------------------------------
@@ -417,23 +381,30 @@ nimble_ps_model <- nimbleCode({
   
   # If they've been recruited do they mate at this time step
   for(i in 1:nf){
-    amating_f[i,1] ~ dbern(recruit_f[i,1] * delta *  zf[i])
+    amating_f[i,1] ~ dbern(delta * recruit_f[i,1]* zf[i])
   }
-
+  
   for(j in 1:nm){
-    amating_m[j,1] ~ dbern(recruit_m[j,1] * delta  * zm[j])
+    amating_m[j,1] ~ dbern(delta * recruit_m[j,1] * zm[j])
   }
   
   # Build Homogeneous Partnership probabilities 
   for(i in 1:nf){
     # Flat likelihood of mating conditional on decision to mate
     for(j in 1:nm){
-      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1] 
+      psi_cond[i, j, 1] <- psi[i,j,1] * amating_f[i,1] * amating_m[j,1]
     }
   }
   
   # Assign Pairs using Custom Random Matrix Sampling Distribution 
-  apairs_f[1:nf,1] ~ dpaircat(psi_cond[1:nf, 1:nm, 1], amating_f[1:nf,1], amating_m[1:nm,1], nf, nm)
+  arrivals[1:nf,1] ~ darrivalcat(amating_f[1:nf,1],
+                                 nf)
+  
+  apairs_f[1:nf,1] ~ dpaircat(psi_cond[1:nf, 1:nm, 1], 
+                              arrivals[1:nf,1], 
+                              nf, 
+                              nm)
+  
   single_female[1:nf,1] <- vectorMatch(apairs_f[1:nf,1], nm + 1)
   
   #Update Total History (at start of time 2, what is the history data)
@@ -452,7 +423,7 @@ nimble_ps_model <- nimbleCode({
     for(j in 1:nm){
       am[j,t] ~ dbern(PhiM * am[j,t-1] * recruit_m[j,t-1]  + (1-recruit_m[j,t-1]))
     }
-
+    
     # Marginal Recapture Event for Females in the Population (P[X^F_T|X^M_T]) given males
     phi.totalF[1:nf,t-1] <- compute_prob_condF(single_female[1:nf,t-1],
                                                am[1:(nm+1),t],
@@ -471,17 +442,17 @@ nimble_ps_model <- nimbleCode({
     
     
     # 3. Decision to Mate -------------------------------------------------------------------------------------------------------------------
-     
+    
     # Female Mating Choice at time t
     for(i in 1:nf){
-      amating_f[i,t] ~ dbern(af[i,t] * recruit_f[i,t] * delta * zf[i])
+      amating_f[i,t] ~ dbern(delta * af[i,t] * recruit_f[i,t] * zf[i])
     }
-
+    
     # Male Mating Choice at time t
     for(j in 1:nm){
-      amating_m[j,t] ~ dbern(am[j,t] * recruit_m[j,t] * delta * zm[j])
+      amating_m[j,t] ~ dbern(delta * am[j,t] * recruit_m[j,t] * zm[j])
     }
-                                
+    
     prob_repartner[1:nf,t-1] <- compute_pr_repartner(beta0,
                                                      beta1,
                                                      histories[1:nf,1:(nm+1),t],
@@ -493,7 +464,7 @@ nimble_ps_model <- nimbleCode({
                                                      na_repartner[1:nf,t-1],
                                                      nf,
                                                      nm)
-    
+
     # Choose to re-form pairs
     for(i in 1:nf){
       arepartner[i,t-1] ~ dbern(prob_repartner[i,t-1])
@@ -514,16 +485,17 @@ nimble_ps_model <- nimbleCode({
       # If repairing then force partner to be only choice
       # If not repairing then exclude past partner plus any non-mating males
       for(j in 1:nm){
-        psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t]*
-                                (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) +
-                                arepartner[i,t-1] * equals(apairs_f[i,t-1],j) * (male_taken_jt[j,t-1]))
+        psi_cond[i, j, t] <- (psi[i,j,t] * amating_f[i,t] * amating_m[j,t]) * (1-equals(apairs_f[i,t-1],j)) * (1-arepartner[i,t-1]) * (1-male_taken_jt[j,t-1]) +
+          arepartner[i,t-1] * equals(apairs_f[i,t-1],j) * (male_taken_jt[j,t-1]) 
       }
     }
     
     # Assign Pairs using Custom Random Matrix Sampling Distribution 
-    apairs_f[1:nf,t] ~ dpaircat(psi_cond[1:nf,1:nm,t], 
-                                amating_f[1:nf,t], 
-                                amating_m[1:nm,t], 
+    arrivals[1:nf,t] ~ darrivalcat(amating_f[1:nf,t],
+                                   nf)
+    
+    apairs_f[1:nf,t] ~ dpaircat(psi_cond[1:nf, 1:nm, t], 
+                                arrivals[1:nf,t], 
                                 nf, 
                                 nm)
     
@@ -535,39 +507,16 @@ nimble_ps_model <- nimbleCode({
         histories[i, j, t+1] <- histories[i, j, t] + equals(apairs_f[i,t],j) * (1 - single_female[i,t])
       }
     }
-    
-    
   }
   
   # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
-  
-  # Marginal Recapture Event for Males in the Population (P[X^M_T])
-  for(j in 1:nm){
-    recap_m[j,1] ~ dbern(PM * recruit_m[j,1] * zm[j])
-  }
-  # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
-  p.totalF[1:nf,1] <- compute_prob_condF(single_female[1:nf,1],
-                                         recap_m[1:(nm+1),1],
-                                         apairs_f[1:nf,1],
-                                         PF,
-                                         PM,
-                                         Pfm,
-                                         Pf0,
-                                         nf,
-                                         nm)
-  
-  # Draw Recapture Probability
-  for(i in 1:nf){
-    recap_f[i, 1] ~ dbern(p.totalF[i,1] * recruit_f[i,1] * zf[i])
-    
-  }
-  
-  for(t in 2:k){
+  for(t in 1:k){
     
     # Marginal Recapture Event for Males in the Population (P[X^M_T])
     for(j in 1:nm){
       recap_m[j,t] ~ dbern(PM * am[j,t] * recruit_m[j,t] * zm[j])
     }
+    
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
     p.totalF[1:nf,t] <- compute_prob_condF(single_female[1:nf,t],
                                            recap_m[1:(nm+1),t],
@@ -582,7 +531,7 @@ nimble_ps_model <- nimbleCode({
     # Draw Recapture Probability
     for(i in 1:nf){
       recap_f[i, t] ~ dbern(p.totalF[i,t] * af[i,t] * recruit_f[i,t] * zf[i])
-
+      
     }
   }
   
@@ -708,6 +657,8 @@ generate_nimble_init_pairs <- function(ps_data){
   am <- ps_data$am
   recap_m <- ps_data$recap_m
   na_repartner <- ps_data$na_repartner
+  arrivals <- ps_data$arrivals 
+  
   
   # Define local fn equals to emulate jags code
   # Equals call (1 if T; 0 if F)
@@ -786,6 +737,9 @@ generate_nimble_init_pairs <- function(ps_data){
   
   delta <- rbeta(1, 1, 1)
   
+  # delta <- c(ps_data$amating_f[!is.na(ps_data$af) & ps_data$af == 1],ps_data$amating_m[!is.na(ps_data$am) & ps_data$am == 1]) %>% table() %>% prop.table()
+  # delta <- delta[2]
+  
   # Pairs reforming
   beta0 <- rnorm(1, 0, 1/4)
   beta1 <- rnorm(1, 0, 1/4)
@@ -803,13 +757,17 @@ generate_nimble_init_pairs <- function(ps_data){
   
   # Sample augmentation female
   for(i in 1:nf){
-    zf[i] <- ifelse(is.na(zf[i]), rbinom(1, 1, xi), zf[i])
+    zf[i] <- ifelse(is.na(zf[i]), 
+                    rbinom(1, 1, xi), 
+                    zf[i])
   }
   
   
   # Sample augmentation male
   for(j in 1:nm){
-    zm[j] <- ifelse(is.na(zm[j]), rbinom(1, 1, xi), zm[j])
+    zm[j] <- ifelse(is.na(zm[j]), 
+                    rbinom(1, 1, xi), 
+                    zm[j])
   }
   
   
@@ -847,6 +805,7 @@ generate_nimble_init_pairs <- function(ps_data){
   p.totalF       <- matrix(NA, nrow = nf, ncol = k)
   male_taken_jt  <- matrix(NA, nrow = nm, ncol = k-1)
   forced_repartner <- matrix(NA, nrow = nf, ncol = k-1)
+  lp_cat <- list()
   
   # Time 2 through k initialization
   for(t in 1:k){
@@ -859,7 +818,7 @@ generate_nimble_init_pairs <- function(ps_data){
           am[j,t] <- rbinom(1,1, PhiM * am[j,t-1] * recruit_m[j,t-1] + (1-recruit_m[j,t-1]))
         }
       }
-
+      
       # Marginal Recapture Event for Females in the Population (P[X^F_T|X^M_T])
       phi.totalF[1:nf, t-1] <- compute_prob_condF(is_single_female   = single_female[1:nf,t-1],
                                                   current_male_state = am[1:(nm+1), t],
@@ -883,11 +842,11 @@ generate_nimble_init_pairs <- function(ps_data){
     for(i in 1:nf){
       if(t == 1){
         amating_f[i,t] <- ifelse(is.na(amating_f[i,t]), 
-                                 0 * rbinom(1, 1, recruit_f[i,t] * delta* zf[i]), 
+                                 rbinom(1, 1, recruit_f[i,t] * delta* zf[i]),
                                  amating_f[i,t])
       } else {
         amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),
-                                 0 * rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta * zf[i]), 
+                                 rbinom(1, 1, af[i,t] * recruit_f[i,t] * delta* zf[i]),
                                  amating_f[i,t])
       }
       
@@ -897,11 +856,11 @@ generate_nimble_init_pairs <- function(ps_data){
     for(j in 1:nm){
       if(t == 1){
         amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),
-                                 0 * rbinom(1, 1, recruit_m[j,t] * delta * zm[j]), 
+                                 rbinom(1, 1, recruit_m[j,t] * delta* zm[j]),
                                  amating_m[j,t])
       } else {
         amating_m[j,t] <- ifelse(is.na( amating_m[j,t]),
-                                 0 * rbinom(1, 1, am[j,t] * recruit_m[j,t] * delta * zm[j]),  
+                                 rbinom(1, 1, am[j,t] * recruit_m[j,t] * delta * zm[j]),
                                  amating_m[j,t])
       }
       
@@ -911,7 +870,7 @@ generate_nimble_init_pairs <- function(ps_data){
     # arepartner is zero at time  1
     if(t > 1){
       
-      # # Probability of re-forming 
+      # # Probability of re-forming
       prob_repartner[1:nf, t-1] <- compute_pr_repartner(intercept      = beta0,
                                                         slope          = beta1,
                                                         history        = histories[1:nf, 1:(nm+1), t],
@@ -926,7 +885,7 @@ generate_nimble_init_pairs <- function(ps_data){
       
       # Choose to re-form pairs
       for(i in 1:nf){
-        arepartner[i,t-1] <- ifelse(is.na(arepartner[i,t-1]), 
+        arepartner[i,t-1] <- ifelse(is.na(arepartner[i,t-1]),
                                     rbinom(1,1,prob_repartner[i,t-1]),
                                     arepartner[i,t-1])
         
@@ -958,25 +917,27 @@ generate_nimble_init_pairs <- function(ps_data){
       }
     }
     
-    # Sample from possible partnerships
-    apairs_f[1:nf, t] <- rpaircat(n               = 1,
-                                  available_mates = psi_cond[1:nf,1:nm,t],
-                                  mating_f        = amating_f[1:nf,t],
-                                  mating_m        = amating_m[1:nm,t],
-                                  nf              = nf,
-                                  nm              = nm)
     
-    lp <- dpaircat(x               = apairs_f[1:nf,t], 
-                   available_mates = psi_cond[1:nf,1:nm,t],
-                   mating_f        = amating_f[1:nf,t],
-                   mating_m        = amating_m[1:nm,t],
-                   nf              = nf,
-                   nm              = nm,
-                   log             = 1)
+    arrivals[1:nf,t] <- rarrivalcat(n        = 1, 
+                                    mating_f = amating_f[1:nf,t],
+                                    nf       = nf)
     
+    apairs_f[1:nf,t]<- rpaircat(n               = 1,
+                                available_mates = psi_cond[1:nf,1:nm,t],
+                                arrivals        = arrivals[1:nf,t], 
+                                nf              = nf,
+                                nm              = nm)
+    
+    
+    lp_cat[[t]] <- dpaircat(x               = apairs_f[1:nf,t], 
+                            available_mates = psi_cond[1:nf,1:nm,t],
+                            arrivals        = arrivals[1:nf,t],
+                            nf              = nf,
+                            nm              = nm,
+                            log             = 1)
     
     # If sampling is going wrong
-    if(lp == -Inf|lp == Inf|is.nan(lp)) browser()
+    if(lp_cat[[t]] == -Inf|lp_cat[[t]] == Inf|is.nan(lp_cat[[t]])) browser()
     
     # Assign single females
     single_female[1:nf,t] <- equals(apairs_f[1:nf,t],nm+1)
@@ -1005,6 +966,7 @@ generate_nimble_init_pairs <- function(ps_data){
                                             nf                 = nf,
                                             nm                 = nm) 
   }
+  sum(unlist(lp_cat))
   
   # Update Initial Values to follow NIMBLE structure -----------------------------------------------------------------
   
@@ -1041,20 +1003,19 @@ generate_nimble_init_pairs <- function(ps_data){
   
   # Pair index (female perspective)
   apairs_f <- build_NA_mat(apairs_f, ps_data$apairs_f)
-
-    # Repartner index (female perspective)
+  
+  # Repartner index (female perspective)
   arepartner <- build_NA_mat(arepartner, ps_data$arepartner)
   
   zf <- build_NA_vec(zf, ps_data$zf)
   zm <- build_NA_vec(zm, ps_data$zm)
+  
   # Return Results ------------------------------------------------------------------
   
   # Store in object
   ps_inits <- list(
     PF = PF,
     PM = PM,
-    # v.pf   = v.pf,
-    # v.phif = v.phif,
     raw_rho = raw_rho,
     rho = rho,
     PhiF = PhiF,
@@ -1074,15 +1035,16 @@ generate_nimble_init_pairs <- function(ps_data){
     amating_m = amating_m,
     arepartner = arepartner,
     apairs_f =  apairs_f,
+    arrivals = arrivals,
     af = af,
-    am = am
-   # histories = histories,
-    # single_female = single_female,
-    # phi.totalF = phi.totalF,
-    # p.totalF = p.totalF,
-    # male_taken_jt = male_taken_jt,
-    # prob_repartner = prob_repartner,
-    # psi_cond = psi_cond
+    am = am,
+    histories = histories,
+    single_female = single_female,
+    phi.totalF = phi.totalF,
+    p.totalF = p.totalF,
+    male_taken_jt = male_taken_jt,
+    prob_repartner = prob_repartner,
+    psi_cond = psi_cond
   )
   
   # Return Initial Values for a single chain
@@ -1095,14 +1057,21 @@ compile_pair_swap_nimble <- function(ps_data,
   
   # Registering Random Pair-Swap Distribution
   cat("Registering Random Pair-Swap Distribution...", "\n")
-  
+
   registerDistributions(list(
     dpaircat = list(
-      BUGSdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
-      Rdist = "dpaircat(available_mates, mating_f, mating_m, nf, nm)",
+      BUGSdist = "dpaircat(available_mates, arrivals, nf, nm)",
+      Rdist = "dpaircat(available_mates, arrivals, nf, nm)",
       discrete = TRUE,
       range = c(1, (ps_data$nm+1)),
-      types = c('value = double(1)', 'available_mates = double(2)','mating_f = double(1)','mating_m = double(1)','nf = integer(0)', 'nm = integer(0)'),
+      types = c('value = double(1)', 'available_mates = double(2)','arrivals = double(1)','nf = integer(0)', 'nm = integer(0)'),
+      pqAvail = FALSE),
+    darrivalcat = list(
+      BUGSdist = "darrivalcat(mating_f, nf)",
+      Rdist = "darrivalcat(mating_f, nf)",
+      discrete = TRUE,
+      range = c(1, (ps_data$nf)),
+      types = c('value = double(1)', 'mating_f = double(1)', 'nf = integer(0)'),
       pqAvail = FALSE)
   ))
   
@@ -1133,7 +1102,8 @@ compile_pair_swap_nimble <- function(ps_data,
     recap_m         = ps_data$recap_m,
     psi             = ps_data$psi,
     na_repartner    = ps_data$na_repartner,
-    constraint_data = c(1,1)
+    constraint_data = c(1,1),
+    arrivals        = ps_data$arrivals
   )
   
   if(!is.null(params)){
@@ -1171,7 +1141,8 @@ compile_pair_swap_nimble <- function(ps_data,
   lp_init <- psModel$calculate()
   print(paste0("LP from initial values is ", round(lp_init,3)))
   
-  # Assign dpaircat sampler
+  # Assign dpaircat sampler to the global environment
+  assign('sampler_arrivals', sampler_arrivals, envir = .GlobalEnv)
   assign('sampler_pairs', sampler_pairs, envir = .GlobalEnv)
   
   cat("Compiling Graphical Model in C++ (SLOW)...", "\n")
@@ -1187,23 +1158,33 @@ compile_pair_swap_nimble <- function(ps_data,
                                             multivariateNodesAsScalars = T, 
                                             onlySlice = F))
   
+  
+  cat("Adding custom random pair sampler to arrivals", "\n")
+  
+  # Default sampler wont work here....
+  psConf$removeSampler("arrivals", print = F)
+  
+  for(t in 1:ps_data$k){
+    temp_name_arrival <- "arrivals[1:" %+% ps_data$nf %+% "," %+% t %+% "]"
+    psConf$addSampler(target = temp_name_arrival, type = "sampler_arrivals", print = T)
+  }
+  
   cat("Adding custom random pair sampler to apairs_f...", "\n")
   
-  
+  # Default sampler wont work here....
   psConf$removeSampler("apairs_f", print = F)
   
   for(t in 1:ps_data$k){
     temp_name_cat <- "apairs_f[1:" %+% ps_data$nf %+% "," %+% t %+% "]"
     psConf$addSampler(target = temp_name_cat, type = "sampler_pairs", print = T)
   }
- 
-  psConf$removeSampler("recap_m",print = F)
-  for(t in 1:ps_data$k){
-    temp_name_recap_m <- "recap_m[1:" %+% (ps_data$nf+1) %+% "," %+% t %+% "]"
-    psConf$addSampler(target = temp_name_recap_m, type = "sampler_posterior_predictive", print = T)
-  }
-  # psConf$removeSampler("recap_f",print = F)
   
+  
+  # NIMBLE thinks recap_m is partially observed. Remove this and posterior predictive sampler on F.
+  psConf$removeSampler("recap_m",print = F)
+  psConf$removeSampler("recap_f",print = F)
+  
+  # Display Samplers
   print(psConf)
   
   cat("Adding Monitors and Constructing MCMC...", "\n")
@@ -1211,13 +1192,13 @@ compile_pair_swap_nimble <- function(ps_data,
   psMCMC  <- buildMCMC(psConf)
   
   cat("Compiling MCMC Samplers (SLOW)...", "\n")
-  CpsMCMC <- compileNimble(psMCMC, project = psModel)
+  CmdlMCMC <- compileNimble(psMCMC, project = psModel)
   
   cat("Project Defined, MCMC and Model are compiled...", "\n")
   
   cat("Returning Model Object...", "\n")
   
-  return(list(CpsMCMC      = CpsMCMC, 
+  return(list(CmdlMCMC      = CmdlMCMC, 
               nimble_inits = nimble_inits))
   
   
@@ -1229,7 +1210,7 @@ run_nimble <- function(CmdlMCMC,
                        niter,
                        nburnin,
                        thin,
-                       inits = NULL,
+                       # inits,
                        nchains=3,
                        seed = F){
   
@@ -1238,7 +1219,7 @@ run_nimble <- function(CmdlMCMC,
                      niter             = niter,
                      nburnin           = nburnin, 
                      thin              = thin,
-                     inits             = inits,
+                     # inits             = inits,
                      nchains           = nchains,
                      setSeed           = seed,
                      samplesAsCodaMCMC = TRUE)
@@ -1250,24 +1231,25 @@ run_nimble <- function(CmdlMCMC,
 # Run compilation/initialization/sampling in one call 
 # Dummy function intended for parallelization but can be used in serial as well
 execute_pair_swap_nimble_pipeline <- function(seed, 
-                                    data, 
-                                    params, 
-                                    niter, 
-                                    nthin,
-                                    nburnin, 
-                                    nchains){
+                                              data, 
+                                              params, 
+                                              niter, 
+                                              nthin,
+                                              nburnin, 
+                                              nchains){
   
   nimble_complied <- compile_pair_swap_nimble(data, params)
-  inits <- generate_nimble_init_pairs(data)
-  samples <- run_nimble(CmdlMCMC = nimble_complied$CpsMCMC,
+  
+  # inits <- generate_nimble_init_pairs(data)
+  samples <- run_nimble(CmdlMCMC = nimble_complied$CmdlMCMC,
                         niter    = niter,
                         thin     = nthin,
                         nburnin  = nburnin,
                         nchains  = nchains,
-                        inits    = inits,
+                        # inits    = nimble_complied$nimble_inits,
                         seed     = seed) 
   return(list(samples = samples,
-              inits   = inits))
+              inits   = nimble_complied$nimble_inits))
   
 }
 
@@ -1278,7 +1260,7 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
   
   if(ncores == 1){
     cat("Only one core specified, not bothering with parallelization. Set ncores > 1 if so desired.")
-    samples <- execute_nimble_pipeline(F, data, params, niter, nthin, nburnin, 1)
+    samples <- execute_pair_swap_nimble_pipeline(F, data, params, niter, nthin, nburnin, 1)
     return(samples)
   }
   
@@ -1322,3 +1304,276 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
               seed    = seeds))
   
 }
+
+
+
+
+# # Pair-Swap random assignment distribution function
+# dpaircat <- nimbleFunction(
+#   run = function(x = double(1), 
+#                  available_mates = double(2), 
+#                  nf = integer(0),
+#                  nm = integer(0), 
+#                  log = integer(0, default = 1)){
+#     
+#     returnType(double(0))
+#     
+#     # prob_grid <- available_mates#/(sum(available_mates) + equals(sum(available_mates),0))
+#     
+#     # females <- rep(1:nf,nm)
+#     # males <- numeric(nf * nm)
+#     # for(j in 1:nm){
+#     #   males[(1:nf) + nf*(j-1)] <- rep(j, nf)
+#     # }
+#     
+#     # n_outcomes <- sum(prob_grid)#sum(1 * (prob_grid > 0))
+#     
+#     ll <- numeric(nf)
+#     
+#     
+#     # for(i in 1:nf){
+#     #   if(x[i] != (nm+1)){
+#     #     lli <- -log((sum(prob_grid) + equals(sum(prob_grid),0)))
+#     #     ll[i] <- lli 
+#     #     prob_grid[i,1:nm] <- 0
+#     #     prob_grid[1:nf,x[i]] <- 0
+#     #   } else {
+#     #     potential_mates <- available_mates[i,1:nm]
+#     #     N_potential <- sum(potential_mates) 
+#     #     if(N_potential > 1.0){
+#     #     #   
+#     #     #   index_potential <- (1:nm) * potential_mates
+#     #     #   index_potential <- index_potential[index_potential != 0]
+#     #     #   
+#     #     #   xlli <- 1
+#     #     #   
+#     #     #   for(j in 1:N_potential){
+#     #     #     Nj_potential <- sum(available_mates[1:nf,index_potential[j]])
+#     #     #     xlli <- xlli * ((N_potential)/(N_potential+1)) * ((Nj_potential)/(Nj_potential+1))  
+#     #     #   }
+#     #     #   
+#     #     #   ll[i] <- log(pmin(pmax(0, 1 - xlli), 1))
+#     #       ll[i] <- N_potential * log(1 - 1/N_potential)
+#     #         #dbinom(0,size = N_potential, 1/N_potential)
+#     #     }
+#     #   }
+#     # }
+#     
+#     logProb <- 0#sum(ll)
+#     if(log) return(logProb)
+#     else return(exp(logProb))
+#   }
+# )
+# 
+# 
+# 
+# # Pair-Swap random assignment random value generator function
+# rpaircat <- nimbleFunction(
+#   run = function(n = integer(0),
+#                  available_mates = double(2),
+#                  nf = integer(0),
+#                  nm = integer(0)){
+#     
+#     
+#     returnType(double(1))
+#     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
+#     
+#     x <- rep(nm+1,nf)
+#     
+#     prob_grid <- available_mates#/(sum(available_mates) + equals(sum(available_mates),0))
+#     
+#     females <- rep(1:nf,nm)
+#     males <- numeric(nf * nm)
+#     for(j in 1:nm){
+#       males[(1:nf) + nf*(j-1)] <- rep(j, nf)
+#     }
+#     
+#     n_outcomes <- sum(prob_grid)#sum(1 * (prob_grid > 0))
+#     
+#     y <- rep(0,nf*nm)
+#     ij <- 0
+#     probVect <- numeric(nf * nm)
+#       
+#     while(n_outcomes > 0){
+#       for(j in 1:nm){
+#         probVect[1:nf + nf * (j-1)] <- prob_grid[1:nf,j] 
+#       }
+#       ij <- rcat(n = 1,prob = probVect)
+#       prob_grid[females[ij],1:nm] <- 0
+#       prob_grid[1:nf,males[ij]] <- 0
+#       y[ij] <- 1
+#       # prob_grid <- prob_grid/(sum(prob_grid) + equals(sum(prob_grid),0))
+#       n_outcomes <- sum(prob_grid)#sum(1 * (prob_grid > 0))
+#     }
+#     
+#     x[females[y==1]] <- males[y==1]
+#     
+#     
+#     return(x)
+#   }
+# )
+# 
+# # Pair-Swap random assignment distribution function
+# dpaircat <- nimbleFunction(
+#   run = function(x = double(1),
+#                  available_mates = double(2),
+#                  mating_f = double(1),
+#                  mating_m = double(1),
+#                  nf = integer(0),
+#                  nm = integer(0),
+#                  log = integer(0, default = 1)){
+#     
+#     
+#     available_mates2 <- matrix( 0, nrow = nf+1, ncol = nm + 1)
+#     returnType(double(0))
+#     
+#     # How many available males and females
+#     mating_females <- sum(mating_f) + 1
+#     mating_males  <- sum(mating_m) + 1
+#     osr <- mating_females/mating_males
+#     
+#     if(osr <= 1){
+#       ll <- rep(0, nf)
+#       # possible_mates <- rep(0,nf)
+#       available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm], equals(sum(available_mates[1,1:nm]),0)) #+ 1e-6
+#       ll[1] <- dcat(x[1],available_mates2[1,1:(nm+1)],log = TRUE)
+#       
+#       for(i in 2:nf){
+#         
+#         # Remove Formed Pairs
+#         for(j in 1:nm){
+#           available_mates2[i,j] <- available_mates[i,j]*(1-1*any(j == x[1:(i-1)]))
+#         }
+#         
+#         #Add case in which no pairs are available
+#         available_mates2[i,(nm+1)] <-  equals(sum(available_mates2[i,1:nm]),0) #+ 1e-6
+#         
+#         ll[i] <- dcat(x[i],available_mates2[i,1:(nm+1)],log = TRUE)
+#         
+#         
+#       }
+#     } else {
+#       y <- rep(nf+1, nm)
+#       ll <- rep(0,nm)
+#       
+#       # Build vector of male pairs
+#       # Need base likelihood on these values
+#       for(j in 1:nm){
+#         # Find which is your mate
+#         for(i in 1:nf){
+#           # if(is.nan(x[i])|is.na(x[i])) x[i] <- nm+1
+#           if(x[i] == j){
+#             y[j] <- i
+#           }
+#         }
+#       }
+#       
+#       
+#       # Apply mating selection for first male
+#       available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1], equals(sum(available_mates[1:nf,1]),0)) #+ 1e-6
+#       ll[1] <- dcat(y[1],available_mates2[1:(nf+1),1],log = TRUE)
+#       
+#       # Iterate over remaining males
+#       for(j in 2:nm){
+#         
+#         # Remove Formed Pairs
+#         for(i in 1:nf){
+#           available_mates2[i,j] <- available_mates[i,j]*(1-1*any(i == y[1:(j-1)]))
+#         }
+#         
+#         #Add case in which no pairs are available
+#         available_mates2[(nf+1),j] <- equals(sum(available_mates2[1:nf,j]),0) #+ 1e-6
+#         
+#         # Find mate for i
+#         ll[j] <- dcat(y[j],available_mates2[1:(nf+1),j],log = TRUE)
+#         
+#       }
+#     }
+#     
+#     logProb <- sum(ll)
+#     if(log) return(logProb)
+#     else return(exp(logProb))
+#   }
+# )
+# 
+# # 
+# # # Pair-Swap random assignment random value generator function
+# rpaircat <- nimbleFunction(
+#   run = function(n = integer(0),
+#                  available_mates = double(2),
+#                  mating_f = double(1),
+#                  mating_m = double(1),
+#                  nf = integer(0),
+#                  nm = integer(0)){
+#     
+#     x <- rep(nm+1,nf)
+#     
+#     available_mates2 <- matrix(value = 0, nrow = nf+1, ncol = nm + 1)
+#     
+#     returnType(double(1))
+#     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
+#     
+#     # How many available males and females
+#     mating_females <- sum(mating_f) + 1
+#     mating_males  <- sum(mating_m) + 1
+#     osr <- mating_females/mating_males
+#     
+#     # If operating sex ratio is balanced or in favor of females
+#     # Iterate across female
+#     if(osr <= 1){
+#       
+#       available_mates2[1, 1:(nm+1)] <- c(available_mates[1,1:nm],equals(sum(available_mates[1,1:nm]),0)) #+ 1e-6
+#       x[1] <- rcat(n=1, prob = available_mates2[1, 1:(nm+1)])
+#       
+#       for(i in 2:nf){
+#         
+#         # Remove Formed Pairs
+#         for(j in 1:nm){
+#           available_mates2[i,j] <- available_mates[i,j]*(1-1*any(j == x[1:(i-1)]))
+#         }
+#         
+#         #Add case in which no pairs are available
+#         available_mates2[i,(nm+1)] <- equals(sum(available_mates2[i,1:nm]),0) + 1e-6
+#         
+#         # Find mate for i
+#         x[i] <- rcat(n=1, prob = available_mates2[i, 1:(nm+1)])
+#         
+#       }
+#       
+#     } else {
+#       # Otherwise OSR favors males so we iterate across their mating pop instead
+#       y <- rep(nf+1,nm)
+#       
+#       # Apply mating selection for first male
+#       available_mates2[1:(nf+1), 1] <- c(available_mates[1:nf,1], equals(sum(available_mates[1:nf,1]),0)) #+ 1e-6
+#       y[1] <- rcat(n = 1, prob = available_mates2[1:(nf+1),1])
+#       
+#       # Iterate over remaining males
+#       for(j in 2:nm){
+#         
+#         # Remove Formed Pairs
+#         for(i in 1:nf){
+#           available_mates2[i,j] <- available_mates[i,j]*(1-1*any(i == y[1:(j-1)]))
+#         }
+#         
+#         #Add case in which no pairs are available
+#         available_mates2[(nf+1),j] <- equals(sum(available_mates2[1:nf,j]),0) #+ 1e-6
+#         
+#         # Find mate for i
+#         y[j] <- rcat(n= 1, prob = available_mates2[1:(nf+1), j])
+#         
+#       }
+#       
+#       # Mapping male choices back to the female vector
+#       for(i in 1:nf){
+#         for(j in 1:nm){
+#           if(y[j] == i){
+#             x[i] <- j
+#           }
+#         }
+#       }
+#     }
+#     
+#     return(x)
+#   }
+# )
