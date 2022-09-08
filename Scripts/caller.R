@@ -13,35 +13,35 @@ library(ggmcmc)
 niter <- 1e4
 nburnin <- niter/2
 nchains <- 4
-nthin <- 1
+nthin <- 5
 
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
+source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
 source(file.path(src_dir,"Scripts","pair_swap_mod_nimble.R"))
-# source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
 source(file.path(src_dir,"Scripts","fn_sim_pair_data.R"))
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
-k = 15
-n = 100
+k = 30
+n = 300
 
 # Seeds for Testing
-set.seed(42)
+set.seed(30)
 # set.seed(1e5)
 
 # Parameter Grid 
 param_list <- list(
   n            = n, # Number of Animals
   k            = k, # Occasions
-  lf           = 15, # Data Augmentation for Females (M_F)
-  lm           = 15, # Data Augmentation for Males (M_M)
+  lf           = 35, # Data Augmentation for Females (M_F)
+  lm           = 35, # Data Augmentation for Males (M_M)
   prop.female  = 0.5, # Proportion of simulated individuals to be female
-  delta        = rep(0.8, k), # Probability that mating is attempted
+  delta        = rep(1, k), # Probability that mating is attempted
   phi.f        = rep(0.9, k), # Marginal Prob of Female Survival
   phi.m        = rep(0.9, k), # Marginal Prob of Male Survival
-  gam          = rep(0.8, k), # Correlation in Survival Prob of Mates
+  gam          = rep(0, k), # Correlation in Survival Prob of Mates
   p.f          = rep(0.8, k), # Marginal Prob of Female Recapture
   p.m          = rep(0.8, k), # Marginal Prob of Male Recapture
   rho          = rep(0, k), # Correlation in male survival rates
@@ -54,7 +54,7 @@ param_list <- list(
 
 # Generate One set of Data
 ps_data <- sim_dat(param_list) # pair-swap data
-check_sim_output(ps_data)
+# check_sim_output(ps_data)
 js_data <- format_to_js(ps_data) 
 
 # # Known settings
@@ -102,7 +102,10 @@ js_data <- format_to_js(ps_data)
 # for(i in 1:ps_data$true_pop_m){
 #   ps_data$amating_m[i,] <- ifelse(ps_data$recruit_m[i,]==0,NA,ps_data$amating_m[i,])
 # }
-# # 
+#
+
+
+# # ADDING KNOWN PAIRS
 # psi_known <- array(0, dim = dim(ps_data$psi))
 # psi_known[,dim(psi_known)[2],] <- 0
 # 
@@ -115,14 +118,28 @@ js_data <- format_to_js(ps_data)
 #     }
 #   }
 # }
-# #
-# #
+# 
+# 
+# # psi_known <- ps_data$psi
+# # 
+# # for(t in 1:ps_data$k){
+# #   for(i in 1:ps_data$nf){
+# #     for(j in 1:ps_data$nm){
+# #       if((is.na(ps_data$zf[i])|is.na(ps_data$zm[j])) & is.na(ps_data$apf[i,t])){
+# #         psi_known[i,j,t] <- 1
+# #       }
+# #     }
+# #   }
+# # }
+# 
 # ps_data$psi <- psi_known
 
 ## Compile model PS------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma",#"beta0", "beta1",
-                   "delta","eps","gl","gu","ru","rl","NF","NM")
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma",#"beta0", #"beta1",
+                   "eps","gl","gu","ru","rl","NF","NM","xi")
 
+# ACCOUNT FOR RECRUITMENT....
+x <- Sys.time()
 fit <- run_pair_swap_nimble_parallel(data = ps_data, 
                                      params = nimble_params,
                                      niter = niter, 
@@ -133,6 +150,9 @@ fit <- run_pair_swap_nimble_parallel(data = ps_data,
 samples <- fit$samples
 inits <- fit$inits
 seeds <- fit$seed
+y <- Sys.time()
+
+difftime(y,x,units = "hours")
 
 # inits = generate_nimble_init_pairs(ps_data)
 # samples <- run_nimble(CmdlMCMC,
@@ -146,7 +166,7 @@ seeds <- fit$seed
 ## Compile model JS-----------------------------------------------------------------------
 
 js_params <- c("PF","PM", "PhiF","PhiM", "xi", "NF", "NM")
-
+x <- Sys.time()
 fit_js <- run_js_nimble_parallel(data = js_data, 
                               params = js_params,
                               niter = niter, 
@@ -157,7 +177,9 @@ fit_js <- run_js_nimble_parallel(data = js_data,
 samples_js <- fit_js$samples
 inits_js <- fit_js$inits
 seeds_js <- fit_js$seed
+y <- Sys.time()
 
+difftime(y,x,units = "hours")
 
 ## Summary
 
@@ -169,7 +191,8 @@ round(cbind(summ2[[1]][,"Mean"],summ2[[2]][,c("2.5%","97.5%")])[1:6,],3)
 
 
 ## Convergence diagnostics
-gelman.diag(samples[,c("NF","NM","PhiF","PhiM","PF","PM", "rho","delta")])
+gelman.diag(samples[,c("NF","NM","PhiF","PhiM","PF","PM", "rho","gamma")])
+gelman.diag(samples_js[,c("NF","NM","PhiF","PhiM","PF","PM")])
 
 ## Effective sample size
 ess <- round(effectiveSize(samples)/(nchains * niter),2)
@@ -178,10 +201,6 @@ ess
 
 chain <- 4
 ## Traceplots.
-ggs(samples) %>% 
-  # filter(Chain == chain) %>%
-  ggs_traceplot("apairs_f[12,3]")#  + 
-  # geom_hline(yintercept = param_list$rho[1], col = "red", size = 1.5)
 ggs(samples) %>% 
   # filter(Chain == chain) %>%
   ggs_traceplot("gamma") #+ 
@@ -194,15 +213,15 @@ ggs(samples) %>%
 ggs(samples) %>%
   # filter(Chain == chain) %>%
   ggs_traceplot("P") # + 
-# geom_hline(yintercept = 0.7, col = "red", size = 0.5)
-ggs(samples)%>% 
-  # filter(Chain == chain)  %>%
-  ggs_traceplot("delta")  #+ 
-  
-# geom_hline(yintercept = param_list$delta[1], col = "red", size = 1.5)
-ggs(samples) %>% 
-  # filter(Chain == chain) %>% 
-  ggs_traceplot("beta")
+# # geom_hline(yintercept = 0.7, col = "red", size = 0.5)
+# ggs(samples)%>% 
+#   # filter(Chain == chain)  %>%
+#   ggs_traceplot("delta")  #+ 
+#   
+# # geom_hline(yintercept = param_list$delta[1], col = "red", size = 1.5)
+# ggs(samples) %>% 
+#   # filter(Chain == chain) %>% 
+#   ggs_traceplot("beta")
 
 ggs(samples) %>% 
   # filter(Chain == chain) %>%
@@ -212,9 +231,14 @@ ggs(samples)%>%
   # filter(Chain == chain)  %>%
   ggs_traceplot("xi")
 
-
 # Store Results
-saveRDS(samples, "samples_inf_2.rds")
-saveRDS(inits, "inits_inf_2.rds")
-saveRDS(summ, "summ_inf_2.rds")
-saveRDS(ps_data, "ps_data_mod_inf_2.rds")
+saveRDS(samples, "samples_psi_known_delta0.rds")
+saveRDS(inits, "inits_psi_known_delta0.rds")
+saveRDS(ps_data, "ps_data_psi_known_delta0.rds")
+saveRDS(seeds, "seeds_psi_known_delta0.rds")
+
+
+saveRDS(samples_js, "samples_js_psi_known.rds")
+saveRDS(inits_js, "inits_js_psi_known.rds")
+saveRDS(js_data, "js_data_psi_known.rds")
+saveRDS(seeds_js, "seeds_js_psi_known.rds")

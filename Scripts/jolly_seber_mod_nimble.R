@@ -241,14 +241,14 @@ compile_js_nimble <- function(js_data,
 
 
 # Get Samples from Model
-run_nimble <- function(CmdlMCMC,
-                       niter,
-                       nburnin,
-                       thin,
-                       # inits = NULL,
-                       nchains=3,
-                       seed = F){
-
+run_nimble_js <- function(CmdlMCMC,
+                          niter,
+                          nburnin,
+                          thin,
+                          # inits = NULL,
+                          nchains=3,
+                          seed = F){
+  
   cat("MCMC Sampling from Model...","\n")
   samples <- runMCMC(mcmc              = CmdlMCMC,
                      niter             = niter,
@@ -258,7 +258,7 @@ run_nimble <- function(CmdlMCMC,
                      nchains           = nchains,
                      setSeed           = seed,
                      samplesAsCodaMCMC = TRUE)
-
+  
   cat("Returning Output...","\n")
   return(samples)
 }
@@ -275,13 +275,13 @@ execute_js_nimble_pipeline <- function(seed,
   
   nimble_complied <- compile_js_nimble(data, params)
   # inits <- generate_init_js(data)
-  samples <- run_nimble(CmdlMCMC = nimble_complied$CmdlMCMC,
-                        niter    = niter,
-                        thin     = nthin,
-                        nburnin  = nburnin,
-                        nchains  = nchains,
-                        # inits    = inits,
-                        seed     = seed) 
+  samples <- run_nimble_js(CmdlMCMC = nimble_complied$CmdlMCMC,
+                           niter    = niter,
+                           thin     = nthin,
+                           nburnin  = nburnin,
+                           nchains  = nchains,
+                           # inits    = inits,
+                           seed     = seed) 
   return(list(samples = samples,
               inits   = nimble_complied$nimble_inits))
   
