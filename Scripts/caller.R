@@ -10,16 +10,16 @@ library(coda)
 library(ggmcmc)
 
 ## MCMC parameters
-niter <- 1e4
+niter <- 3e4
 nburnin <- niter/2
-nchains <- 4
+nchains <- 5
 nthin <- 5
 
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
 source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","pair_swap_mod_nimble.R"))
+source(file.path(src_dir,"Scripts","pair_swap_mod_nimble3.R"))
 source(file.path(src_dir,"Scripts","fn_sim_pair_data.R"))
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
@@ -44,7 +44,7 @@ param_list <- list(
   gam          = rep(0, k), # Correlation in Survival Prob of Mates
   p.f          = rep(0.8, k), # Marginal Prob of Female Recapture
   p.m          = rep(0.8, k), # Marginal Prob of Male Recapture
-  rho          = rep(0, k), # Correlation in male survival rates
+  rho          = rep(0.8, k), # Correlation in male survival rates
   betas        = list(beta0 = 90, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
   init         = sample(1, n, TRUE), # Initial Entry into population for individual n
@@ -195,24 +195,26 @@ gelman.diag(samples[,c("NF","NM","PhiF","PhiM","PF","PM", "rho","gamma")])
 gelman.diag(samples_js[,c("NF","NM","PhiF","PhiM","PF","PM")])
 
 ## Effective sample size
-ess <- round(effectiveSize(samples)/(nchains * niter),2)
+ess <- round(effectiveSize(samples)/(nchains * (niter-nburnin)/nthin),2)
+ess_js <- round(effectiveSize(samples_js)/(nchains * (niter-nburnin)/nthin),2)
 ess
+ess_js
 
-
-chain <- 4
+chain <- 1
 ## Traceplots.
 ggs(samples) %>% 
-  # filter(Chain == chain) %>%
+  filter(Chain == chain) %>%
   ggs_traceplot("gamma") #+ 
-  # geom_hline(yintercept = param_list$gam[1], col = "red", size = 1.5)
+  
+# geom_hline(yintercept = param_list$gam[1], col = "red", size = 1.5)
 
 ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("rho") #
-
-ggs(samples) %>%
+  ggs_density("rho") #
+chain <- 4
+ggs(samples_js) %>%
   # filter(Chain == chain) %>%
-  ggs_traceplot("P") # + 
+  ggs_density("P")# + ylim(c(0,1)) # + 
 # # geom_hline(yintercept = 0.7, col = "red", size = 0.5)
 # ggs(samples)%>% 
 #   # filter(Chain == chain)  %>%
@@ -232,13 +234,13 @@ ggs(samples)%>%
   ggs_traceplot("xi")
 
 # Store Results
-saveRDS(samples, "samples_psi_known_delta0.rds")
-saveRDS(inits, "inits_psi_known_delta0.rds")
-saveRDS(ps_data, "ps_data_psi_known_delta0.rds")
-saveRDS(seeds, "seeds_psi_known_delta0.rds")
+saveRDS(samples, "samples_simple_80gam_0rho_300_30.rds")
+saveRDS(inits, "inits_simple_80gam_0rho_300_30.rds")
+saveRDS(ps_data, "ps_data_simple_80gam_0rho_300_30.rds")
+saveRDS(seeds, "seeds_simple_80gam_0rho_300_30.rds")
 
 
-saveRDS(samples_js, "samples_js_psi_known.rds")
-saveRDS(inits_js, "inits_js_psi_known.rds")
-saveRDS(js_data, "js_data_psi_known.rds")
-saveRDS(seeds_js, "seeds_js_psi_known.rds")
+saveRDS(samples_js, "samples_js_80gam_0rho_simple_300_30.rds")
+saveRDS(inits_js, "inits_js_80gam_0rho_simple_300_30.rds")
+saveRDS(js_data, "js_data_80gam_0rho_simple_300_30.rds")
+saveRDS(seeds_js, "seeds_js_80gam_0rho_simple_300_30.rds")

@@ -722,10 +722,17 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
     j <- pairs_f[i, time-1]
     single_check <- 1*(j == (nm + 1))
     
+    if(single_check != 1){
+      male_previous_alive <- recruit_m[j,time-1] * sm[j,time-1]
+    } else {
+      male_previous_alive <- 0
+    }
+   
+    
     # Conditional Probability of survival given pair status
-    prob_cond_f <- single_check * phi.f[time] + 
-      (1-single_check) * (sm[j,time] * joint_surv_pmf$prob.mf/phi.m[time]  + 
-                            (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
+    prob_cond_f <- (single_check + (1-single_check) * (1-male_previous_alive)) * phi.f[time] + 
+                   (1-single_check) * male_previous_alive * (sm[j,time] * joint_surv_pmf$prob.mf/phi.m[time]  + 
+                                          (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
     
     
     sf[i,time] <- rbinom(1,1, prob = prob_cond_f * sf[i,time-1] * recruit_f[i,time-1] + (1-recruit_f[i,time-1]))
@@ -1337,9 +1344,12 @@ compute_hidden_pairs <- function(pairs_f,
             } 
           }
           
-          amating_f[i,t] <- 1
+          amating_f[i,t] <- 1#0
           psi[i,,t] <- 0
-          psi[i,c(next_partner,last_partner),t] <- 1
+          # psi[i,(nm+1),t] <- 1
+          apairs_f[i,t] <- next_partner#nm+1
+          psi[i,c(next_partner),t] <- 1
+          # psi[i,c(next_partner,last_partner),t] <- 1
         }
       } else {
         if(apairs_f[i,t] == (nm+1)){
@@ -1431,8 +1441,15 @@ simulate_recapture <- function(recap_f,
       j <- pairs_f[i, t]
       single_check <- 1*(j == (nm + 1))
       
-      recap_prob_cond_f <- single_check * p.f[t] + 
-        (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+      if(single_check != 1){
+        male_alive <- recruit_m[j,t] * sm[j,t]
+      } else {
+        male_alive <- 0
+      }
+     
+      
+      recap_prob_cond_f <- (single_check + (1-single_check) * (1-male_alive)) * p.f[t] + 
+        (1-single_check) * male_alive * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
                               (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
       
       
@@ -1590,6 +1607,12 @@ add_data_augmentation <- function(lf,
   psi2 <- array(NA,dim = c(nf+lf,nm+lm+1,k))
   if(lm != 0) psi2[,(nm+1):(nm+lm),1:k] <- 0 # aug males
   if(lf != 0) psi2[(nf+1):(nf+lf),,1:k] <- 0 # aug females
+  if(lm != 0 & lf != 0){
+    for(t in 1:k){
+      diag(psi2[(nf+1):(nf+lf),(nm+1):(nm+lm),t]) <- 1
+    }
+  }
+  
   psi2[,(nm+lm+1),1:k] <- 0 # dummy entry
   psi2[1:nf,1:nm,1:k] <- psi
   
@@ -1637,6 +1660,7 @@ add_data_augmentation <- function(lf,
     }
   }
   
+  apairs_f[is.na(apairs_f)] <- (nm+lm+1)
   
   # Return augmented data
   return(list(recruit_f     = recruit_f,
@@ -1937,7 +1961,7 @@ simulate_cr_data <- function(n,
     nm             = nm, # Number of males
     sex            = sex, # Sex of sampled individuals
     initial_entry  = initial_entry, # When did they enter the population
-    
+    single_female  = do.call(cbind, lapply(1:k, function(t) 1*(apairs_f[1:nf,t] == (nm+1)))),
     # Latent States (true values - hidden in real data)
     mating_f       = mating_f, # Mate status of females at t (+ dummy)
     mating_m       = mating_m, # Mate status of males at t (+ dummy)
@@ -1952,8 +1976,8 @@ simulate_cr_data <- function(n,
     # Observed /Inferred states (Missing Values are possible)
     zf             = zf,
     zm             = zm,
-    recruit_f      = recruit_f[1:nf,1:k], 
-    recruit_m      = recruit_m[1:nm,1:k],
+    recruit_f      = rbind(recruit_f[1:nf,1:k],rep(0,k)),
+    recruit_m      = rbind(recruit_m[1:nm,1:k],rep(0,k)),
     recruit_f_true = recruit_f_true,
     recruit_m_true = recruit_m_true,
     psi            = psi, # Pairs that may exist (not excluded due to already formed pairs)
