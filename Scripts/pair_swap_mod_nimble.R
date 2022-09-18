@@ -121,27 +121,22 @@ sampler_pairs <- nimbleFunction(
     # Vars
     nf <- model$getParam(target, 'nf')
     nm <- model$getParam(target, 'nm')
-    # arrivals <- model$getParam(target, "arrivals")
     psi_cond_t <- model$getParam(target, 'available_mates')
-    logProbs <- numeric(2)
-    probs <- numeric(2)
     ## checks
     if(model$getDistribution(target) != 'dpaircat') stop('can only use pair categorical sampler on node with dpaircat distribution')
   },
   run = function() {
-    # current_pairs <- model[[target]]
-    # logProbs[1] <<- model$getLogProb(calcNodes)
-    # if(is.nan(logProbs[1])) logProbs[1] <<- -Inf
-    # Simulate new partners
-    model[[target]] <<- rpaircat(1,psi_cond_t,
-                                 # arrivals,
-                                 nf, 
-                                 nm) # accept target
-    # logProbs[2] <<- model$calculate(calcNodes) # calculate logprobs
-    # if(is.nan(logProbs[2])) logProbs[2] <<- -Inf
-    
-    
-    acceptanceProb <- 1#1/(exp(logProbs[1] - logProbs[2]) + 1)
+     currentLogProb <- model$getLogProb(calcNodes)
+     model[[target]] <<- rpaircat(1,psi_cond_t, nf,nm)
+     otherLogProbPrior <- model$calculate(target)
+     
+     if(otherLogProbPrior == -Inf) {
+       otherLogProb <- otherLogProbPrior
+     } else {
+       otherLogProb <- otherLogProbPrior + model$calculate(calcNodesNoSelf)
+     }
+
+    acceptanceProb <- 1/(exp(logProbs[1] - logProbs[2]) + 1)
     jump <- (!is.nan(acceptanceProb)) & (runif(1,0,1) < acceptanceProb)
     if(jump) {
       nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
@@ -1082,7 +1077,8 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
   ncores <- min(ncores, detectCores()-2)
   
   if(ncores == 1){
-    cat("Only one core specified, not bothering with parallelization. Set ncores > 1 if so desired.")
+    cat("Only one core specified, not bothering with parallelization...", "\n")
+    cat("Plase set ncores > 1 (up to number of available threads) for parallel processing...","\n")
     samples <- execute_pair_swap_nimble_pipeline(F, data, params, niter, nthin, nburnin, 1)
     return(samples)
   }

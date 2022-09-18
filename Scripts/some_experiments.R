@@ -324,3 +324,80 @@ names(y) <- names(jags_data2)
 #   index <- which(!is.na(jags_data$af[,t]))
 #   print(all(jags_data$sf[index,t] == jags_data$af[index,t]))
 # } 
+
+# # Known settings
+# ps_data$zf <- c(rep(1,ps_data$true_pop_f),rep(0, ps_data$lf))
+# ps_data$zm <- c(rep(1,ps_data$true_pop_m),rep(0, ps_data$lm))
+
+#
+# ps_data$amating_f <- rbind(ps_data$mating_f[1:ps_data$true_pop_f,],matrix(0,nrow = ps_data$lf+1, ncol = ps_data$k))
+# ps_data$amating_m <- rbind(ps_data$mating_m[1:ps_data$true_pop_m,],matrix(0,nrow = ps_data$lm+1, ncol = ps_data$k))
+# ps_data$arepartner <- rbind(ps_data$repartner[,2:ps_data$k], matrix(0,nrow = ps_data$lf, ncol = ps_data$k-1))
+# ps_data$recruit_f <- rbind(ps_data$recruit_f_true[1:ps_data$true_pop_f,],matrix(1,nrow = ps_data$lf, ncol = ps_data$k))
+# ps_data$recruit_m <- rbind(ps_data$recruit_m_true[1:ps_data$true_pop_m,],matrix(1,nrow = ps_data$lm, ncol = ps_data$k))
+# ps_data$af        <- rbind(ps_data$sf[1:ps_data$true_pop_f,],matrix(1,nrow = ps_data$lf, ncol = ps_data$k),rep(0,ps_data$k))
+# ps_data$am        <- rbind(ps_data$sm[1:ps_data$true_pop_m,],matrix(1,nrow = ps_data$lm, ncol = ps_data$k),rep(0,ps_data$k))
+
+
+# RHO FAILS WHEN EVERYTHING BUT AMATING/ZF (AND AREREPARTNER REMOVED) is on
+# COULD DA be the problem? 
+
+# DA Seems fine...
+# Amating_F/amating_m included corrupts the result...
+
+# TRY WITHOUT PSI (not including throws error at initial value generation - must check this)
+
+# Turn on amating only - why does it fail?
+
+# for(i in 1:nrow(ps_data$amating_f)){
+#   x <- max(which(1 == ps_data$amating_f[i,]))
+#   if(abs(x)==Inf) next
+#   ps_data$af[i,1:x] <- 1
+#   rm(x)
+# }
+# 
+# 
+# for(i in 1:nrow(ps_data$amating_m)){
+#   x <- max(which(1 == ps_data$amating_m[i,]))
+#   if(abs(x)==Inf) next
+#   ps_data$am[i,1:x] <- 1
+#   rm(x)
+# }
+# for(i in 1:ps_data$true_pop_f){
+#   ps_data$amating_f[i,] <- ifelse(ps_data$recruit_f[i,]==0,NA,ps_data$amating_f[i,])
+# }
+#
+# for(i in 1:ps_data$true_pop_m){
+#   ps_data$amating_m[i,] <- ifelse(ps_data$recruit_m[i,]==0,NA,ps_data$amating_m[i,])
+# }
+#
+
+
+# # ADDING KNOWN PAIRS
+# psi_known <- array(0, dim = dim(ps_data$psi))
+# psi_known[,dim(psi_known)[2],] <- 0
+# 
+# for(t in 1:ps_data$k){
+#   for(i in 1:ps_data$true_pop_f){
+#     for(j in 1:ps_data$true_pop_m){
+#       if(ps_data$pairs_f[i,t]==j){
+#         psi_known[i,j,t] <- 1
+#       }
+#     }
+#   }
+# }
+# 
+# 
+# # psi_known <- ps_data$psi
+# # 
+# # for(t in 1:ps_data$k){
+# #   for(i in 1:ps_data$nf){
+# #     for(j in 1:ps_data$nm){
+# #       if((is.na(ps_data$zf[i])|is.na(ps_data$zm[j])) & is.na(ps_data$apf[i,t])){
+# #         psi_known[i,j,t] <- 1
+# #       }
+# #     }
+# #   }
+# # }
+# 
+# ps_data$psi <- psi_known

@@ -552,7 +552,7 @@ add_last_capture <- function(cap.data){
               min_age = min(age)) %>%
     ungroup() %>% 
     mutate(known_lifespan = final_entry-initial_entry + 1,
-           max_remaining = 12 - known_lifespan,
+           max_remaining = 20 - known_lifespan,
            first_possible = ifelse(min_age == 0, initial_entry + 1, 
                                    ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining)),
            last_possible = ifelse(final_entry + max_remaining >= 28, 28, final_entry + max_remaining)) 
@@ -576,9 +576,9 @@ clean_filtered <- function(cap.data){
   
   # Add minimum possible age and maximum possible age
   cap.data <- cap.data %>% 
-    mutate(upper_age = ifelse(time - first_possible + 1 < 12, time - first_possible + 1, 12),
+    mutate(upper_age = ifelse(time - first_possible + 1 < 20, time - first_possible + 1, 20),
            upper_age = ifelse(upper_age < 0, 0, upper_age),
-           lower_age = ifelse(time - initial_entry + 1 < 12, time - initial_entry + 1, 12),
+           lower_age = ifelse(time - initial_entry + 1 < 20, time - initial_entry + 1, 20),
            lower_age = ifelse(lower_age < 0, 0, lower_age))
   
   return(cap.data)
@@ -593,23 +593,23 @@ assign_ids_bysex <- function(cap.data){
     arrange(sex, animal_id) %>% 
     distinct() %>%
     group_by(sex) %>% 
-    summarize(jags_id = 1:n(), animal_id = animal_id) %>% 
+    summarize(nimble_id = 1:n(), animal_id = animal_id) %>% 
     ungroup() 
   
   
-  # Add gender specific ids (for jags/nimble modelling)
+  # Add gender specific ids (for nimble/nimble modelling)
   cap.data <- cap.data %>% 
     left_join(id_catalog, by = c("animal_id", "sex")) %>% 
-    left_join(rename(id_catalog,"jags_partner_id" = jags_id), by = c("partner_id" = "animal_id")) %>% 
+    left_join(rename(id_catalog,"nimble_partner_id" = nimble_id), by = c("partner_id" = "animal_id")) %>% 
     select(-sex.y) %>% rename(sex = sex.x) %>% 
-    left_join(filter(rename(id_catalog,"jags_mother_id" = jags_id)), by = c("mother_id" = "animal_id")) %>% 
+    left_join(filter(rename(id_catalog,"nimble_mother_id" = nimble_id)), by = c("mother_id" = "animal_id")) %>% 
     select(-sex.y) %>% rename(sex = sex.x)
   
   return(cap.data)
   
 }
 
-# Build Jags Data for recruitment 
+# Build nimble Data for recruitment 
 populate_recruit <- function(cap.data, nf, nm, k){
   
   # Recruitment matrices
@@ -618,21 +618,21 @@ populate_recruit <- function(cap.data, nf, nm, k){
   
   # Extract initial entry by id 
   female_init <- cap.data %>% 
-    select(sex, jags_id, initial_entry, first_possible) %>% 
+    select(sex, nimble_id, initial_entry, first_possible) %>% 
     filter(sex == "F") %>% 
-    arrange(jags_id) %>% 
+    arrange(nimble_id) %>% 
     distinct()
 
   male_init <- cap.data %>%
-    select(sex, jags_id, initial_entry, first_possible) %>% 
+    select(sex, nimble_id, initial_entry, first_possible) %>% 
     filter(sex == "M") %>%
-    arrange(jags_id) %>% 
+    arrange(nimble_id) %>% 
     distinct()
   
   
   # Populate Female 
   for(i in 1:nrow(female_init)){
-    f_id <- female_init$jags_id[i]
+    f_id <- female_init$nimble_id[i]
     init_id <- female_init$initial_entry[i]
     recruit_f[f_id, init_id:k] <- 1
     # Add limit to when they could have entered
@@ -647,7 +647,7 @@ populate_recruit <- function(cap.data, nf, nm, k){
   
   # Populate Male 
   for(i in 1:nrow(male_init)){
-    m_id <- male_init$jags_id[i]
+    m_id <- male_init$nimble_id[i]
     init_m_id <- male_init$initial_entry[i]
     recruit_m[m_id, init_m_id:k] <- 1
     first_possible_m <- male_init$first_possible[i]
@@ -663,7 +663,7 @@ populate_recruit <- function(cap.data, nf, nm, k){
   
 }
 
-# Build JAGS data for desire to mate at t
+# Build nimble data for desire to mate at t
 populate_mating <- function(cap.data, nf, nm, k){
   
   # Attempt to mate matrix
@@ -673,26 +673,26 @@ populate_mating <- function(cap.data, nf, nm, k){
   # Mating status of females/males
   female_mating <- cap.data %>%
     filter(sex == "F") %>% 
-    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    select(time, nimble_id, mated, first_possible, last_possible) %>% 
     mutate(mated = ifelse(first_possible > time| time > last_possible, 0, mated)) %>% 
     distinct()
   
   male_mating <- cap.data %>% 
     filter(sex == "M") %>% 
-    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    select(time, nimble_id, mated, first_possible, last_possible) %>% 
     mutate(mated = ifelse(first_possible > time| time > last_possible, 0, mated)) %>% 
     distinct()
   
   # Assign mate status to females
   for(i in 1:nrow(female_mating)){
-    f_id <- female_mating$jags_id[i]
+    f_id <- female_mating$nimble_id[i]
     t <- female_mating$time[i]
     amating_f[f_id,t] <- female_mating$mated[i]
   }
   
   # Assing mate status to males
   for(i in 1:nrow(male_mating)){
-    m_id <- male_mating$jags_id[i]
+    m_id <- male_mating$nimble_id[i]
     t <- male_mating$time[i]
     amating_m[m_id,t] <- male_mating$mated[i]
   }
@@ -700,7 +700,7 @@ populate_mating <- function(cap.data, nf, nm, k){
   return(list(amating_f = amating_f, amating_m = amating_m))
 }
 
-# Assign known pairs and possible fates for JAGS 
+# Assign known pairs and possible fates for nimble 
 populate_pairs <- function(cap.data, nf, nm, k){
   
   #Pairs matrix
@@ -712,14 +712,14 @@ populate_pairs <- function(cap.data, nf, nm, k){
   apairs[,,1] <- 0 
   
   # Females and partners
-  female_mates <- cap.data %>% filter(sex == "F") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
-  male_mates   <- cap.data %>% filter(sex == "M") %>% select(time, jags_id, jags_partner_id, jags_mother_id)
+  female_mates <- cap.data %>% filter(sex == "F") %>% select(time, nimble_id, nimble_partner_id, nimble_mother_id)
+  male_mates   <- cap.data %>% filter(sex == "M") %>% select(time, nimble_id, nimble_partner_id, nimble_mother_id)
   
   # Assign pairs
   for(t in 1:k){
     for(i in 1:nf){
-      female_id <- female_mates[female_mates$time == t,"jags_id"][i]
-      female_partner_id <- female_mates[female_mates$time == t,"jags_partner_id"][i]
+      female_id <- female_mates[female_mates$time == t,"nimble_id"][i]
+      female_partner_id <- female_mates[female_mates$time == t,"nimble_partner_id"][i]
       if(is.na(female_partner_id)) next #skip if no partner
       for(j in 1:nm){
         # Zero out other pair formation
@@ -733,8 +733,8 @@ populate_pairs <- function(cap.data, nf, nm, k){
   
   for(t in 1:k){
     for(j in 1:nm){
-      male_id <- male_mates[male_mates$time == t,"jags_id"][j]
-      male_partner_id <- male_mates[male_mates$time == t,"jags_partner_id"][j]
+      male_id <- male_mates[male_mates$time == t,"nimble_id"][j]
+      male_partner_id <- male_mates[male_mates$time == t,"nimble_partner_id"][j]
       if(is.na(male_partner_id)) next #skip if no partner
       for(i in 1:nf){
         # Zero out other pair formation
@@ -748,13 +748,13 @@ populate_pairs <- function(cap.data, nf, nm, k){
   
   # Replace NA values with zero for mother-child pairs
   impossible_pairs <- male_mates %>% 
-    filter(!is.na(jags_mother_id)) %>% 
-    select(jags_id, jags_mother_id) %>% 
+    filter(!is.na(nimble_mother_id)) %>% 
+    select(nimble_id, nimble_mother_id) %>% 
     distinct()
   # Go through impossible pairings and zero them out across all time
   for(l in 1:nrow(impossible_pairs)){
-    male_id <- impossible_pairs$jags_id[l]
-    mother_id <- impossible_pairs$jags_mother_id[l]
+    male_id <- impossible_pairs$nimble_id[l]
+    mother_id <- impossible_pairs$nimble_mother_id[l]
     apairs[mother_id+1,male_id+1,] <- 0
   }
   
@@ -762,26 +762,26 @@ populate_pairs <- function(cap.data, nf, nm, k){
   # Mating status of females/males
   female_mating <- cap.data %>%
     filter(sex == "F") %>% 
-    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    select(time, nimble_id, mated, first_possible, last_possible) %>% 
     mutate(mated = ifelse(first_possible > time|time > last_possible, 0, mated)) %>% 
     distinct()
   
   male_mating <- cap.data %>% 
     filter(sex == "M") %>% 
-    select(time, jags_id, mated, first_possible, last_possible) %>% 
+    select(time, nimble_id, mated, first_possible, last_possible) %>% 
     mutate(mated = ifelse(first_possible > time|time > last_possible, 0, mated)) %>% 
     distinct()
   
   # Assign no mate to females who couldn't be in population based on age
   for(i in 1:nrow(female_mating)){
-    f_id <- female_mating$jags_id[i]
+    f_id <- female_mating$nimble_id[i]
     t <- female_mating$time[i]
     if(!is.na(female_mating$mated[i])) if(female_mating$mated[i] == 0) apairs[f_id+1,,t+1] <- 0
   }
   
   # Assign no mate to males who couldn't be in population based on age
   for(i in 1:nrow(male_mating)){
-    m_id <- male_mating$jags_id[i]
+    m_id <- male_mating$nimble_id[i]
     t <- male_mating$time[i]
     if(!is.na(male_mating$mated[i])) if(male_mating$mated[i] == 0) apairs[,m_id+1,t+1] <- 0
   }
@@ -799,34 +799,34 @@ populate_surv <- function(cap.data, nf, nm, k){
   
   # Survival data.frames
   surv_f <- cap.data %>%
-    select(sex, jags_id, time, surv_individual_confounded, last_possible) %>%
+    select(sex, nimble_id, time, surv_individual_confounded, last_possible) %>%
     #mutate(surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded)) %>% 
     filter(sex == "F") %>% 
-    arrange(jags_id) %>% 
+    arrange(nimble_id) %>% 
     distinct()
   
   last_alive_f <- surv_f %>% 
-    group_by(jags_id) %>% 
+    group_by(nimble_id) %>% 
     summarize(last_alive = max(which(surv_individual_confounded == 1))) %>% 
     ungroup()
   
   surv_m <- cap.data %>% 
-    select(sex, jags_id, time, surv_individual_confounded, last_possible)  %>%
+    select(sex, nimble_id, time, surv_individual_confounded, last_possible)  %>%
    # mutate(surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded)) %>% 
     filter(sex == "M") %>% 
-    arrange(jags_id) %>%
+    arrange(nimble_id) %>%
     distinct()
   
   last_alive_m <- surv_m %>% 
-    group_by(jags_id) %>% 
+    group_by(nimble_id) %>% 
     summarize(last_alive = max(which(surv_individual_confounded == 1))) %>% 
     ungroup()
   
   # Populate survival matrices for females
   for(i in 1:nrow(surv_f)){
-    id <- surv_f$jags_id[i]
+    id <- surv_f$nimble_id[i]
     t <- surv_f$time[i]
-    last_seen <- last_alive_f %>% filter(jags_id == id) %>% pull(last_alive)
+    last_seen <- last_alive_f %>% filter(nimble_id == id) %>% pull(last_alive)
     last_possible <- surv_f$last_possible[i]
     
     # Must have been alive prior to being seen (or not in pop yet)
@@ -843,9 +843,9 @@ populate_surv <- function(cap.data, nf, nm, k){
   
   # Populate survival matrices for males
   for(i in 1:nrow(surv_m)){
-    id <- surv_m$jags_id[i]
+    id <- surv_m$nimble_id[i]
     t <- surv_m$time[i]
-    last_alive <- last_alive_m %>% filter(jags_id == id) %>% pull(last_alive)
+    last_alive <- last_alive_m %>% filter(nimble_id == id) %>% pull(last_alive)
     last_possible <- surv_m$last_possible[i]
     
     # Must have been alive prior to being seen (or not in pop yet)
@@ -872,27 +872,27 @@ populate_recap <- function(cap.data, nf, nm, k){
   
   # Recapture data.frames
   recapture_f <- cap.data %>%
-    select(sex, jags_id, time, recapture_individual) %>%
+    select(sex, nimble_id, time, recapture_individual) %>%
     filter(sex == "F") %>% 
-    arrange(jags_id) %>% 
+    arrange(nimble_id) %>% 
     distinct()
   
   recapture_m <- cap.data %>% 
-    select(sex, jags_id, time, recapture_individual) %>%
+    select(sex, nimble_id, time, recapture_individual) %>%
     filter(sex == "M") %>% 
-    arrange(jags_id) %>%
+    arrange(nimble_id) %>%
     distinct()
   
   # Populate recapture matrices for females
   for(i in 1:nrow(recapture_f)){
-    id <- recapture_f$jags_id[i]
+    id <- recapture_f$nimble_id[i]
     t <- recapture_f$time[i]
     recap_f[id, t] <- recapture_f$recapture_individual[i]
   }
   
   # Populate recapture matrices for males
   for(i in 1:nrow(recapture_m)){
-    id <- recapture_m$jags_id[i]
+    id <- recapture_m$nimble_id[i]
     t <- recapture_m$time[i]
     recap_m[id, t] <- recapture_m$recapture_individual[i]
   }
@@ -975,7 +975,6 @@ add_data_augmentation_ducks <- function(lf,
                                         amating_f,
                                         amating_m,
                                         apairs_f,
-                                        apairs_m,
                                         arepartner,
                                         af,
                                         am,
@@ -1053,8 +1052,8 @@ add_data_augmentation_ducks <- function(lf,
   # Drop dummy row for now
   psi <- psi[,-(nm+1),]
   psi2 <- array(NA,dim = c(nf+lf,nm+lm+1,k))
-  psi2[,(nm+1):(nm+lm),1:k] <- 1 # aug males
-  psi2[(nf+1):(nf+lf),,1:k] <- 1 # aug females
+  psi2[,(nm+1):(nm+lm),1:k] <- 0 # aug males
+  psi2[(nf+1):(nf+lf),,1:k] <- 0 # aug females
   psi2[,(nm+lm+1),1:k] <- 0 # dummy entry
   psi2[1:nf,1:nm,1:k] <- psi
   
@@ -1103,6 +1102,8 @@ add_data_augmentation_ducks <- function(lf,
       }
     }
   }
+  
+  apairs_f[is.na(apairs_f)] <- (nm+lm+1)
   
   
   # Return augmented data
@@ -1304,12 +1305,12 @@ filter_impossible_matchs <- function(psi,
   
 }
 
-# Prepare data for jags
-build_jags_data <- function(cap.data, data_aug, lf, lm){
+# Prepare data for nimble
+build_nimble_data <- function(cap.data, data_aug, lf, lm){
   
   # Index values
-  nf <- cap.data %>% select(sex, jags_id) %>% filter(sex=="F") %>% distinct() %>% arrange(jags_id) %>% nrow()
-  nm <- cap.data %>% select(sex, jags_id) %>% filter(sex=="M") %>% distinct() %>% arrange(jags_id) %>% nrow()
+  nf <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="F") %>% distinct() %>% arrange(nimble_id) %>% nrow()
+  nm <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="M") %>% distinct() %>% arrange(nimble_id) %>% nrow()
   k <- cap.data %>% select(time) %>% distinct() %>% nrow()
   
   # Recruitment matrices
@@ -1338,6 +1339,10 @@ build_jags_data <- function(cap.data, data_aug, lf, lm){
   # Construct partner index by female
   apairs_f <- populate_apairs_f(apairs,amating_f,nf,nm,k)
   
+  
+  #
+  
+ 
   # Construct partially repartnership matrix
   # arepartner <- populate_arepartner(apairs_f, nf, nm, k)
   #browser()
@@ -1352,6 +1357,191 @@ build_jags_data <- function(cap.data, data_aug, lf, lm){
       recap_m = recap_m,
       nf = nf,
       nm = nm)
+  
+  for(i in 1:nf){
+    
+    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+    num_partners_i <- length(partners_i)
+    
+    first_partner <- partners_i[1]
+    
+    # If no pairs observed make no possible combos
+    if(num_partners_i == 0){
+      apairs_f[i,1:k] <- (nm+1)
+      arepartner[i,1:k] <- 0
+      amating_f[i,1:k] <- 0
+      psi[i,,1:k] <- 0
+      psi[i,(nm+1),1:k] <- 1
+      next
+    }
+    
+    for(t in 1:k){
+      
+      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      if(length(last_partner)==0){
+        last_partner <- first_partner
+      } 
+      last_partner <- last_partner[length(last_partner)]
+      
+      if(t == k){
+        next_partner <- last_partner
+      } else {
+        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        if(length(next_partner)==0){
+          next_partner <- last_partner
+        } 
+        next_partner <- next_partner[1]
+        
+      }
+      
+      if(is.na(apairs_f[i,t])){
+        
+        if(t == 1){
+          
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == first_partner)|first_partner==(nm+1)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,(nm+1),t] <- 1
+              next 
+            }
+          }
+          
+          apairs_f[i,t] <- first_partner
+          #apairs_m[first_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[first_partner,t] <- 1
+          psi[,first_partner,t] <- 0
+          psi[i,,t] <- 0
+          psi[i,first_partner,t] <- 1
+          
+          next
+        }
+        
+        if(next_partner == last_partner){
+          
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)|(last_partner==(nm+1))){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,(nm+1),t] <- 1
+              next
+            } 
+          }
+          apairs_f[i,t] <- last_partner
+          #apairs_m[last_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[last_partner,t] <- 1
+          psi[,last_partner,t] <- 0
+          psi[i,,t] <- 0
+          psi[i,last_partner,t] <- 1
+          next
+        }
+        
+        if(last_partner == (nm+1)){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,(nm+1),t] <- 1
+              next
+            } 
+          }
+          apairs_f[i,t] <- next_partner
+          #apairs_m[next_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[next_partner,t] <- 1
+          psi[,next_partner,t] <- 0
+          psi[i,,t] <- 0
+          psi[i,next_partner,t] <- 1
+          next
+        }
+        
+        if(next_partner == (nm+1)){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,(nm+1),t] <- 1
+              next
+            } 
+          }
+          apairs_f[i,t] <- last_partner
+          #apairs_m[last_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[last_partner,t] <- 1
+          psi[,last_partner,t] <- 0
+          psi[i,,t] <- 0
+          psi[i,last_partner,t] <- 1
+          next
+          
+        }
+        
+        if(next_partner != last_partner){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,(nm+1),t] <- 1
+              next
+            } 
+            
+            
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != next_partner)){
+              apairs_f[i,t] <- next_partner
+              #apairs_m[next_partner,t] <- i
+              amating_f[i,t] <- 1
+              amating_m[next_partner,t] <- 1
+              psi[,next_partner,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,next_partner,t] <- 1
+              next
+            } 
+            
+            
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- last_partner
+              #apairs_m[last_partner,t] <- i
+              amating_f[i,t] <- 1
+              amating_m[last_partner,t] <- 1
+              psi[,last_partner,t] <- 0
+              psi[i,,t] <- 0
+              psi[i,last_partner,t] <- 1
+              next
+            } 
+          }
+          
+          amating_f[i,t] <- 0
+          psi[i,,t] <- 0
+          # psi[i,(nm+1),t] <- 1
+          apairs_f[i,t] <- nm+1
+          # psi[i,c(next_partner),t] <- 1
+          # psi[i,c(next_partner,last_partner),t] <- 1
+        }
+      } else {
+        if(apairs_f[i,t] == (nm+1)){
+          amating_f[i,t] <- 0
+          psi[i,,t] <- 0
+          psi[i,(nm+1),t] <- 1
+        } else {
+          amating_f[i,t] <- 1
+          psi[i,,t] <- 0
+          psi[,apairs_f[i,t],t] <- 0
+          psi[i,apairs_f[i,t],t] <- 1
+          
+        }
+        
+      }
+    }
+  }
+  
+  
+  
   
   
   if(data_aug){
@@ -1401,22 +1591,22 @@ build_jags_data <- function(cap.data, data_aug, lf, lm){
   nf <- nf + lf
   nm <- nm + lm
   
-  
-  # add_dummy_row <- function(mat, x = 1){
-  #   return(rbind(mat,rep(x,ncol(mat))))
-  # }
-  # add_dummy_col <- function(mat, x = 1){
-  #   return(cbind(rep(x,nrow(mat)),mat))
-  # }
+
+  add_dummy_row <- function(mat, x = 0){
+    return(rbind(mat,rep(x,ncol(mat))))
+  }
+  add_dummy_col <- function(mat, x = 0){
+    return(cbind(rep(x,nrow(mat)),mat))
+  }
   
   # Store results in list 
-  jags_data <- list(nf         = nf, 
+  nimble_data <- list(nf         = nf, 
                     nm         = nm,
                     k          = k,
-                    recruit_f  = recruit_f, #add_dummy_row(recruit_f),
-                    recruit_m  = recruit_m, #add_dummy_row(recruit_m),
-                    amating_f  = amating_f, #add_dummy_row(amating_f),
-                    amating_m  = amating_m, #add_dummy_row(amating_m),
+                    recruit_f  = add_dummy_row(recruit_f),
+                    recruit_m  = add_dummy_row(recruit_m),
+                    amating_f  = add_dummy_row(amating_f),
+                    amating_m  = add_dummy_row(amating_m),
                     apf        = apairs_f,
                     apairs_f =  matrix(NA, 
                                        nrow=nrow(apairs_f), 
@@ -1424,14 +1614,17 @@ build_jags_data <- function(cap.data, data_aug, lf, lm){
                     arepartner = arepartner[,2:k], # repartner with inferred states 
                     apairs     = apairs,
                     psi        = psi, 
-                    af         = af,#add_dummy_row(af),
-                    am         = am,#add_dummy_row(am),
-                    recap_f    = recap_f, #add_dummy_row(recap_f, 0),
-                    recap_m    = recap_m,
+                    af         = add_dummy_row(af),
+                    am         = add_dummy_row(am),
+                    recap_f    = add_dummy_row(recap_f, 0),
+                    recap_m    = add_dummy_row(recap_m, 0),
                     zf         = zf,
-                    zm         = zm) #add_dummy_row(recap_m,0))
+                    zm         = zm,
+                    single_female  = do.call(cbind, lapply(1:k, function(t) 1*(apairs_f[1:nf,t] == (nm+1)))),
+                    recruit_f      = rbind(recruit_f[1:nf,1:k],rep(0,k)),
+                    recruit_m      = rbind(recruit_m[1:nm,1:k],rep(0,k))) #add_dummy_row(recap_m,0))
   
   # Return model data
-  return(jags_data)
+  return(nimble_data)
 }
 
