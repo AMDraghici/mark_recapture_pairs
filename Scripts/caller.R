@@ -10,14 +10,14 @@ library(coda)
 library(ggmcmc)
 
 ## MCMC parameters
-niter <- 1e5
+niter <- 1e4
 nburnin <- niter/2
 nchains <- 5
-nthin <- 20
+nthin <- 5
 
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
-setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
+# setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
 source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
 source(file.path(src_dir,"Scripts","pair_swap_mod_nimble4.R"))
@@ -27,7 +27,7 @@ source(file.path(src_dir,"Scripts","fn_sim_pair_data2.R"))
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
 k = 30
-n = 300
+n = 100
 
 # Seeds for Testing
 set.seed(2*pi)
@@ -37,10 +37,10 @@ set.seed(2*pi)
 param_list <- list(
   n            = n, # Number of Animals
   k            = k, # Occasions
-  lf           = 30, # Data Augmentation for Females (M_F)
-  lm           = 30, # Data Augmentation for Males (M_M)
+  lf           = 10, # Data Augmentation for Females (M_F)
+  lm           = 10, # Data Augmentation for Males (M_M)
   prop.female  = 0.5, # Proportion of simulated individuals to be female
-  delta        = rep(1, k), # Probability that mating is attempted
+  delta        = rep(0.8, k), # Probability that mating is attempted
   phi.f        = rep(0.9, k), # Marginal Prob of Female Survival
   phi.m        = rep(0.9, k), # Marginal Prob of Male Survival
   gam          = rep(0.9, k), # Correlation in Survival Prob of Mates
@@ -59,11 +59,8 @@ ps_data <- sim_dat(param_list) # pair-swap data
 # check_sim_output(ps_data)
 js_data <- format_to_js(ps_data) 
 
-# 0.021858, 0.021858 0.015658 0.016329 
-# 0.18,0.16,0.16
-
 ## Compile model PS------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma",
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta",
                    "eps","gl","gu","ru","rl","NF","NM","xi","Phi00","Phif0","Phim0","Phifm","P00","Pf0","Pm0","Pfm")
 
 # ACCOUNT FOR RECRUITMENT....
@@ -81,15 +78,6 @@ seeds <- fit$seed
 y <- Sys.time()
 
 difftime(y,x,units = "hours")
-
-# inits = generate_nimble_init_pairs(ps_data)
-# samples <- run_nimble(CmdlMCMC,
-#                       niter = niter,
-#                       nburnin = niter/2,
-#                       nchains = nchains,
-#                       thin  = nthin,
-#                       inits = inits,
-#                       seed = F)
 
 ## Compile model JS-----------------------------------------------------------------------
 
@@ -128,39 +116,41 @@ ess_js <- round(effectiveSize(samples_js)/(nchains * (niter-nburnin)/nthin),2)
 ess
 ess_js
 
-chain <- 4
+chain <- 3
 ## Traceplots.
-ggs(samples) %>% 
+p1 <- ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_density("gamma") #+ 
+  ggs_traceplot("gamma") +
+  geom_hline(yintercept = param_list$gam[1], col = "red") 
+
+p2 <- ggs(samples) %>% 
+  # filter(Chain == chain) %>%
+  ggs_traceplot("rho") +
+  geom_hline(yintercept = param_list$rho[1], col = "red") 
+gridExtra::grid.arrange(p1,p2,nrow = 2)
+
   
 # geom_hline(yintercept = param_list$gam[1], col = "red", size = 1.5)
 
+p1 <- ggs(samples) %>% 
+  # filter(Chain == chain) %>%
+  ggs_traceplot("PhiF") +
+  geom_hline(yintercept = param_list$phi.f[1], col = "red")
+p2 <- ggs(samples) %>%
+  # filter(Chain == chain) %>%
+  ggs_traceplot("PhiM") +
+  geom_hline(yintercept = param_list$phi.m[1], col = "red")
+
+gridExtra::grid.arrange(p1,p2,nrow=2)
+
+
 ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("PhiF") #
-suchain <- 4
-ggs(samples) %>%
-  
-  # filter(Chain == chain) %>%
-  ggs_traceplot("PM") # + ylim(c(0,1)) 
-# # geom_hline(yintercept = 0.7, col = "red", size = 0.5)
-# ggs(samples)%>% 
-#   # filter(Chain == chain)  %>%
-#   ggs_traceplot("delta")  #+ 
-#   
-# # geom_hline(yintercept = param_list$delta[1], col = "red", size = 1.5)
-# ggs(samples) %>% 
-#   # filter(Chain == chain) %>% 
-#   ggs_traceplot("beta")
+  ggs_traceplot("delta")
 
 ggs(samples) %>% 
   # filter(Chain == chain) %>%
   ggs_traceplot("N")
-
-ggs(samples)%>%
-  # filter(Chain == chain)  %>%
-  ggs_traceplot("delta")
 
 hduck_run <- list(ps_samples = samples,
                   ps_data    = ps_data,

@@ -61,7 +61,6 @@ rpaircat <- nimbleFunction(
         n_choices <- sum(available_mates2)   
       }
     }
-    
     return(x)
   }
 )
@@ -69,8 +68,7 @@ rpaircat <- nimbleFunction(
 # Probability of survival (or recapture) conditional on partner status
 compute_prob_condF <- nimbleFunction(
   run = function(is_single_female = double(1),
-                 recruit_male = double(1),
-                 previous_male_state = double(1),
+                 amating_m = double(1),
                  current_male_state = double(1),
                  current_pairs_f = double(1),
                  ProbF = double(0),
@@ -84,11 +82,11 @@ compute_prob_condF <- nimbleFunction(
     returnType(double(1))
     out <- numeric(nf)
     
-    male_previous_alive <- recruit_male[current_pairs_f] * previous_male_state[current_pairs_f]
+    male_mating <- amating_m[current_pairs_f]
     male_current_alive <- current_male_state[current_pairs_f]
     
-    out <- (is_single_female[1:nf] + (1-is_single_female[1:nf])* (1-male_previous_alive)) * ProbF +
-      (1-is_single_female) * male_previous_alive * (male_current_alive * (Probfm/ProbM) + (1- male_current_alive) * (Probf0/(1-ProbM)))
+    out <- (is_single_female[1:nf] + (1-is_single_female[1:nf])* (1-male_mating)) * ProbF +
+      (1-is_single_female) * male_mating * (male_current_alive * (Probfm/ProbM) + (1- male_current_alive) * (Probf0/(1-ProbM)))
     
     return(out)
   }
@@ -97,10 +95,8 @@ compute_prob_condF <- nimbleFunction(
 # Compute Conditional Partnership Grid
 compute_psi_cond <- nimbleFunction(
   run = function(psi_t = double(2),
-                 recruit_f = double(1),
-                 recruit_m = double(1),
-                 af = double(1),
-                 am = double(1),
+                 amating_f = double(1),
+                 amating_m = double(1),
                  nf = integer(0),
                  nm = integer(0)){
     
@@ -109,7 +105,7 @@ compute_psi_cond <- nimbleFunction(
     
     for(i in 1:nf){
       for(j in 1:nm){
-        psi_cond_t[i,j] <- psi_t[i,j] *  recruit_f[i] * af[i] * recruit_m[j] * am[j]
+        psi_cond_t[i,j] <- psi_t[i,j] *  amating_f[i] * amating_m[j]
       }
     }
     
@@ -201,28 +197,26 @@ nimble_ps_model <- nimbleCode({
   # Conditional Partnership/Survival Steps -------------------------------------------------------------------------------------------------
  
    # 2a. Mating at time t-----------------------------------------------------------------------------------------------------------
-  # # Female Recruitment
-  # for(i in 1:nf){
-  #   for(t in 1:k){
-  #     amating_f[i,t] ~ dbern(delta * recruit_f[i,t] * af[i,t] * zf[i])
-  #   } 
-  # }
-  # 
-  # # Male Recruitment
-  # for(j in 1:nm){
-  #   for(t in 1:k){
-  #     amating_m[j,t] ~ dbern(delta * recruit_m[j,t] * am[j,t] * zm[j])
-  #   } 
-  # }
-  
+  # Female Recruitment
+  for(i in 1:nf){
+    for(t in 1:k){
+      amating_f[i,t] ~ dbern(delta * recruit_f[i,t] * af[i,t] * zf[i])
+    }
+  }
+
+  # Male Recruitment
+  for(j in 1:nm){
+    for(t in 1:k){
+      amating_m[j,t] ~ dbern(delta * recruit_m[j,t] * am[j,t] * zm[j])
+    }
+  }
+
   # 2b. Decision to Mate at t-----------------------------------------------------------------------------------------------------------------
   for(t in 1:k){
     # Need to have both been recruited+alive by time t in order to form a pair-bond 
     psi_cond[1:(nf+1),1:(nm+1), t] <- compute_psi_cond(psi[1:(nf+1),1:(nm+1),t],
-                                                       recruit_f[1:nf,t],
-                                                       recruit_m[1:nm,t],
-                                                       af[1:nf,t],
-                                                       am[1:nm,t],
+                                                       amating_f[1:nf,t],
+                                                       amating_m[1:nm,t],
                                                        nf,
                                                        nm)
     
@@ -241,8 +235,7 @@ nimble_ps_model <- nimbleCode({
     
     # Marginal Recapture Event for Females in the Population (P[X^F_T|X^M_T]) given males
     phi.totalF[1:nf,t-1] <- compute_prob_condF(single_female[1:nf,t-1],
-                                               recruit_m[1:(nm+1),t-1],
-                                               am[1:(nm+1),t-1],
+                                               amating_m[1:(nm+1),t-1],
                                                am[1:(nm+1),t],
                                                apairs_f[1:nf,t-1],
                                                PhiF,
@@ -268,8 +261,7 @@ nimble_ps_model <- nimbleCode({
     
     # Marginal Recapture Event for females in the Population (P[X^F_T|X^M_T])
     p.totalF[1:nf,t] <- compute_prob_condF(single_female[1:nf,t],
-                                           recruit_m[1:(nm+1),t],
-                                           am[1:(nm+1),t],
+                                           amating_m[1:(nm+1),t],
                                            recap_m[1:(nm+1),t],
                                            apairs_f[1:nf,t],
                                            PF,
@@ -290,7 +282,7 @@ nimble_ps_model <- nimbleCode({
   xi ~ dbeta(0.1,1.0)
   
   # Mating or not
-  # delta ~ dbeta(1,1)
+  delta ~ dbeta(1,1)
   
   # Recruitment 
   for(t in 1:k){
@@ -475,7 +467,7 @@ generate_nimble_init_pairs <- function(ps_data){
   xi <- rbeta(1,0.3,1)
   
   # Mating or not
-  delta <- 1 #rbeta(1,1,1)
+  delta <- rbeta(1,1,1)
   
   # Missing Data Simulation --------------------------------------------------------
   
@@ -523,14 +515,13 @@ generate_nimble_init_pairs <- function(ps_data){
       # Marginal Survival Event for Males in the Population (Y^M_T)---------------------------------------------
       for(j in 1:nm){
         if(is.na(am[j,t])){
-          am[j,t] <- rbinom(1,1, PhiM * am[j,t-1] * recruit_m[j,t-1] * zm[j] + (1-recruit_m[j,t-1]))
+          am[j,t] <- rbinom(1,1, PhiM * am[j,t-1] * recruit_m[j,t-1] + (1-recruit_m[j,t-1]))
         }
       }
       
       # Marginal Recapture Probability for Females in the Population (P[X^F_T|X^M_T])
       phi.totalF[1:nf, t-1] <- compute_prob_condF(is_single_female    = single_female[1:nf,t-1],
-                                                  recruit_male        = recruit_m[1:(nm+1),t-1],
-                                                  previous_male_state = am[1:(nm+1), t-1],
+                                                  amating_m           = amating_m[1:(nm+1),t-1],
                                                   current_male_state  = am[1:(nm+1), t],
                                                   current_pairs_f     = apairs_f[1:nf, t-1],
                                                   ProbF               = PhiF,
@@ -543,7 +534,7 @@ generate_nimble_init_pairs <- function(ps_data){
       # Marginal Recapture Event for Females in the Population ([X^F_T|X^M_T])
       for(i in 1:nf){
         if(is.na(af[i,t])){
-          af[i, t] <- rbinom(1,1, phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t-1] * zf[i]  + (1-recruit_f[i,t-1]))
+          af[i, t] <- rbinom(1,1, phi.totalF[i,t-1] * af[i,t-1] * recruit_f[i,t-1]  + (1-recruit_f[i,t-1]))
         }
       }
     }
@@ -554,33 +545,33 @@ generate_nimble_init_pairs <- function(ps_data){
     
     # Female Mating
     for(i in 1:nf){
-        amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),rbinom(1, 1, delta * recruit_f[i,t] * af[i,t] * zf[i]), amating_f[i,t])
+        amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),
+                                 rbinom(1, 1, delta * recruit_f[i,t] * af[i,t] * zf[i]), 
+                                 amating_f[i,t])
     }
     
     # Male Mating
     for(j in 1:nm){
-        amating_m[j,t] <- ifelse(is.na(amating_m[j,t]),rbinom(1, 1, delta * recruit_m[j,t] * am[j,t]* zm[j]), amating_m[j,t])
+        amating_m[j,t] <- ifelse(is.na(amating_m[j,t]),
+                                 rbinom(1, 1, delta * recruit_m[j,t] * am[j,t]* zm[j]), 
+                                 amating_m[j,t])
     }
     
     # Need to have both been recruited+alive by time t in order to form a pair-bond 
     psi_cond[1:(nf+1),1:(nm+1), t] <- compute_psi_cond(psi[1:(nf+1),1:(nm+1),t],
-                                                       recruit_f[1:nf,t],
-                                                       recruit_m[1:nm,t],
-                                                       af[1:nf,t],
-                                                       am[1:nm,t],
+                                                       amating_f[1:nf,t],
+                                                       amating_m[1:nm,t],
                                                        nf,
                                                        nm)
     
     apairs_f[1:nf,t] <- rpaircat(n = 1, psi_cond[1:(nf+1), 1:(nm+1), t], nf, nm)
     single_female[1:nf,t] <- equals(apairs_f[1:nf,t],nm+1)
     
-
     # 5. Joint Recapture --------------------------------------------------------------------------------------------------------------------
     
     # Marginal Recapture Probability for Females in the Population (P[X^F_T|X^M_T])
     p.totalF[1:nf, t] <- compute_prob_condF(is_single_female    = single_female[1:nf,t],
-                                            recruit_male        = recruit_m[1:(nm+1),t],
-                                            previous_male_state = am[1:(nm+1), t],
+                                            amating_m           = amating_m[1:(nm+1),t],
                                             current_male_state  = recap_m[1:(nm+1), t],
                                             current_pairs_f     = apairs_f[1:nf, t],
                                             ProbF               = PF,
@@ -642,14 +633,14 @@ generate_nimble_init_pairs <- function(ps_data){
     raw_gamma     = raw_gamma,
     gamma         = gamma,
     eps           = eps,
-    # delta         = delta,
+    delta         = delta,
     xi            = xi,
     zf            = zf,
     zm            = zm,
     recruit_m     = recruit_m,
     recruit_f     = recruit_f,
-    # amating_m     = amating_m,
-    # amating_f     = amating_f,
+    amating_m     = amating_m,
+    amating_f     = amating_f,
     af            = af,
     am            = am,
     apairs_f      = apairs_f,
@@ -676,7 +667,10 @@ compile_pair_swap_nimble <- function(ps_data,
       Rdist = "dpaircat(available_mates, nf, nm)",
       discrete = TRUE,
       range = c(1, (ps_data$nm+1)),
-      types = c('value = double(1)', 'available_mates = double(2)','nf = integer(0)', 'nm = integer(0)'),
+      types = c('value = double(1)', 
+                'available_mates = double(2)',
+                'nf = integer(0)', 
+                'nm = integer(0)'),
       pqAvail = FALSE)
   ))
   
@@ -697,8 +691,8 @@ compile_pair_swap_nimble <- function(ps_data,
     zm              = ps_data$zm,
     recruit_f       = ps_data$recruit_f,
     recruit_m       = ps_data$recruit_m,
-    # amating_f       = ps_data$amating_f,
-    # amating_m       = ps_data$amating_m,
+    amating_f       = ps_data$amating_f,
+    amating_m       = ps_data$amating_m,
     af              = ps_data$af,
     am              = ps_data$am,
     apairs_f        = ps_data$apairs_f,
@@ -860,7 +854,7 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
     #  Load Libraries
     libs <- c("boot", "ggplot2", "nimble", "coda", "ggmcmc", "tidyverse")
     lapply(libs,require, character.only = T)
-    source(paste0(getwd(), "/Scripts/pair_swap_mod_nimble.R"))
+    source(paste0(getwd(), "/Scripts/pair_swap_mod_nimble4.R"))
     `%+%` <- function(a, b) paste0(a, b)
   })
   

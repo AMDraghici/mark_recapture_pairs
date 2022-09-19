@@ -478,7 +478,6 @@ initialize_survival_status <- function(sex, k, initial_entry, sf, sm){
   # Return Survival states
   init_surv_list <- list(sf = sf, sm = sm)
   return(init_surv_list)
-  
 }
 
 # 6. Update Data structures from [t,t+1)------------------------------------------------------------------------
@@ -1174,7 +1173,7 @@ compute_hidden_pairs <- function(pairs_f,
   psi_array <- array(NA,dim = c(nf+1,nm+1,k))
   
   for(t in 1:k){
-    psi_array[,,t] <- rbind(cbind(psi[,,t],rep(1,(nf))),rep(1, nm+1))
+    psi_array[,,t] <- rbind(cbind(psi[,,t],rep(0,(nf))),rep(0, nm+1))
   }
   
   psi <- psi_array
@@ -1214,13 +1213,60 @@ compute_hidden_pairs <- function(pairs_f,
   for(i in 1:nf){
     for(t in 1:k){
       if(!is.na(apairs_f[i,t])){
-        psi[i,,t] <- 0
-        psi[,apairs_f[i,t],t] <- 0
-        psi[i,apairs_f[i,t],t] <- 1
+        j <- apairs_f[i,t]
+        psi[i,1:(nm+1),t] <- 0
+        psi[1:(nf+1),j,t] <- 0
+        psi[i,j,t] <- 1
       }
     }
   }
   
+  # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
+  for(i in 1:nf){
+    
+    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+    first_partner <- partners_i[1]
+    
+    # If no pairs observed make no possible combos
+    if(length(partners_i) == 0) next
+    
+    for(t in 1:k){
+      # Who was individual i's last partner?
+      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      if(length(last_partner)==0){
+        last_partner <- first_partner
+      } 
+      last_partner <- last_partner[length(last_partner)]
+      
+      # Who was individual i's next partner?
+      # If t == k and unknown then just grab last partner
+      if(t == k){
+        next_partner <- last_partner
+      } else {
+        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        if(length(next_partner)==0){
+          next_partner <- last_partner
+        } 
+        next_partner <- next_partner[1]
+      }
+      
+      # If observed unmated set to unmated
+      if(!is.na(amating_f[i,t])){
+        if(amating_f[i,t] == 0){
+          apairs_f[i,t] <- (nm+1)
+          psi[i,-(nm+1),t] <- 0
+          next
+        }
+      }
+      
+      if(is.na(apairs_f[i,t])){
+        potential_partners_i <- c(nm+1, last_partner, next_partner)
+        psi[i,-potential_partners_i,t] <- 0
+      }
+    }
+  }
+  
+  # -----------------------------------------------------------------------------------------------------------------------------------------------------------
   
   # Store results in a list
   pairs_list <- list(apairs_m   = apairs_m,
