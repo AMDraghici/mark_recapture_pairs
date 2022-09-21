@@ -13,57 +13,57 @@ vectorMatch <- nimbleFunction(
     return(output)}
 )
 
-# Equal probability of selecting any configuration 
-dpaircat <- nimbleFunction(
-  run = function(x = double(1),
-                 available_mates = double(2),
-                 nf = integer(0),
-                 nm = integer(0),
-                 log = integer(0, default = 1)){
-    
-    returnType(double(0))
-    logProb <- 0 
-    if(log) return(logProb)
-    else return(exp(logProb))
-  }
-)
-
-# Sample without replacement 2D 
-rpaircat <- nimbleFunction(
-  run = function(n = integer(0),
-                 available_mates = double(2),
-                 nf = integer(0),
-                 nm = integer(0)){
-    
-    
-    returnType(double(1))
-    if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
-    
-    x <- rep(nm+1,nf)
-    available_mates2 <- available_mates
-    n_choices <- sum(available_mates2)   
-
-    while(n_choices != 0){
-      choice_flat <- rcat(n =1 , c(available_mates2[1:(nf+1),1:(nm+1)]))
-      row_choice <-  1 + (choice_flat-1) %% (nf+1)
-      col_choice <- ceiling(choice_flat/(nf+1))
-      
-      if(row_choice == (nf+1)){
-        available_mates2[1:(nf+1),col_choice] <- 0 
-        n_choices <- sum(available_mates2)   
-      } else if(col_choice == (nm+1)){
-        available_mates2[row_choice,1:(nm+1)] <- 0 
-        n_choices <- sum(available_mates2)   
-      } else {
-        x[row_choice] <- col_choice
-        available_mates2[row_choice,1:(nm+1)] <- 0 
-        available_mates2[1:(nf+1),col_choice] <- 0 
-        n_choices <- sum(available_mates2)   
-      }
-    }
-    return(x)
-  }
-)
+# # Equal probability of selecting any configuration
+# dpaircat <- nimbleFunction(
+#   run = function(x = double(1),
+#                  available_mates = double(2),
+#                  nf = integer(0),
+#                  nm = integer(0),
+#                  log = integer(0, default = 1)){
+# 
+#     returnType(double(0))
+#     logProb <- 0
+#     if(log) return(logProb)
+#     else return(exp(logProb))
+#   }
+# )
+# 
+# # Sample without replacement 2D
+# rpaircat <- nimbleFunction(
+#   run = function(n = integer(0),
+#                  available_mates = double(2),
+#                  nf = integer(0),
+#                  nm = integer(0)){
+# 
+# 
+#     returnType(double(1))
+#     if(n != 1) print("rpaircat only allows n = 1; using n = 1.")
+# 
+#     x <- rep(nm+1,nf)
+#     available_mates2 <- available_mates
+#     n_choices <- sum(available_mates2)
+# 
+#     while(n_choices != 0){
+#       choice_flat <- rcat(n =1 , c(available_mates2[1:(nf+1),1:(nm+1)]))
+#       row_choice <-  1 + (choice_flat-1) %% (nf+1)
+#       col_choice <- ceiling(choice_flat/(nf+1))
+# 
+#       if(row_choice == (nf+1)){
+#         available_mates2[1:(nf+1),col_choice] <- 0
+#         n_choices <- sum(available_mates2)
+#       } else if(col_choice == (nm+1)){
+#         available_mates2[row_choice,1:(nm+1)] <- 0
+#         n_choices <- sum(available_mates2)
+#       } else {
+#         x[row_choice] <- col_choice
+#         available_mates2[row_choice,1:(nm+1)] <- 0
+#         available_mates2[1:(nf+1),col_choice] <- 0
+#         n_choices <- sum(available_mates2)
+#       }
+#     }
+#     return(x)
+#   }
+# )
 
 # Probability of survival (or recapture) conditional on partner status
 compute_prob_condF <- nimbleFunction(
@@ -195,24 +195,24 @@ nimble_ps_model <- nimbleCode({
       recruit_m[j,t] ~ dbern(recruit_m[j,t-1] + (1-recruit_m[j,t-1]) * eps[t])
     } 
   }
-
+  
   # Conditional Partnership/Survival Steps -------------------------------------------------------------------------------------------------
- 
-   # 2a. Mating at time t-----------------------------------------------------------------------------------------------------------
+  
+  # 2a. Mating at time t-----------------------------------------------------------------------------------------------------------
   # Female Recruitment
   for(i in 1:nf){
     for(t in 1:k){
       amating_f[i,t] <- recruit_f[i,t] * af[i,t]  # * zf[i]dbern(delta * recruit_f[i,t] * af[i,t] * zf[i])
     }
   }
-
+  
   # Male Recruitment
   for(j in 1:nm){
     for(t in 1:k){
       amating_m[j,t] <- recruit_m[j,t] * am[j,t]  # * zm[j]dbern(delta * recruit_m[j,t] * am[j,t] * zm[j])
     }
   }
-
+  
   # 2b. Decision to Mate at t-----------------------------------------------------------------------------------------------------------------
   for(t in 1:k){
     # Need to have both been recruited+alive by time t in order to form a pair-bond 
@@ -226,7 +226,7 @@ nimble_ps_model <- nimbleCode({
     apairs_f[1:nf,t] ~ dpaircat(psi_cond[1:(nf+1), 1:(nm+1), t], nf, nm)
     single_female[1:nf,t] <- vectorMatch(apairs_f[1:nf,t], nm + 1)
   }
-
+  
   # 3. Joint Survival [t-1,t) ---------------------------------------------------------------------------------------------------------------
   for(t in 2:k){
     
@@ -547,16 +547,16 @@ generate_nimble_init_pairs <- function(ps_data){
     
     # Female Mating
     for(i in 1:nf){
-        amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),
-                                 rbinom(1, 1, delta * recruit_f[i,t] * af[i,t] * zf[i]), 
-                                 amating_f[i,t])
+      amating_f[i,t] <- ifelse(is.na(amating_f[i,t]),
+                               rbinom(1, 1, delta * recruit_f[i,t] * af[i,t] * zf[i]), 
+                               amating_f[i,t])
     }
     
     # Male Mating
     for(j in 1:nm){
-        amating_m[j,t] <- ifelse(is.na(amating_m[j,t]),
-                                 rbinom(1, 1, delta * recruit_m[j,t] * am[j,t]* zm[j]), 
-                                 amating_m[j,t])
+      amating_m[j,t] <- ifelse(is.na(amating_m[j,t]),
+                               rbinom(1, 1, delta * recruit_m[j,t] * am[j,t]* zm[j]), 
+                               amating_m[j,t])
     }
     
     # Need to have both been recruited+alive by time t in order to form a pair-bond 

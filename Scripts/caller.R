@@ -10,10 +10,10 @@ library(coda)
 library(ggmcmc)
 
 ## MCMC parameters
-niter <- 1e4
+niter <- 2e4
 nburnin <- niter/2
 nchains <- 5
-nthin <- 5
+nthin <- 10
 
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
@@ -27,10 +27,10 @@ source(file.path(src_dir,"Scripts","fn_sim_pair_data2.R"))
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
 k = 30
-n = 100
+n = 500
 
 # Seeds for Testing
-set.seed(2*pi)
+set.seed(exp(1))
 # set.seed(1e5)
 
 # Parameter Grid 
@@ -40,7 +40,7 @@ param_list <- list(
   lf           = 10, # Data Augmentation for Females (M_F)
   lm           = 10, # Data Augmentation for Males (M_M)
   prop.female  = 0.5, # Proportion of simulated individuals to be female
-  delta        = rep(0.8, k), # Probability that mating is attempted
+  delta        = rep(1, k), # Probability that mating is attempted
   phi.f        = rep(0.9, k), # Marginal Prob of Female Survival
   phi.m        = rep(0.9, k), # Marginal Prob of Male Survival
   gam          = rep(0.9, k), # Correlation in Survival Prob of Mates
@@ -60,7 +60,7 @@ ps_data <- sim_dat(param_list) # pair-swap data
 js_data <- format_to_js(ps_data) 
 
 ## Compile model PS------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma","delta",
+nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma",
                    "eps","gl","gu","ru","rl","NF","NM","xi","Phi00","Phif0","Phim0","Phifm","P00","Pf0","Pm0","Pfm")
 
 # ACCOUNT FOR RECRUITMENT....
@@ -134,12 +134,12 @@ gridExtra::grid.arrange(p1,p2,nrow = 2)
 
 p1 <- ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("PhiF") +
-  geom_hline(yintercept = param_list$phi.f[1], col = "red")
+  ggs_traceplot("PF") +
+  geom_hline(yintercept = param_list$p.f[1], col = "red")
 p2 <- ggs(samples) %>%
   # filter(Chain == chain) %>%
-  ggs_traceplot("PhiM") +
-  geom_hline(yintercept = param_list$phi.m[1], col = "red")
+  ggs_traceplot("PM") +
+  geom_hline(yintercept = param_list$p.m[1], col = "red")
 
 gridExtra::grid.arrange(p1,p2,nrow=2)
 

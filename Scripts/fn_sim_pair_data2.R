@@ -1045,13 +1045,13 @@ compute_hidden_pairs <- function(pairs_f,
     }
   }
   
-  
-  # apairs_f <- pairs_f
-  # apairs_m <- pairs_m
-  # arepartner <- repartner
-  # amating_f <- mating_f
-  # amating_m <- mating_m
-  # 
+# 
+#   apairs_f <- pairs_f
+#   apairs_m <- pairs_m
+#   arepartner <- repartner
+#   amating_f <- mating_f
+#   amating_m <- mating_m
+
   
   # Add details to 2d apairs matrix ------------------------------------------------------------------------------------------
   
@@ -1173,7 +1173,7 @@ compute_hidden_pairs <- function(pairs_f,
   psi_array <- array(NA,dim = c(nf+1,nm+1,k))
   
   for(t in 1:k){
-    psi_array[,,t] <- rbind(cbind(psi[,,t],rep(0,(nf))),rep(0, nm+1))
+    psi_array[,,t] <- rbind(cbind(psi[,,t],rep(1,(nf))),rep(1, nm+1))
   }
   
   psi <- psi_array
@@ -1199,11 +1199,11 @@ compute_hidden_pairs <- function(pairs_f,
   }
   
   # Filter Down to Pairs that were observed 
-  possible_partners <- lapply(1:nf, function(i) c(nm+1, unique(apairs_f[i, 1:k][!is.na(apairs_f[i,1:k])])))
+  possible_partners <- lapply(1:nf, function(i) unique(c(nm+1, apairs_f[i, 1:k][!is.na(apairs_f[i,1:k])])))
   
   for(i in 1:nf){
     if(length(possible_partners[[i]]) == 0){
-      psi[i,, 1:k] <- 0
+      psi[i,1:nm, 1:k] <- 0
     } else {
       psi[i, -possible_partners[[i]], 1:k] <- 0
     }
@@ -1215,7 +1215,7 @@ compute_hidden_pairs <- function(pairs_f,
       if(!is.na(apairs_f[i,t])){
         j <- apairs_f[i,t]
         psi[i,1:(nm+1),t] <- 0
-        psi[1:(nf+1),j,t] <- 0
+        if(j != (nm+1)) psi[1:(nf+1),j,t] <- 0
         psi[i,j,t] <- 1
       }
     }
@@ -1488,7 +1488,11 @@ add_data_augmentation <- function(lf,
   if(lm != 0) psi2[,(nm+1):(nm+lm),1:k] <- 0 # aug males
   if(lf != 0) psi2[(nf+1):(nf+lf),,1:k] <- 0 # aug females
   
-  psi2[,(nm+lm+1),1:k] <- 0 # dummy entry
+  if(lm != 0) psi2[(nf+1):(nf+lf),(nm+lm+1),1:k] <- 1 # single
+  if(lf != 0) psi2[(nf+lf+1),(nm+1):(nm+lm),1:k] <- 1 # aug females
+  
+  
+  # psi2[,(nm+lm+1),1:k] <- 0 # dummy entry
   psi2[1:nf,1:nm,1:k] <- psi_middle
   psi2[(nf+lf+1), 1:(nm),1:k] <- psi_end_row
   psi2[1:(nf), (nm+lm+1),1:k] <- psi_end_col
@@ -1500,13 +1504,13 @@ add_data_augmentation <- function(lf,
       if(is.na(amating_f[i,t])) next # if we dont know..
       
       if(amating_f[i,t] == 0){ # are not they mating
-        psi2[i,,t] <- 0 
+        psi2[i,1:nm,t] <- 0 
       } else { # if yes 
         
         if(is.na(apairs_f[i,t])) next  # if we dont know..
         
         if(apairs_f[i,t] == (nm+lm+1)){ # are they not able to find a partner(seen alone) 
-          psi2[i,,t] <- 0 
+          psi2[i,1:nm,t] <- 0 
           if(arepartner[i,t]==1) browser()
         } else{
           psi2[i,,t] <- 0
@@ -1522,13 +1526,13 @@ add_data_augmentation <- function(lf,
       if(is.na(amating_m[j,t])) next # if we dont know..
       
       if(amating_m[j,t] == 0){ # are they not mating
-        psi2[,j,t] <- 0 
+        psi2[1:nf,j,t] <- 0 
       } else { # if yes 
         
         if(is.na(apairs_m[j,t])) next # if dont know..
         
         if(apairs_m[j,t] == (nf+lf+1)){ # are they not able to find a partner(seen alone) 
-          psi2[,j,t] <- 0 
+          psi2[1:nf,j,t] <- 0 
         } else{
           psi2[,j,t] <- 0
           psi2[apairs_m[j,t],j,t] <- 1 # only their partner
