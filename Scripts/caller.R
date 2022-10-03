@@ -10,67 +10,67 @@ library(coda)
 library(ggmcmc)
 
 ## MCMC parameters
-niter <- 2e4
-nburnin <- niter/2
+niter <- 5e4
+nburnin <- niter/4
 nchains <- 5
-nthin <- 10
+nthin <- 5
 
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
 # setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
-source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","pair_swap_mod_nimble4.R"))
-source(file.path(src_dir,"Scripts","fn_sim_pair_data2.R"))
+# source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
+source(file.path(src_dir,"Scripts","pair_swap_mod_nimble8.R"))
+source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
+source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 # source(file.path(src_dir,"Scripts","fn_process_hduck_data.R"))
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
-k = 30
-n = 500
+k = 10
+n = 100
 
 # Seeds for Testing
-set.seed(exp(1))
+set.seed(pi)
 # set.seed(1e5)
 
 # Parameter Grid 
 param_list <- list(
   n            = n, # Number of Animals
   k            = k, # Occasions
-  lf           = 10, # Data Augmentation for Females (M_F)
-  lm           = 10, # Data Augmentation for Males (M_M)
-  prop.female  = 0.5, # Proportion of simulated individuals to be female
+  prop.female  = 0.45, # Proportion of simulated individuals to be female
   delta        = rep(1, k), # Probability that mating is attempted
-  phi.f        = rep(0.9, k), # Marginal Prob of Female Survival
-  phi.m        = rep(0.9, k), # Marginal Prob of Male Survival
-  gam          = rep(0.9, k), # Correlation in Survival Prob of Mates
-  p.f          = rep(0.8, k), # Marginal Prob of Female Recapture
-  p.m          = rep(0.8, k), # Marginal Prob of Male Recapture
-  rho          = rep(0.8, k), # Correlation in male survival rates
-  betas        = list(beta0 = 1000, beta1 = 0.1), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
+  phi.f        = rep(0.8, k), # Marginal Prob of Female Survival
+  phi.m        = rep(0.8, k), # Marginal Prob of Male Survival
+  gam          = rep(0, k), # Correlation in Survival Prob of Mates
+  p.f          = rep(0.7, k), # Marginal Prob of Female Recapture
+  p.m          = rep(0.7, k), # Marginal Prob of Male Recapture
+  rho          = rep(0, k), # Correlation in male survival rates
+  betas        = list(beta0 = 300000, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
   init         = sample(1, n, TRUE), # Initial Entry into population for individual n
-  show_unmated = T, # Include unmated observations in attempt to mate step
-  data_aug     = T  # Add individuals to data augmentation
+  show_unmated = T # Include unmated observations in attempt to mate step
 )
 
 # Generate One set of Data
 ps_data <- sim_dat(param_list) # pair-swap data
-# check_sim_output(ps_data)
-js_data <- format_to_js(ps_data) 
+cjs_data <- format_to_cjs(ps_data)
+x <- lapply(1:k, function(t) rowSums(ps_data$psi[,1:(ps_data$nm),t]))
+
 
 ## Compile model PS------------------------------------------------------------------------
-nimble_params <- c("PF","PM","rho","PhiF","PhiM","gamma",
-                   "eps","gl","gu","ru","rl","NF","NM","xi","Phi00","Phif0","Phim0","Phifm","P00","Pf0","Pm0","Pfm")
+nimble_params <- c("PF","PM","PhiF","PhiM",
+                   "gl","gu","gamma",
+                   "ru","rl","rho")
 
 # ACCOUNT FOR RECRUITMENT....
 x <- Sys.time()
-fit <- run_pair_swap_nimble_parallel(data = ps_data, 
-                                     params = nimble_params,
-                                     niter = niter, 
-                                     nthin = nthin, 
+fit <- run_pair_swap_nimble_parallel(data    = ps_data, 
+                                     params  = nimble_params,
+                                     niter   = niter, 
+                                     nthin   = nthin, 
                                      nburnin = nburnin,
-                                     ncores = nchains)
+                                     ncores  = nchains)
 
 samples <- fit$samples
 inits <- fit$inits
@@ -79,20 +79,20 @@ y <- Sys.time()
 
 difftime(y,x,units = "hours")
 
-## Compile model JS-----------------------------------------------------------------------
+## Compile model CJS-----------------------------------------------------------------------
 
-js_params <- c("PF","PM", "PhiF","PhiM", "xi", "NF", "NM")
+cjs_params <- c("PF","PM", "PhiF","PhiM")
 x <- Sys.time()
-fit_js <- run_js_nimble_parallel(data = js_data, 
-                              params = js_params,
-                              niter = niter, 
-                              nthin = nthin, 
-                              nburnin = nburnin,
-                              ncores = nchains)
+fit_cjs <- run_cjs_nimble_parallel(data = cjs_data,
+                                  params = cjs_params,
+                                  niter = niter,
+                                  nthin = nthin,
+                                  nburnin = nburnin,
+                                  ncores = nchains)
 
-samples_js <- fit_js$samples
-inits_js <- fit_js$inits
-seeds_js <- fit_js$seed
+samples_cjs <- fit_cjs$samples
+inits_cjs <- fit_cjs$inits
+seeds_cjs <- fit_cjs$seed
 y <- Sys.time()
 
 difftime(y,x,units = "hours")
@@ -100,57 +100,61 @@ difftime(y,x,units = "hours")
 ## Summary
 
 summ <- summary(samples)
-round(cbind(summ[[1]][,"Mean"],summ[[2]][,c("2.5%","97.5%")])[1:14,],3)
-
-summ2 <- summary(samples_js)
-round(cbind(summ2[[1]][,"Mean"],summ2[[2]][,c("2.5%","97.5%")])[1:6,],3)
+round(cbind(summ[[1]][,"Mean"],summ[[2]][,c("2.5%","97.5%")]),3)
+# 
+summ2 <- summary(samples_cjs)
+round(cbind(summ2[[1]][,"Mean"],summ2[[2]][,c("2.5%","97.5%")]),3)
 
 
 ## Convergence diagnostics
-gelman.diag(samples[,c("NF","NM","PhiF","PhiM","PF","PM", "rho","gamma")])
-gelman.diag(samples_js[,c("NF","NM","PhiF","PhiM","PF","PM")])
+gelman.diag(samples)
+gelman.diag(samples_cjs)
 
 ## Effective sample size
 ess <- round(effectiveSize(samples)/(nchains * (niter-nburnin)/nthin),2)
-ess_js <- round(effectiveSize(samples_js)/(nchains * (niter-nburnin)/nthin),2)
+ess_cjs <- round(effectiveSize(samples_cjs)/(nchains * (niter-nburnin)/nthin),2)
 ess
-ess_js
+ess_cjs
 
 chain <- 3
 ## Traceplots.
 p1 <- ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("gamma") +
-  geom_hline(yintercept = param_list$gam[1], col = "red") 
+  ggs_density("gamma") +
+  geom_vline(xintercept = param_list$gam[1], col = "red")   + xlim(c(-1,1))
 
 p2 <- ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("rho") +
-  geom_hline(yintercept = param_list$rho[1], col = "red") 
+  ggs_density("rho") +
+  geom_vline(xintercept = param_list$rho[1], col = "red") + xlim(c(-1,1))
 gridExtra::grid.arrange(p1,p2,nrow = 2)
 
   
+
 # geom_hline(yintercept = param_list$gam[1], col = "red", size = 1.5)
 
 p1 <- ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("PF") +
-  geom_hline(yintercept = param_list$p.f[1], col = "red")
+  # ggs_traceplot("PF") +
+  ggs_density("PF") +
+  geom_vline(xintercept = param_list$p.f[1], col = "red") + xlim(c(0,1))
 p2 <- ggs(samples) %>%
   # filter(Chain == chain) %>%
-  ggs_traceplot("PM") +
-  geom_hline(yintercept = param_list$p.m[1], col = "red")
+  ggs_density("PM") +
+  geom_vline(xintercept = param_list$p.m[1], col = "red") + xlim(c(0,1))
 
 gridExtra::grid.arrange(p1,p2,nrow=2)
 
-
-ggs(samples) %>% 
+p1 <- ggs(samples) %>% 
   # filter(Chain == chain) %>%
-  ggs_traceplot("delta")
-
-ggs(samples) %>% 
+  ggs_density("PhiF") +
+  geom_vline(xintercept = param_list$phi.f[1], col = "red") + xlim(c(0,1))
+p2 <- ggs(samples) %>%
   # filter(Chain == chain) %>%
-  ggs_traceplot("N")
+  ggs_density("PhiM") +
+  geom_vline(xintercept = param_list$phi.m[1], col = "red") + xlim(c(0,1))
+
+gridExtra::grid.arrange(p1,p2,nrow=2)
 
 hduck_run <- list(ps_samples = samples,
                   ps_data    = ps_data,
