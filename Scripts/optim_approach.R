@@ -42,7 +42,7 @@ param_list <- list(
   rho          = rep(0, k), # Correlation in male survival rates
   betas        = list(beta0 = 1e3, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
-  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
+  init         = sample(1:15, n, TRUE), # Initial Entry into population for individual n
   show_unmated = T # Include unmated observations in attempt to mate step
 )
 
@@ -117,21 +117,21 @@ ru <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
 lower = c(gl,rl)
 upper = c(gu,ru)
 
-
-optim(par             = runif(2,min = lower,max = upper),
-      fn              = partial_likelihood,
-      PhiM            = PhiM,
-      PhiF            = PhiF,
-      PF              = PF,
-      PM              = PM,
-      first_capture_f = first_capture_f,
-      recap_f         = recap_f,
-      recap_m         = recap_m,
-      apairs_f        = apairs_f,
-      control         = list(factr = 1e5),
-      method          = "L-BFGS-B",
-      lower           = lower,
-      upper           = upper)
+# 
+# optim(par             = runif(2,min = lower,max = upper),
+#       fn              = partial_likelihood,
+#       PhiM            = PhiM,
+#       PhiF            = PhiF,
+#       PF              = PF,
+#       PM              = PM,
+#       first_capture_f = first_capture_f,
+#       recap_f         = recap_f,
+#       recap_m         = recap_m,
+#       apairs_f        = apairs_f,
+#       control         = list(factr = 1e5),
+#       method          = "L-BFGS-B",
+#       lower           = lower,
+#       upper           = upper)
 
 nlminb(start          = runif(2,min = lower,max = upper),
       objective       = partial_likelihood,
@@ -167,7 +167,8 @@ mesh %>%
   geom_line() + 
   theme(legend.position = "none")
 
-mesh %>% ggplot(aes(rho,gamma, fill = as.numeric(exp(-nll))))+ 
+mesh %>% ggplot(aes(rho,gamma, fill = as.numeric((nll))))+ 
   geom_tile()
 
-plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = exp(-mesh$nll))
+plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = exp(-(mesh$nll)))
+plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = (-(mesh$nll)))
