@@ -20,9 +20,9 @@ nthin <- 10
 # setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
 # source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
+# source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
+source(file.path(src_dir,"Scripts","fn_sim_pair_data4.R"))
 # source(file.path(src_dir,"Scripts","fn_process_hduck_data.R"))
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------

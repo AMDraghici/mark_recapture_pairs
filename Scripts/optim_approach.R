@@ -9,20 +9,14 @@ library(nimble)
 library(coda)
 library(ggmcmc)
 
-## MCMC parameters
-niter <- 1e5
-nburnin <- niter/4
-nchains <- 1
-nthin <- 10
-
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
 # setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
 # source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
+# source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
+source(file.path(src_dir,"Scripts","fn_sim_pair_data4.R"))
 # source(file.path(src_dir,"Scripts","fn_process_hduck_data.R"))
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
@@ -45,7 +39,7 @@ param_list <- list(
   gam          = rep(0, k), # Correlation in Survival Prob of Mates
   p.f          = rep(0.75, k), # Marginal Prob of Female Recapture
   p.m          = rep(0.75, k), # Marginal Prob of Male Recapture
-  rho          = rep(0.25, k), # Correlation in male survival rates
+  rho          = rep(0, k), # Correlation in male survival rates
   betas        = list(beta0 = 1e3, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
   init         = sample(1, n, TRUE), # Initial Entry into population for individual n
@@ -74,16 +68,16 @@ partial_likelihood <- function(pars,
                                recap_m,
                                apairs_f){
   
-  # gamma <- pars[1]
-  rho <- pars[1]
+  gamma <- pars[1]
+  rho <- pars[2]
   
-  surv_dist <- compute_jbin_cjs(PhiF, PhiM, 0)
+  surv_dist <- compute_jbin_cjs(PhiF, PhiM, gamma)
   recap_dist <- compute_jbin_cjs(PF, PM, rho)
   
   obs_dist <- c(surv_dist$prob.mf * recap_dist$prob.00 + 
-                surv_dist$prob.f0 * (1-PF) +  
-                surv_dist$prob.m0 * (1-PM) + 
-                surv_dist$prob.00, 
+                  surv_dist$prob.f0 * (1-PF) +  
+                  surv_dist$prob.m0 * (1-PM) + 
+                  surv_dist$prob.00, 
                 surv_dist$prob.f0 * PF + surv_dist$prob.mf * recap_dist$prob.f0,
                 surv_dist$prob.m0 * PM + surv_dist$prob.mf * recap_dist$prob.m0,
                 surv_dist$prob.mf * recap_dist$prob.mf)
@@ -112,6 +106,7 @@ partial_likelihood <- function(pars,
 }
 
 
+
 gl <- compute_jbin_param_cjs(PhiF,PhiM)$cor_lower_bound
 gu <- compute_jbin_param_cjs(PhiF,PhiM)$cor_upper_bound
 
@@ -119,11 +114,11 @@ rl <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound
 ru <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
 
 
-lower = c(rl)
-upper = c(ru)
+lower = c(gl,rl)
+upper = c(gu,ru)
 
 
-optim(par             = runif(1,min = lower,max = upper),
+optim(par             = runif(2,min = lower,max = upper),
       fn              = partial_likelihood,
       PhiM            = PhiM,
       PhiF            = PhiF,
@@ -138,7 +133,7 @@ optim(par             = runif(1,min = lower,max = upper),
       lower           = lower,
       upper           = upper)
 
-nlminb(start          = runif(1,min = lower,max = upper),
+nlminb(start          = runif(2,min = lower,max = upper),
       objective       = partial_likelihood,
       PhiM            = PhiM,
       PhiF            = PhiF,
@@ -152,9 +147,9 @@ nlminb(start          = runif(1,min = lower,max = upper),
       upper           = upper)
 
 
-mesh <- expand.grid(0, seq(rl,ru,by = 0.01))
+mesh <- expand.grid(gamma = seq(gl,gu,by = 0.01), rho =  seq(rl,ru,by = 0.01))
 
-nll <- sapply(1:nrow(mesh), function(i) partial_likelihood(pars =          c(mesh$Var1[i]),
+nll <- sapply(1:nrow(mesh), function(i) partial_likelihood(pars =  c(mesh$gamma[i],mesh$rho[i]),
                                                     PhiM            = PhiM,
                                                     PhiF            = PhiF,
                                                     PF              = PF,
@@ -167,5 +162,12 @@ nll <- sapply(1:nrow(mesh), function(i) partial_likelihood(pars =          c(mes
 
 mesh$nll <- nll
 
-mesh %>% ggplot(aes(x = Var1, y = nll, col = as.factor(Var2))) + geom_line() + theme(legend.position = "none")
+mesh %>% 
+  ggplot(aes(x = rho, y = nll, col = as.factor(gamma))) +
+  geom_line() + 
+  theme(legend.position = "none")
 
+mesh %>% ggplot(aes(rho,gamma, fill = as.numeric(exp(-nll))))+ 
+  geom_tile()
+
+plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = exp(-mesh$nll))
