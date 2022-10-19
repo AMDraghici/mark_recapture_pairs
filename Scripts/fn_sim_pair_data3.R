@@ -1227,8 +1227,8 @@ compute_hidden_pairs <- function(pairs_f,
   
   last_partner_matrix <- matrix(NA, nrow = nf, ncol = k)
   next_partner_matrix <- matrix(NA, nrow = nf, ncol = k)
-  
-  # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
+  # 
+  # # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
   for(i in 1:nf){
 
     partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
@@ -1271,9 +1271,9 @@ compute_hidden_pairs <- function(pairs_f,
 
       last_partner_matrix[i,t] <- last_partner
       next_partner_matrix[i,t] <- next_partner
-      
+
       if(is.na(apairs_f[i,t])){
-       
+
         if(next_partner == last_partner & next_partner != nm+1){
           potential_partners_i <- c(next_partner)
           psi[i,-potential_partners_i,t] <- 0
@@ -1282,7 +1282,7 @@ compute_hidden_pairs <- function(pairs_f,
           potential_partners_i <- c(nm+1, last_partner, next_partner)
           psi[i,-potential_partners_i,t] <- 0
         }
-        
+
       }
     }
   }
@@ -1562,6 +1562,10 @@ simulate_cr_data <- function(n,
   
   # FOR TESTING
   psi_check  <- psi 
+  # # browser()
+  # apairs_f <- pairs_f
+  # am <- sm
+  
   
   az <- matrix(NA, nrow = nf, ncol = k)
   ar <- matrix(NA, nrow = nf, ncol = k)
