@@ -1565,6 +1565,7 @@ simulate_cr_data <- function(n,
   # # browser()
   # apairs_f <- pairs_f
   # am <- sm
+  # af <- sf
   
   
   az <- matrix(NA, nrow = nf, ncol = k)

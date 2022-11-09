@@ -10,9 +10,9 @@ library(coda)
 library(ggmcmc)
 
 ## MCMC parameters
-niter <- 1e5
+niter <- 1e4
 nburnin <- niter/4
-nchains <- 1
+nchains <- 5
 nthin <- 10
 
 ## Load scripts
@@ -20,9 +20,9 @@ nthin <- 10
 # setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
 # source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
-# source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
+source(file.path(src_dir,"Scripts","pair_swap_mod_nimble8.R"))
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","fn_sim_pair_data4.R"))
+source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 # source(file.path(src_dir,"Scripts","fn_process_hduck_data.R"))
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
@@ -48,7 +48,7 @@ param_list <- list(
   rho          = rep(0.8, k), # Correlation in male survival rates
   betas        = list(beta0 = 1e3, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
-  init         = sample(1:29, n, TRUE), # Initial Entry into population for individual n
+  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
   show_unmated = T # Include unmated observations in attempt to mate step
 )
 
@@ -59,7 +59,7 @@ x <- lapply(1:k, function(t) rowSums(ps_data$psi[,1:(ps_data$nm),t]))
 
 
 ## Compile model PS------------------------------------------------------------------------
-nimble_params <- c("PF","PM","PhiF","PhiM","beta0","beta1",
+nimble_params <- c("PF","PM","PhiF","PhiM",#,"beta0","beta1",
                    "gl","gu","gamma",
                    "ru","rl","rho")
 
