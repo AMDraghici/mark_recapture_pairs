@@ -302,7 +302,7 @@ plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = (-(mesh$nll)))
 
 # P^MF PHI^MF
 
-compute_fn <- function(x, PMF, PHIF, PHIM){
+compute_surv_cor <- function(x, PMF, PHIF, PHIM){
   sigF <- sqrt(PHIF * (1-PHIF))
   sigM <- sqrt(PHIM * (1-PHIM))
   
@@ -315,7 +315,7 @@ compute_fn <- function(x, PMF, PHIF, PHIM){
 }
 
 
-y <- compute_fn(seq(0,1,by = 0.01),0.65625, 0.8, 0.8)
+y <- compute_surv_cor(seq(0,1,by = 0.01),0.65625, 0.8, 0.8)
 plot(y = y , x =seq(0,1,by = 0.01), type = "l" )
 
 
@@ -347,4 +347,4 @@ for(i in 1:nf){
   }
 }
 
-compute_fn(n/N,0.65625, 0.8, 0.8)
+compute_surv_cor(n/N,0.65625, 0.8, 0.8)
