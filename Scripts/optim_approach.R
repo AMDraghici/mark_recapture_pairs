@@ -16,7 +16,7 @@ src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_r
 # source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
 # source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
+source(file.path(src_dir,"Scripts","fn_sim_pair_data4.R"))
 # source(file.path(src_dir,"Scripts","fn_process_hduck_data.R"))
 
 recapture_correlations <- list()
@@ -300,7 +300,51 @@ plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = exp(-(mesh$nll)))
 plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = (-(mesh$nll)))
 
 
-# P^MF PHI^MF
+# SURVIVAL CORRELATION
+# TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
+# Set number of occasions and animals
+k = 30
+n_pop = 150
+
+# Seeds for Testing
+# set.seed(pi)
+# set.seed(1e5)
+source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
+
+PF <- 0.999
+PM <- 0.999
+PhiF <- 0.8
+PhiM <- 0.8
+gam_true <- 0.83
+rho_true <- 0
+PFM <- compute_jbin_cjs(PF,PM,rho_true)$prob.mf 
+PhiMF <- compute_jbin_cjs(PhiF,PhiM,gam_true)$prob.mf
+prob_prod <- PFM * PhiMF
+
+
+# Parameter Grid 
+param_list <- list(
+  n            = n_pop, # Number of Animals
+  k            = k, # Occasions
+  prop.female  = 0.5, # Proportion of simulated individuals to be female
+  delta        = rep(1, k), # Probability that mating is attempted
+  phi.f        = rep(PhiF, k), # Marginal Prob of Female Survival
+  phi.m        = rep(PhiM, k), # Marginal Prob of Male Survival
+  gam          = rep(gam_true, k), # Correlation in Survival Prob of Mates
+  p.f          = rep(PF, k), # Marginal Prob of Female Recapture
+  p.m          = rep(PM, k), # Marginal Prob of Male Recapture
+  rho          = rep(rho_true, k), # Correlation in male survival rates
+  betas        = list(beta0 = 1e4, beta1 = 100), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
+  rand_init    = F, # Randomize Initial Entry (just leave as F)
+  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
+  # lf = 0,
+  # lm = 0,
+  show_unmated = T # Include unmated observations in attempt to mate step
+)
+
+# Generate One set of Data
+ps_data <- lapply(1:100,function(i) sim_dat(param_list)) # 
+
 
 compute_surv_cor <- function(x, PMF, PHIF, PHIM){
   sigF <- sqrt(PHIF * (1-PHIF))
@@ -314,79 +358,80 @@ compute_surv_cor <- function(x, PMF, PHIF, PHIM){
   return(pmax(pmin(gu, y),gl))
 }
 
-
-# TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
-# Set number of occasions and animals
-k = 30
-n = 400
-
-# Seeds for Testing
-# set.seed(pi)
-# set.seed(1e5)
-
-# Parameter Grid 
-param_list <- list(
-  n            = n, # Number of Animals
-  k            = k, # Occasions
-  prop.female  = 0.5, # Proportion of simulated individuals to be female
-  delta        = rep(1, k), # Probability that mating is attempted
-  phi.f        = rep(0.8, k), # Marginal Prob of Female Survival
-  phi.m        = rep(0.8, k), # Marginal Prob of Male Survival
-  gam          = rep(0, k), # Correlation in Survival Prob of Mates
-  p.f          = rep(0.75, k), # Marginal Prob of Female Recapture
-  p.m          = rep(0.75, k), # Marginal Prob of Male Recapture
-  rho          = rep(0.5, k), # Correlation in male survival rates
-  betas        = list(beta0 = 1e3, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
-  rand_init    = F, # Randomize Initial Entry (just leave as F)
-  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
-  show_unmated = T # Include unmated observations in attempt to mate step
-)
-
-# Generate One set of Data
-ps_data <- sim_dat(param_list) # 
-
-
-N <- 0
-n <- 0
-apairs_f <- ps_data$apairs_f
-nm <- ps_data$nm
-nf <- ps_data$nf
-k <- ps_data$k
-first_capture_f <- ps_data$first_capture_f
-recap_f <- ps_data$recap_f
-recap_m <- ps_data$recap_m
-
-for(i in 1:nf){
-  for(j in (first_capture_f[i]+1):k){
-    if(!is.na(apairs_f[i,j-1])){
+compute_correlation <- function(ps_data, PFM, PhiF, PhiM){
+  
+  N <- 0
+  n <- 0
+  apairs_f <- ps_data$apairs_f
+  nm <- ps_data$nm
+  nf <- ps_data$nf
+  k <- ps_data$k
+  first_capture_f <- ps_data$first_capture_f
+  recap_f <- ps_data$recap_f
+  recap_m <- ps_data$recap_m
+  
+  
+  for(i in 1:nf){
+    for(j in (first_capture_f[i]+1):k){
       
-      if(apairs_f[i,j-1] == (nm+1)) next
-    
-      if(!is.na(apairs_f[i,j])){
-        if(apairs_f[i,j] == apairs_f[i,j-1]){
-          if(recap_f[i,j] == 1 & recap_m[apairs_f[i,j],j] == 1){
-            n <- n + 1
-            N <- N +1
+      if(!is.na(apairs_f[i,j-1])){
+        
+        if(apairs_f[i,j-1] == (nm+1)) next
+        
+        if(!is.na(apairs_f[i,j])){
+          if(apairs_f[i,j] == apairs_f[i,j-1]){
+            if(recap_f[i,j] == 1 & recap_m[apairs_f[i,j],j] == 1){
+              n <- n + 1
+              N <- N +1
+            } else {
+              N <- N+1
+            } 
           } else {
-            N <- N+1
-          } 
+            N <- N + 1
+          }
         } else {
           N <- N + 1
         }
-      } else {
-        N <- N + 1
       }
     }
   }
+  
+  obs <- compute_surv_cor(n/N,PFM, PhiF, PhiM)
+  
+  return(list(obs = obs,
+              n = n,
+              N = N))
 }
 
-obs <- compute_surv_cor(n/N,0.65625, 0.8, 0.8)
+
+gamma_corr <- lapply(1:length(ps_data), function(i) compute_correlation(ps_data[[i]], 
+                                                                        PFM,
+                                                                        PhiF,
+                                                                        PhiM))
+
+n  <- sapply(1:length(ps_data), function(i) gamma_corr[[i]]$n)
+N  <- sapply(1:length(ps_data), function(i) gamma_corr[[i]]$N)
+gam <- sapply(1:length(ps_data), function(i) gamma_corr[[i]]$obs)
 
 
-
-y <- compute_surv_cor(seq(0,1,by = 0.01),0.65625, 0.8, 0.8)
+y <- compute_surv_cor(seq(0,1,by = 0.01),PFM, PhiF, PhiM)
 plot(y = y , x =seq(0,1,by = 0.01), type = "l" )
-abline(v = qbinom(c(0.05,0.95),N, 0.8*0.8 * 0.65625)/N, col = "red")
-abline(v = n/N, col = "blue")
-abline(h = obs, col = "blue")
+abline(v = qbinom(c(0.05,0.95),N, PFM * PhiMF)/N, col = "red")
+abline(h = 0.5, lty = 2)
+points(x = n/N, y = gam)
+
+lb <- qbinom(c(0.025),N, PFM * PhiMF)/N
+ub <- qbinom(c(0.975),N, PFM * PhiMF)/N
+
+mean((n/N) > ub)
+mean((n/N) < lb)
+
+gam_lb <- compute_surv_cor(lb,PFM, PhiF, PhiM)
+gam_ub <- compute_surv_cor(ub, PFM, PhiF, PhiM)
+
+mean(gam <= gam_lb)
+mean(gam >= gam_ub)
+
+mean(gam)
+plot(density(gam))
 

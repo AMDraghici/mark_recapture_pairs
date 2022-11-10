@@ -1607,10 +1607,13 @@ simulate_cr_data <- function(n,
     }
   }
   
-  if(!data_aug){
-    lf <- 0
-    lm <- 0
-  } 
+  lf <- 0
+  lm <- 0
+  
+  # if(!data_aug){
+  #   lf <- 0
+  #   lm <- 0
+  # } 
   
   # Generate SKeleton Data Structures
   sex           <- construct_sexes(n = n, prop.female = prop.female)
