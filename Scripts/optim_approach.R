@@ -16,7 +16,7 @@ src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_r
 # source(file.path(src_dir,"Scripts","jolly_seber_mod_nimble.R"))
 # source(file.path(src_dir,"Scripts","pair_swap_mod_nimble9.R"))
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
-source(file.path(src_dir,"Scripts","fn_sim_pair_data4.R"))
+source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 # source(file.path(src_dir,"Scripts","fn_process_hduck_data.R"))
 
 recapture_correlations <- list()
@@ -303,19 +303,34 @@ plotly::plot_ly(x = mesh$gamma, y = mesh$rho, z = (-(mesh$nll)))
 # SURVIVAL CORRELATION
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
-k = 30
+
+# Load packages
+library(parallel)
+library(dclone)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+library(rjags)
+library(nimble)
+library(coda)
+library(ggmcmc)
+
+## Load scripts
+`%+%` <- function(a, b) paste0(a, b)
+# setwd("C:/Users/Alex/Documents/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/")
+src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
+k = 10
 n_pop = 150
 
 # Seeds for Testing
-# set.seed(pi)
-# set.seed(1e5)
+set.seed(pi)
 source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 
-PF <- 0.999
-PM <- 0.999
+PF <- 0.75
+PM <- 0.75
 PhiF <- 0.8
 PhiM <- 0.8
-gam_true <- 0.83
+gam_true <- 0.5
 rho_true <- 0
 PFM <- compute_jbin_cjs(PF,PM,rho_true)$prob.mf 
 PhiMF <- compute_jbin_cjs(PhiF,PhiM,gam_true)$prob.mf
@@ -336,14 +351,12 @@ param_list <- list(
   rho          = rep(rho_true, k), # Correlation in male survival rates
   betas        = list(beta0 = 1e4, beta1 = 100), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
-  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
-  # lf = 0,
-  # lm = 0,
+  init         = sample(1, n_pop, TRUE), # Initial Entry into population for individual n
   show_unmated = T # Include unmated observations in attempt to mate step
 )
 
 # Generate One set of Data
-ps_data <- lapply(1:100,function(i) sim_dat(param_list)) # 
+ps_data <- lapply(1:500,function(i) sim_dat(param_list)) # 
 
 
 compute_surv_cor <- function(x, PMF, PHIF, PHIM){
@@ -358,11 +371,16 @@ compute_surv_cor <- function(x, PMF, PHIF, PHIM){
   return(pmax(pmin(gu, y),gl))
 }
 
-compute_correlation <- function(ps_data, PFM, PhiF, PhiM){
+compute_correlation <- function(ps_data, PFM, PhiF, PhiM, known_pairs){
   
   N <- 0
   n <- 0
-  apairs_f <- ps_data$apairs_f
+  if(known_pairs){
+    apairs_f <- ps_data$pairs_f 
+  } else{
+    apairs_f <- ps_data$apairs_f 
+  }
+ 
   nm <- ps_data$nm
   nf <- ps_data$nf
   k <- ps_data$k
@@ -404,34 +422,51 @@ compute_correlation <- function(ps_data, PFM, PhiF, PhiM){
 }
 
 
-gamma_corr <- lapply(1:length(ps_data), function(i) compute_correlation(ps_data[[i]], 
-                                                                        PFM,
-                                                                        PhiF,
-                                                                        PhiM))
+gamma_corr_known <- lapply(1:length(ps_data), function(i) compute_correlation(ps_data[[i]], 
+                                                                              PFM,
+                                                                              PhiF,
+                                                                              PhiM,
+                                                                              known_pairs = T))
+
+
+gamma_corr_unknown <- lapply(1:length(ps_data), function(i) compute_correlation(ps_data[[i]], 
+                                                                              PFM,
+                                                                              PhiF,
+                                                                              PhiM,
+                                                                              known_pairs = F))
+
+
+
+gamma_corr <- gamma_corr_known
 
 n  <- sapply(1:length(ps_data), function(i) gamma_corr[[i]]$n)
 N  <- sapply(1:length(ps_data), function(i) gamma_corr[[i]]$N)
 gam <- sapply(1:length(ps_data), function(i) gamma_corr[[i]]$obs)
 
-
+# Construct Boundary Plot
 y <- compute_surv_cor(seq(0,1,by = 0.01),PFM, PhiF, PhiM)
-plot(y = y , x =seq(0,1,by = 0.01), type = "l" )
+plot(y = y , x =seq(0,1,by = 0.01), type = "l" , ylab = "Predicted Gamma", xlab = "MLE of Bernoulli Construction", title = "Predicted Values of Gamma from Simulation Study")
 abline(v = qbinom(c(0.05,0.95),N, PFM * PhiMF)/N, col = "red")
 abline(h = 0.5, lty = 2)
 points(x = n/N, y = gam)
 
+# 95% CI for Y (MLE)
 lb <- qbinom(c(0.025),N, PFM * PhiMF)/N
 ub <- qbinom(c(0.975),N, PFM * PhiMF)/N
+1 - mean((n/N) >= ub|(n/N) <= lb)
 
-mean((n/N) > ub)
-mean((n/N) < lb)
-
+# 95% CI for gamma (convert by passing Y into survival function - might need to account for transformation w/ jacobian)
 gam_lb <- compute_surv_cor(lb,PFM, PhiF, PhiM)
 gam_ub <- compute_surv_cor(ub, PFM, PhiF, PhiM)
 
-mean(gam <= gam_lb)
-mean(gam >= gam_ub)
+# Percent coverage by confidence intervals
+pct_coverage <- 1 - mean(gam <= gam_lb | gam >= gam_ub)
+pct_coverage
 
-mean(gam)
-plot(density(gam))
+# Prediction of gamma 
+pred_gam <- mean(gam) 
+pred_gam 
+
+# Density Plot of Gamma
+plot(density(gam), main = "Density of Simulated Values of Gamma", xlab = "Gamma_Hat", ylab = "PDF")
 
