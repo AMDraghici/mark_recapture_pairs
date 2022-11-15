@@ -20,10 +20,8 @@ nimble_cjs_model <- nimbleCode({
   # Priors--------------------------------------------------------------------------------------------
   
   # Split probs by sex 
-  for(i in 1:n){
-    p[i] <- female[i] * PF + (1-female[i]) * PM
-    phi[i] <- female[i] * PhiF + (1-female[i])* PhiM
-  }
+  p[1:n]   <- female[1:n] * PF   + (1-female[1:n]) * PM
+  phi[1:n] <- female[1:n] * PhiF + (1-female[1:n])* PhiM
   
   # Survival by sex
   PhiF ~ dbeta(1,1)
@@ -40,17 +38,17 @@ generate_init_cjs <- function(cjs_data){
   #Unpack Variables -----------------------------------------------------------------
   
   # Known data and indices 
-  k <- cjs_data$k # Number of capture occasions
-  n <- cjs_data$n # Number of animals 
-  female <- cjs_data$female # Sex
-  x <- cjs_data$x # Recapture 
+  k             <- cjs_data$k # Number of capture occasions
+  n             <- cjs_data$n # Number of animals 
+  female        <- cjs_data$female # Sex
+  x             <- cjs_data$x # Recapture 
   initial_entry <- cjs_data$initial_entry
   # CR data with missing components
-  a <- cjs_data$a  # Survival
+  a             <- cjs_data$a  # Survival
   
   # Recapture Prob and Survival Prob -------------------------------------------------
-  PF <- rbeta(1,1,1)
-  PM <- rbeta(1,1,1)
+  PF   <- rbeta(1,1,1)
+  PM   <- rbeta(1,1,1)
   PhiF <- rbeta(1,1,1)
   PhiM <- rbeta(1,1,1)
   
@@ -88,7 +86,7 @@ generate_init_cjs <- function(cjs_data){
     PhiF    = PhiF,
     PhiM    = PhiM,
     a       = a,
-    p       = PF * female + (1-female) * PM,
+    p       = PF   * female + (1-female) * PM,
     phi     = PhiF * female + (1-female) * PhiM
   )
   
@@ -110,9 +108,9 @@ compile_cjs_nimble <- function(cjs_data,
   cat("Organizing Data for Nimble...", "\n")
   
   nimble_cjs_constants <- list(
-    n      = cjs_data$n,
-    k      = cjs_data$k,
-    female = cjs_data$female,
+    n             = cjs_data$n,
+    k             = cjs_data$k,
+    female        = cjs_data$female,
     initial_entry = cjs_data$initial_entry
   )
   
@@ -139,7 +137,7 @@ compile_cjs_nimble <- function(cjs_data,
                       phi     = c(nimble_cjs_constants$n))
   
   cat("Building Model Nodes in Nimble (SLOW)...", "\n")
-  cjsModel <- nimbleModel(code      = nimble_cjs_model, 
+  cjsModel <- nimbleModel(code       = nimble_cjs_model, 
                           constants  = nimble_cjs_constants, 
                           inits      = nimble_inits,
                           data       = nimble_cjs_dat,
@@ -157,7 +155,6 @@ compile_cjs_nimble <- function(cjs_data,
   cat("Configuring Markov Chain Monte Carlo Process (SLOW)...", "\n")
   cjsConf  <- suppressMessages(configureMCMC(cjsModel,
                                              print = F,
-                                             multivariateNodesAsScalars = T, 
                                              useConjugacy = F,
                                              onlySlice = F))
   
@@ -186,7 +183,7 @@ run_nimble_cjs <- function(CmdlMCMC,
                            niter,
                            nburnin,
                            thin,
-                           # inits = NULL,
+                           inits,
                            nchains=3,
                            seed = F){
   
@@ -195,7 +192,7 @@ run_nimble_cjs <- function(CmdlMCMC,
                      niter             = niter,
                      nburnin           = nburnin,
                      thin              = thin,
-                     # inits             = inits,
+                     inits             = inits,
                      nchains           = nchains,
                      setSeed           = seed,
                      samplesAsCodaMCMC = TRUE)
@@ -215,13 +212,13 @@ execute_cjs_nimble_pipeline <- function(seed,
                                         nchains){
   
   nimble_complied <- compile_cjs_nimble(data, params)
-  # inits <- generate_init_cjs(data)
+  inits <- generate_init_cjs(data)
   samples <- run_nimble_cjs(CmdlMCMC = nimble_complied$CmdlMCMC,
                             niter    = niter,
                             thin     = nthin,
                             nburnin  = nburnin,
                             nchains  = nchains,
-                            # inits    = inits,
+                            inits    = inits,
                             seed     = seed) 
   return(list(samples = samples,
               inits   = nimble_complied$nimble_inits))

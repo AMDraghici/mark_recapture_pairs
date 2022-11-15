@@ -16,7 +16,7 @@ source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
 source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 
 
-partial_likelihood <- function(pars,
+partial_likelihood2 <- function(pars,
                                PF,
                                PM,
                                nf,
@@ -47,8 +47,8 @@ partial_likelihood <- function(pars,
     for(t in (first_capture_f[i]+1):(k-1)){
       if(!is.na(apairs_f[i,t]) & !is.na(apairs_f[i,t-1]) & !is.na(apairs_f[i,t+1])){
         if(apairs_f[i,t] != (nm+1)){
-          if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t],t])){
-            if(af[i,t] == 1 & am[apairs_f[i,t],t] == 1){
+          # if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t],t])){
+            # if(af[i,t] == 1 & am[apairs_f[i,t],t] == 1){
               if(apairs_f[i,t] == apairs_f[i,t-1] & apairs_f[i,t] == apairs_f[i,t+1]){
                 if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 1){
                   ll <- ll + lli[1]
@@ -73,12 +73,85 @@ partial_likelihood <- function(pars,
             }
           }
         } 
-      }
-    }
+      # }
+    # }
   }
   
   return(-ll)
 }
+
+compute_recapture_correlation <- function(x, PF, PM){
+    sigF <- sqrt(PF * (1-PF))
+    sigM <- sqrt(PM * (1-PM))
+    
+    rl <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound
+    ru <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
+    
+    y <- (x - (PF * PM))/(sigF * sigM)
+    
+    return(pmax(pmin(ru, y),rl))
+  }
+  
+  
+compute_rho <- function(PF,
+                        PM,
+                        nf,
+                        nm,
+                        k,
+                        first_capture_f,
+                        recap_f,
+                        recap_m,
+                        af,
+                        am,
+                        apairs_f){
+ 
+  
+  n1 <- 0
+  n2 <- 0
+  n3 <- 0
+  n4 <- 0 
+  N  <- 0
+  
+  for(i in 1:nf){
+    for(t in (first_capture_f[i]+1):(k-1)){
+      if(!is.na(apairs_f[i,t]) & !is.na(apairs_f[i,t-1]) & !is.na(apairs_f[i,t+1])){
+        if(apairs_f[i,t] != (nm+1)){
+          if(apairs_f[i,t] == apairs_f[i,t-1] & apairs_f[i,t] == apairs_f[i,t+1]){
+            if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 1){
+              n1 <- n1+1
+              N <- N+1
+            }
+            
+            if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 0){
+              n2 <- n2+1
+              N <- N+1
+            }
+            
+            if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t],t] == 1){
+              n3 <- n3+1
+              N <- N+1
+            }
+            
+            if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t],t] == 0){
+              n4 <- n4+1
+              N <- N+1
+            }
+          }
+        }
+      }
+    } 
+  }
+  
+  rho <- compute_recapture_correlation(n1/N, PF, PM)
+  
+  return(list(rho = rho,
+              n1   = n1,
+              n2   = n2,
+              n3   = n3,
+              n4   = n4,
+              N   = N))
+}
+
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
@@ -117,6 +190,7 @@ param_list <- list(
 ps_data_list<- readRDS("~/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/Simulation_Data_Gamma2.rds")
 
 recapture_correlations <- list()
+recapture_correlations_2 <- list()
 for(i in 1:length(ps_data_list)){
   
   # Generate One set of Data
@@ -128,8 +202,8 @@ for(i in 1:length(ps_data_list)){
   lower = c(rl)
   upper = c(ru)
   
-  recapture_correlations[[i]] <- nlminb(start          = runif(1, min = lower,max = upper),
-                                        objective       = partial_likelihood,
+  recapture_correlations[[i]] <- nlminb(start           = runif(1, min = lower,max = upper),
+                                        objective       = partial_likelihood2,
                                         PF              = param_list$p.f[1],
                                         PM              = param_list$p.m[1],
                                         nf              = ps_data$nf,
@@ -138,18 +212,35 @@ for(i in 1:length(ps_data_list)){
                                         first_capture_f = ps_data$first_capture_f,
                                         recap_f         = ps_data$recap_f,
                                         recap_m         = ps_data$recap_m,
-                                        af              = ps_data$af,
-                                        am              = ps_data$am,
                                         apairs_f        = ps_data$apairs_f,
                                         lower           = lower,
                                         upper           = upper)$par
+  
+  
+  recapture_correlations_2[[i]] <- nlminb(start          = runif(1, min = lower,max = upper),
+                                          objective       = partial_likelihood,
+                                          PF              = param_list$p.f[1],
+                                          PM              = param_list$p.m[1],
+                                          nf              = ps_data$nf,
+                                          k               = ps_data$k,
+                                          nm              = ps_data$nm,
+                                          first_capture_f = ps_data$first_capture_f,
+                                          recap_f         = ps_data$recap_f,
+                                          recap_m         = ps_data$recap_m,
+                                          apairs_f        = ps_data$apairs_f,
+                                          lower           = lower,
+                                          upper           = upper)$par
+  
 }
 
 
 
-plot(density(unlist(recapture_correlations)), main = "Recapture Correlation Estimates", xlab = "Rho_Hat", ylab = "PDF")
+plot(density(unlist(recapture_correlations)), main = "Recapture Correlation Estimates", xlab = "Rho_Hat", ylab = "PDF", xlim = c(-0.1,1), ylim = c(0,6))
 abline(v = mean(unlist(recapture_correlations)), lty = 2, col = "black")
 abline(v = param_list$rho[1], col = "green")
+
+lines(density(unlist(recapture_correlations_2)), col = "red", lty = 2)
+abline(v = mean(unlist(recapture_correlations_2)), lty = 2, col = "red")
 
 
 
@@ -185,8 +276,8 @@ abline(v = param_list$rho[1], col = "green")
 
 PFM_list <- list()
 
-for(i in 1:length(recapture_correlations)){
-  PFM_list[[i]] <- compute_jbin_cjs(PF,PM,recapture_correlations[[i]])$prob.mf 
+for(i in 1:length(x)){
+  PFM_list[[i]] <- compute_jbin_cjs(PF,PM,x[[i]])$prob.mf 
 }
 
 PFM <- unlist(PFM_list)
@@ -206,6 +297,69 @@ compute_surv_cor <- function(x, PMF, PHIF, PHIM){
   return(pmax(pmin(gu, y),gl))
 }
 
+partial_likelihood_gam <- function(pars, ps_data, PFM, PhiF, PhiM){
+  
+  gamma <- pars
+  surv_dist <- compute_jbin_cjs(prob.f = PhiF, 
+                                prob.m = PhiM, 
+                                corr   = gamma)
+  
+  prob <- surv_dist$prob.mf * PFM
+  lli <- log(c(prob,1-prob))
+  ll <- 0
+  
+  # Grab data
+  apairs_f <- ps_data$apairs_f 
+  nm <- ps_data$nm
+  nf <- ps_data$nf
+  k <- ps_data$k
+  first_capture_f <- ps_data$first_capture_f
+  recap_f <- ps_data$recap_f
+  recap_m <- ps_data$recap_m
+  
+  
+  for(i in 1:nf){
+    for(j in (first_capture_f[i]+1):k){
+      
+      if(!is.na(apairs_f[i,j-1])){
+        
+        if(apairs_f[i,j-1] == (nm+1)) next
+        
+        if(recap_f[i,j-1] == 1 & recap_m[apairs_f[i,j-1],j-1] == 1){
+          if(!is.na(apairs_f[i,j])){
+            
+            if((apairs_f[i,j] == apairs_f[i,j-1])){
+              if(recap_f[i,j] == 1 & recap_m[apairs_f[i,j],j] == 1){
+                ll <- ll + lli[1]
+              } else {
+                ll <- ll + lli[2]
+              } 
+            } else {
+              ll <- ll + lli[2]
+            }
+          }else {
+            ll <- ll + lli[2]
+          } 
+        }
+      }
+    }
+  }
+  
+  return(-ll)
+}
+
+
+lower <- compute_jbin_param_cjs(PhiF,PhiM)$cor_lower_bound
+upper <- compute_jbin_param_cjs(PhiF,PhiM)$cor_upper_bound
+
+nlminb(start          = runif(1, min = lower,max = upper),
+       objective       = partial_likelihood_gam,
+       ps_data         = ps_data_list[[10]],
+       PFM             = PFM[10],
+       PhiF            = PhiF, 
+       PhiM            = PhiM,
+       lower           = lower,
+       upper           = upper)#$par
 
 compute_correlation <- function(ps_data, PFM, PhiF, PhiM, known_pairs){
   
@@ -260,8 +414,6 @@ compute_correlation <- function(ps_data, PFM, PhiF, PhiM, known_pairs){
               N = N))
 }
 
-
-
 gamma_corr <- lapply(1:length(ps_data_list), function(i) compute_correlation(ps_data_list[[i]], 
                                                                              PFM[i],
                                                                              PhiF,
@@ -304,3 +456,204 @@ pred_gam
 plot(density(gam), main = "Density of Simulated Values of Gamma", xlab = "Gamma_Hat", ylab = "PDF")
 abline(v = pred_gam[1], lty = 2)
 abline(v = gam_true, lty = 2, col = "red")
+
+
+## BOOTSTRAP GAMMA AND RHO ESTIMATIORS
+x <- Sys.time()
+ps_data <- ps_data_list[[1000]]
+
+bootstrap_dataset_recapture <- function(ps_data, size = NULL){
+  
+  # Pull relevant data
+  recap_f         <- ps_data$recap_f
+  recap_m         <- ps_data$recap_m
+  apairs_f        <- ps_data$apairs_f
+  first_capture_f <- ps_data$first_capture_f   
+  nf              <- ps_data$nf
+  nm              <- ps_data$nm
+  k               <- ps_data$k
+  
+  # Flag females with pair histories that are viable 
+  viable_f <- vector(length = nf)
+  
+  # History needs to interact with recapture likelihood at least once
+  for(i in 1:nf){
+    for(t in (first_capture_f[i]+1):(k-1)){
+      if(!is.na(apairs_f[i,t]) & !is.na(apairs_f[i,t-1]) & !is.na(apairs_f[i,t+1])){
+        if(apairs_f[i,t] != (nm+1)){
+          if(apairs_f[i,t] == apairs_f[i,t-1] & apairs_f[i,t] == apairs_f[i,t+1]){
+            viable_f[i] <- TRUE
+          }
+        }
+      }
+    } 
+  }
+  
+  if(is.null(size)){
+    size <- sum(1 * viable_f)
+  }
+  
+  # Construct objects for subsampling 
+  recap_f_new <- matrix(NA, nrow = size, ncol = k)
+  recap_m_new <- recap_m
+  apairs_f_new <- matrix(NA, nrow = size, ncol = k)
+  first_capture_f_new <- matrix(NA, nrow = k)
+  
+  index_viable_f <- which(viable_f)
+  
+  # sample without replacement and build new recapture dataset
+  index_sample                      <- sample(index_viable_f, replace = T, size = size)
+  recap_f_new[1:size, 1:k]          <- recap_f[index_sample, 1:k]
+  apairs_f_new[1:size, 1:k]         <- apairs_f[index_sample, 1:k]
+  first_capture_f_new[1:size]       <- first_capture_f[index_sample]
+  
+  return(list(recap_f         = recap_f_new,
+              recap_m         = recap_m,
+              apairs_f        = apairs_f_new,
+              first_capture_f = first_capture_f_new,
+              nf              = size,
+              nm              = nm, 
+              k               = k))
+}
+
+generate_bootstrap_replicates <- function(ps_data, iter, size = NULL){
+  replicates <- lapply(1:iter, function(x) bootstrap_dataset_recapture(ps_data, size))
+}
+
+bootstrap_datasets <- generate_bootstrap_replicates(ps_data, 1000)
+
+recapture_correlations_bootstrap <- list()
+for(i in 1:length(bootstrap_datasets)){
+  
+  # Generate One set of Data
+  ps_data_boot <- bootstrap_datasets[[i]] 
+  
+  rl <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound
+  ru <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
+  
+  lower = c(rl)
+  upper = c(ru)
+  
+  recapture_correlations_bootstrap[[i]] <- nlminb(start          = runif(1, min = lower,max = upper),
+                                                  objective       = partial_likelihood,
+                                                  PF              = param_list$p.f[1],
+                                                  PM              = param_list$p.m[1],
+                                                  nf              = ps_data_boot$nf,
+                                                  k               = ps_data_boot$k,
+                                                  nm              = ps_data_boot$nm,
+                                                  first_capture_f = ps_data_boot$first_capture_f,
+                                                  recap_f         = ps_data_boot$recap_f,
+                                                  recap_m         = ps_data_boot$recap_m,
+                                                  apairs_f        = ps_data_boot$apairs_f,
+                                                  lower           = lower,
+                                                  upper           = upper)$par
+}
+
+y <- Sys.time()
+difftime(x,y, units = "mins")
+
+plot(density(unlist(recapture_correlations)), main = "Recapture Correlation Estimates", ylim = c(0,10), xlab = "Rho_Hat", ylab = "PDF")
+abline(v = mean(unlist(recapture_correlations)), lty = 2, col = "black")
+abline(v = param_list$rho[1], col = "green")
+
+
+
+lines(density(unlist(recapture_correlations_bootstrap)), main = "Recapture Correlation Estimates", col = "red", xlab = "Rho_Hat", ylab = "PDF")
+abline(v = mean(unlist(recapture_correlations_bootstrap)), lty = 2, col = "red")
+abline(v = recapture_correlations_bootstrap[[5]], col = "blue")
+
+mean(unlist(recapture_correlations_bootstrap))
+sd(unlist(recapture_correlations_bootstrap)) * sqrt(1000)
+
+mean(unlist(recapture_correlations))
+sd(unlist(recapture_correlations)) 
+
+quantile(unlist(recapture_correlations_bootstrap), c(0.025,0.25,0.75,0.975))
+
+ps_data <- ps_data_list[[2]]
+
+
+bootstrap_dataset_survival <- function(ps_data, size = NULL){
+  
+  # Pull relevant data
+  recap_f         <- ps_data$recap_f
+  recap_m         <- ps_data$recap_m
+  apairs_f        <- ps_data$apairs_f
+  first_capture_f <- ps_data$first_capture_f   
+  nf              <- ps_data$nf
+  nm              <- ps_data$nm
+  k               <- ps_data$k
+  
+  # Flag females with pair histories that are viable 
+  viable_f <- vector(length = nf)
+  
+  for(i in 1:nf){
+    for(j in (first_capture_f[i]+1):k){
+      if(!is.na(apairs_f[i,j-1])){
+        if(apairs_f[i,j-1] == (nm+1)) next
+        if(recap_f[i,j-1] == 1 & recap_m[apairs_f[i,j-1],j-1] == 1){
+          viable_f[i] <- T
+        }
+      }
+    }
+  }
+  
+  
+  if(is.null(size)){
+    size <- sum(1 * viable_f)
+  }
+  
+  # Construct objects for subsampling 
+  recap_f_new <- matrix(NA, nrow = size, ncol = k)
+  recap_m_new <- recap_m
+  apairs_f_new <- matrix(NA, nrow = size, ncol = k)
+  first_capture_f_new <- matrix(NA, nrow = )
+  
+  index_viable_f <- which(viable_f)
+  
+  # sample without replacement and build new recapture dataset
+  index_sample                      <- sample(index_viable_f, replace = T, size = size)
+  recap_f_new[1:size, 1:k]          <- recap_f[index_sample, 1:k]
+  apairs_f_new[1:size, 1:k]         <- apairs_f[index_sample, 1:k]
+  first_capture_f_new[1:size]       <- first_capture_f[index_sample]
+  
+  return(list(recap_f         = recap_f_new,
+              recap_m         = recap_m,
+              apairs_f        = apairs_f_new,
+              first_capture_f = first_capture_f_new,
+              nf              = size,
+              nm              = nm, 
+              k               = k))
+}
+
+generate_bootstrap_replicates_surv <- function(ps_data, iter, size = NULL){
+  replicates <- lapply(1:iter, function(x) bootstrap_dataset_survival(ps_data, size))
+}
+
+bs_replicate_100 <- generate_bootstrap_replicates_surv(ps_data_list[[100]], 1000)
+
+
+gamma_corr_bootstrap <- lapply(1:length(bs_replicate_100), function(i) compute_correlation(bs_replicate_100[[i]], 
+                                                                                             PFM,
+                                                                                             0.8,
+                                                                                             0.8,
+                                                                                             known_pairs = F))
+
+
+n_bootstrap  <- sapply(1:length(bootstrap_datasets), function(i) gamma_corr_bootstrap[[i]]$n)
+N_bootstrap  <- sapply(1:length(bootstrap_datasets), function(i) gamma_corr_bootstrap[[i]]$N)
+gam_bootstrap <- sapply(1:length(bs_replicate_100), function(i) gamma_corr_bootstrap[[i]]$obs)
+
+plot(density((gam)))
+abline(v = mean(gam))
+abline(v = gam_true, col = "red")
+lines(density(gam_bootstrap), col = "purple")
+abline(v = mean(gam_bootstrap), col = "purple",lty = 2)
+abline(v = gam[1], col = "green",lty = 2)
+sd(gam)
+sd(gam_bootstrap)
+
+p <- gamma_corr[[2]]$n/gamma_corr[[2]]$N
+
+sqrt((p * (1-p))/(PFM[2]^2 * gamma_corr[[2]]$N  * (PhiF * (1-PhiF)) * (PhiM * (1-PhiM))))
+
