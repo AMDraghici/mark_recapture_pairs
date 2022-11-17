@@ -37,7 +37,7 @@ set.seed(pi)
 # Parameter Grid 
 param_list <- list(
   n            = n, # Number of Animals
-  k            = k, # Occasions
+  k            = k, # Occasionsga
   prop.female  = 0.45, # Proportion of simulated individuals to be female
   delta        = rep(1, k), # Probability that mating is attempted
   phi.f        = rep(0.8, k), # Marginal Prob of Female Survival
@@ -48,7 +48,7 @@ param_list <- list(
   rho          = rep(0.8, k), # Correlation in male survival rates
   betas        = list(beta0 = 1e3, beta1 = 0), # inv.logit(Beta0 + Beta1 * hij) = Prob of reforming a pair from t-1 after hij times together
   rand_init    = F, # Randomize Initial Entry (just leave as F)
-  init         = sample(1, n, TRUE), # Initial Entry into population for individual n
+  init         = NULL, # Initial Entry into population for individual n
   show_unmated = T # Include unmated observations in attempt to mate step
 )
 

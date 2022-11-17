@@ -1,116 +1,3 @@
-## Generic Functions -------------------------------------------------------------------------------------
-
-#Inline Paste0 function
-`%+%` <- function(a, b) paste0(a, b)
-
-#Odds function
-odds <- function(p){
-  out <- p/(1-p)
-  return(out)
-}
-
-# odds ratio
-or <- function(p,q){
-  odds_p <- odds(p)
-  odds_q <- odds(q)
-  out <- odds_p/odds_q
-  return(out)
-}
-
-# odds product
-op <- function(p,q){
-  odds_p <- odds(p)
-  odds_q <- odds(q)
-  out <- odds_p*odds_q
-  return(out)
-}
-
-#Logistic Function for probability
-logit <- function(p){
-  out <- log(odds(p))
-  return(out)
-}
-
-# #Inverse Logistic Function
-inv.logit <- function(x){
-  out <- (1+exp(-x))^(-1)
-  return(out)
-}
-
-
-# Numerically Stable Version
-softmax <- function(par){
-  n.par <- length(par)
-  par1  <- sort(par, decreasing = TRUE)
-  Lk    <- par1[1]
-  for (k in 1:(n.par-1)) {
-    Lk <- max(par1[k+1], Lk) + log1p(exp(-abs(par1[k+1] - Lk))) 
-  }
-  val <- exp(par - Lk)
-  return(val)
-}
-
-## S/R Distribution Functions -------------------------------------------------------------------------------------
-
-#Extract joint binomial parameters
-compute_jbin_param_cjs <- function(prob.f,prob.m){
-  #Compute Components
-  prob.prod  <- prob.m * prob.f
-  sig.prob.f <- sqrt(prob.f*(1-prob.f))
-  sig.prob.m <- sqrt(prob.m*(1-prob.m))
-  sig.prod   <- sig.prob.f*sig.prob.m
-  ##Upper and Lower bounds for cov of joint binomial
-  lub        <-  sqrt(pmin(or(prob.f,prob.m),1/or(prob.f,prob.m)))
-  glb        <- -sqrt(pmin(op(prob.f,prob.m),1/op(prob.f,prob.m)))
-  #Return values
-  out <- list(prob.prod       = prob.prod,
-              sig.prob.f      = sig.prob.f,
-              sig.prob.m      = sig.prob.m,
-              sig.prod        = sig.prod,
-              cor_lower_bound = glb,
-              cor_upper_bound = lub)
-  return(out)
-}
-
-#Generate Derived Probabilities
-compute_jbin_cjs <- function(prob.f,prob.m,corr){
-  
-  parameters      <- compute_jbin_param_cjs(prob.f,prob.m)
-  cor_upper_bound <- parameters[["cor_upper_bound"]]
-  cor_lower_bound <- parameters[["cor_lower_bound"]]
-  sig.prob.f      <- parameters[["sig.prob.f"]]
-  sig.prob.m      <- parameters[["sig.prob.m"]]
-  
-  # If we are on a boundary condition update correlation structure 
-  boundary_f                <-  which(prob.f == 1| prob.f == 0)
-  boundary_m                <-  which(prob.m == 1| prob.m == 0)
-  boundary                  <-  sort(unique(c(boundary_f, boundary_m)))
-  corr[boundary]            <- 0 #correlation is zero if 1 or 0 for both probs
-  cor_upper_bound[boundary] <- 0
-  cor_lower_bound[boundary] <- 0
-  
-  if(any(round(corr,3) > round(cor_upper_bound,3)) || any(round(corr,3) < round(cor_lower_bound,3))){
-    stop("Correlation " %+% corr %+% " is outside of the bounds [" %+% 
-           as.character(cor_lower_bound) %+% " , " %+%
-           as.character(cor_upper_bound) %+% "]")
-  }
-  
-  ###Joint Probability Distn 
-  prob.mf <- corr * sig.prob.m * sig.prob.f + (prob.f*prob.m)
-  prob.f0 <- prob.f - prob.mf
-  prob.m0 <- prob.m - prob.mf
-  prob.00 <- 1 - prob.f0 - prob.m0 - prob.mf
-  
-  #List of parameters
-  out <- list(prob.mf = prob.mf,
-              prob.f0 = prob.f0,
-              prob.m0 = prob.m0,
-              prob.00 = prob.00)
-  
-  #Return values
-  return(out)
-}
-
 # Construct Model Matrices------------------------------------------------------------------------------------
 
 # Build out data structures and do easy initialization 
@@ -859,7 +746,7 @@ compute_hidden_survival <- function(recap_f,
     
     rm(last_alive)
   }
-
+  
   # Set dummy states to known ones (used for indexing in nimble model)
   af[(nf+1),] <- 0
   am[(nm+1),] <- 0
@@ -1048,14 +935,6 @@ compute_hidden_pairs <- function(pairs_f,
     }
   }
   
-  # #
-    # apairs_f <- pairs_f
-    # apairs_m <- pairs_m
-    # arepartner <- repartner
-    # amating_f <- mating_f
-    # amating_m <- mating_m
-  
-  
   # Add details to 2d apairs matrix ------------------------------------------------------------------------------------------
   
   # Set up female exclusions and male partnerships
@@ -1204,7 +1083,7 @@ compute_hidden_pairs <- function(pairs_f,
   
   # Filter Down to Pairs that were observed 
   possible_partners <- lapply(1:nf, function(i) unique(c(nm+1, apairs_f[i, 1:k][!is.na(apairs_f[i,1:k])])))
-
+  
   for(i in 1:nf){
     if(length(possible_partners[[i]]) == 0){
       psi[i,1:nm, 1:k] <- 0
@@ -1230,13 +1109,13 @@ compute_hidden_pairs <- function(pairs_f,
   # 
   # # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
   for(i in 1:nf){
-
+    
     partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
     first_partner <- partners_i[1]
-
+    
     # If no pairs observed make no possible combos
     if(length(partners_i) == 0) next
-
+    
     for(t in 1:k){
       # Who was individual i's last partner?
       last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
@@ -1244,7 +1123,7 @@ compute_hidden_pairs <- function(pairs_f,
         last_partner <- nm+1
       }
       last_partner <- last_partner[length(last_partner)]
-
+      
       # Who was individual i's next partner?
       # If t == k and unknown then just grab last partner
       if(t == k){
@@ -1259,7 +1138,7 @@ compute_hidden_pairs <- function(pairs_f,
         }
         next_partner <- next_partner[1]
       }
-
+      
       # If observed unmated set to unmated
       if(!is.na(amating_f[i,t])){
         if(amating_f[i,t] == 0){
@@ -1268,12 +1147,12 @@ compute_hidden_pairs <- function(pairs_f,
           next
         }
       }
-
+      
       last_partner_matrix[i,t] <- last_partner
       next_partner_matrix[i,t] <- next_partner
-
+      
       if(is.na(apairs_f[i,t])){
-
+        
         if(next_partner == last_partner & next_partner != nm+1){
           potential_partners_i <- c(next_partner)
           psi[i,-potential_partners_i,t] <- 0
@@ -1283,12 +1162,12 @@ compute_hidden_pairs <- function(pairs_f,
           potential_partners_i <- c(nm+1, last_partner, next_partner)
           psi[i,-potential_partners_i,t] <- 0
         }
-
+        
       }
     }
   }
   
-
+  
   # -----------------------------------------------------------------------------------------------------------------------------------------------------------
   
   # Store results in a list
@@ -1346,8 +1225,8 @@ simulate_recapture <- function(recap_f,
       j <- pairs_f[i, t]
       single_check <- 1*(j == (nm + 1))
       recap_prob_cond_f <- single_check * p.f[t] + 
-                           (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
-                                              (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
+        (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+                              (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
       
       
       recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t])
@@ -1562,13 +1441,11 @@ simulate_cr_data <- function(n,
   nf         <- sex_counts[1]
   nm         <- sex_counts[2]
   
-  # FOR TESTING
-  psi_check  <- psi 
   # # browser()
   # apairs_f <- pairs_f
   # am <- sm
   # af <- sf
-
+  
   for(i in 1:nf){
     for(t in 2:k){
       if(!is.na(apairs_f[i,t-1])){
@@ -1584,7 +1461,7 @@ simulate_cr_data <- function(n,
       }
     }
   }
-
+  
   az <- matrix(NA, nrow = nf, ncol = k)
   ar <- matrix(NA, nrow = nf, ncol = k)
   
@@ -1630,31 +1507,18 @@ simulate_cr_data <- function(n,
     first_capture_m = first_capture_m, # When did they enter the population
     first_capture_f = first_capture_f, # When did they enter the population
     # Latent States (true values - hidden in real data)
-    mating_f        = mating_f, # Mate status of females at t (+ dummy)
-    mating_m        = mating_m, # Mate status of males at t (+ dummy)
     pairs_f         = pairs_f, # partners of females 
     pairs_m         = pairs_m, # partners of males
-    pairs           = pairs, # pair histories
-    histories       = histories, # number of occasions a pair occurred
     sf              = sf, # true survival of females
     sm              = sm, # true survival of males
-    repartner       = repartner, # whether partner from time t-1 was repicked (female x time)
     
     # Observed /Inferred states (Missing Values are possible)
-    psi                 = psi, # Pairs that may exist (not excluded due to already formed pairs)
-    next_partner_matrix = next_partner_matrix,
-    last_partner_matrix = last_partner_matrix,
     ar_known            = ar,
     az_known            = az,
     af                  = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
     am                  = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
-    apairs              = apairs, # Joint Pairs Matrices (array across time)
     apairs_f            = apairs_f,
     apairs_m            = apairs_m[1:nm, 1:k],
-    arepartner          = arepartner, # repartner with inferred states 
-    na_repartner        = 1*is.na(arepartner), # na spots for special cases repartner with inferred states  
-    amating_f           = rbind(amating_f[1:nf,1:k],rep(0,k)), # Mating Status Females at T
-    amating_m           = rbind(amating_m[1:nm,1:k],rep(0,k)),  # Mating Status Males at T
     recap_f             = rbind(recap_f[1:nf,1:k],rep(1,k)), #recap_f[1:nf,1:k], # Observed Recapture of Females
     recap_m             = rbind(recap_m[1:nm,1:k],rep(1,k))  # Observed Recapture of Males
   )

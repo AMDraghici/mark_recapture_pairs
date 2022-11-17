@@ -155,17 +155,18 @@ compute_rho <- function(PF,
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 # Set number of occasions and animals
-PF <- 0.45
-PM <- 0.45
+PF <- 0.75
+PM <- 0.75
 PhiF <- 0.8
 PhiM <- 0.8
-gam_true <- 0.25
+gam_true <- 0.29
 rho_true <- 0.4
 PFM <- compute_jbin_cjs(PF,PM,rho_true)$prob.mf 
 PhiMF <- compute_jbin_cjs(PhiF,PhiM,gam_true)$prob.mf
 prob_prod <- PFM * PhiMF
-n_pop <- 350
-k <- 30
+n_pop <- 300
+k <- 20
+set.seed(1)
 
 # Parameter Grid 
 param_list <- list(
@@ -185,9 +186,9 @@ param_list <- list(
   show_unmated = T # Include unmated observations in attempt to mate step
 )
 
-# ps_data_list <- lapply(1:10, function(x) sim_dat(param_list))
-# saveRDS(ps_data_list, "~/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/Simulation_Data_Gamma2.rds")
-ps_data_list<- readRDS("~/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/Simulation_Data_Gamma2.rds")
+ps_data_list <- lapply(1:25, function(x) sim_dat(param_list))
+# saveRDS(ps_data_list, "~/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/Simulation_Data_Gamma4.rds")
+ps_data_list<- readRDS("~/Projects/Research/Chapter 2 - Dyads/Code/mark_recapture_pair_swap/Simulation_Data_Gamma4.rds")
 
 recapture_correlations <- list()
 recapture_correlations_2 <- list()

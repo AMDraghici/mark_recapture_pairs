@@ -10,15 +10,14 @@ library(coda)
 library(ggmcmc)
 
 ## MCMC parameters
-niter <- 1e4
-nburnin <- niter/2
+niter <- 1e5
+nburnin <- niter/4
 nchains <- 1
 nthin <- 10
 
 ## Load scripts
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_recapture_pair_swap"
-source(file.path(src_dir,"Scripts","pair_swap_mod_nimble8.R"))
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
 source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -120,8 +119,6 @@ summ_gamma <- c(gamma, se_gamma, quantiles_gamma)
 y <- Sys.time()
 difftime(y,x,units = "mins")
 # Return Results----------------------------------------------------------------------------------------------
-
-
 summ_corr <- as.data.frame(rbind(summ_rho, summ_gamma))
 summ_corr$Parameter <- c("rho","gamma")
 summ_corr <- summ_corr[,c("Parameter","Mean", "SE", "2.5%","50%","75%","97.5%")]

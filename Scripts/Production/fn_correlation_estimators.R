@@ -311,14 +311,21 @@ generate_bootstrap_replicates_surv <- function(ps_data, iter){
 
 compute_bootstrap_estimates_survival_correlation <- function(ps_data, 
                                                              iter,
-                                                             recapture_correlation,
+                                                             recapture_correlation = NULL,
                                                              PF,
                                                              PM,
                                                              PhiF,
                                                              PhiM){
   
   bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, iter)
-  rho <- compute_recapture_correlation_simulation(bootstrap_data_replicates, rep(PF, iter), rep(PM, iter))
+  
+  # Can regenerate new values of Rho for Gamma estimation
+  if(is.null(recapture_correlation)){
+    rho <- compute_recapture_correlation_simulation(bootstrap_data_replicates, rep(PF, iter), rep(PM, iter))
+  } else {
+    rho <- rep(recapture_correlation, iter)
+  }
+ 
   gamma <- compute_survival_correlation_simulation(ps_data_list           = bootstrap_data_replicates,
                                                    recapture_correlations = rho,
                                                    PF                     = rep(PF, iter),
