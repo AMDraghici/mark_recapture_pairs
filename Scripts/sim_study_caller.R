@@ -21,6 +21,8 @@ src_dir <- getwd()#"/home/sbonner/Students/Statistics/A_Draghici/Research/mark_r
 source(file.path(src_dir,"Scripts","cormack_jolly_seber_mod_nimble.R"))
 source(file.path(src_dir,"Scripts","fn_sim_pair_data3.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
+source(file.path(src_dir, "Scripts", "Production/fn_process_hduck_data.R"))
+
 
 # TESTING SIMULATED DATA METHOD -------------------------------------------------------------------------------------------------
 PF <- 0.45
@@ -128,3 +130,95 @@ results <- list(fit_cjs   = fit_cjs,
                 summ_corr = summ_corr,
                 rho_bs    = unname(rho_bs),
                 gamma_bs  = unname(gamma_bs))
+
+
+
+
+
+
+
+
+
+
+#HDUCK Data
+dat_dir <- src_dir %+% "/Data/RE__Harlequin_duck_data/"
+cap.data <- gather_hq_data(dat_dir) %>% 
+  build_cr_df() %>% 
+  populate_missing_mate_data() %>%
+  populate_missing_mate_data() %>% 
+  add_implied_states() %>%
+  add_last_capture() %>% 
+  clean_filtered() 
+
+drop_id_yr_filter <- cap.data %>%
+  group_by(animal_id) %>%
+  summarize(num = sum(recapture_individual)) %>% 
+  filter(num < 1) %>%
+  pull(animal_id)
+
+cap.data <- cap.data %>%
+  filter(!(animal_id %in% drop_id_yr_filter)) %>%
+  assign_ids_bysex()
+
+ps_data <- build_nimble_data(cap.data)
+cjs_data <- format_to_cjs(ps_data)
+
+cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
+                              PhiF     = 0,
+                              PhiM     = 0,
+                              PF       = 0,
+                              PM       = 0,
+                              Iter     = 1,
+                              scenario = 1)
+
+
+pred_probs <- cjs_out$Est
+
+cat("Estimating recapture correlation rho...","\n")
+rho <- compute_recapture_correlation(ps_data = ps_data, 
+                                     PF      = pred_probs[3],
+                                     PM      = pred_probs[4])
+names(rho) <- "Est"
+
+# Bootstrap To Estimate SE 
+cat("Bootstrapping to get standard error estimates of rho...","\n")
+rho_bs <- compute_bootstrap_estimates_recapture_correlation(ps_data = ps_data,
+                                                            iter    = 10000,
+                                                            PF      = pred_probs[3],
+                                                            PM      = pred_probs[4])
+# Collect Results
+mean_bstrp_rho      <- mean(rho_bs)
+names(mean_bstrp_rho) <- "Est_Btstrp"
+se_bstrp_rho        <- sd(rho_bs)
+names(se_bstrp_rho) <- "SE"
+quantiles_rho       <- quantile(rho_bs, c(0.025, 0.5, 0.75, 0.975))
+summ_rho <- c(rho, mean_bstrp_rho, se_bstrp_rho, quantiles_rho)
+#-------------------------------------------------------------------------------------------------------------
+
+# Compute Survival Correlation Estimate-----------------------------------------------------------------------
+cat("Estimating recapture correlation rho...","\n")
+gamma <- compute_survival_correlation(ps_data = ps_data,
+                                      PFM     = compute_jbin_cjs(prob.f = pred_probs[3],
+                                                                 prob.m = pred_probs[4],
+                                                                 corr   = rho)$prob.mf,
+                                      PhiF    = pred_probs[1],
+                                      PhiM    = pred_probs[2])
+names(gamma) <- "Est"
+
+# Bootstrap To Estimate SE 
+cat("Bootstrapping to get standard error estimates of gamma...","\n")
+gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                             iter                  = 10000,
+                                                             recapture_correlation = NULL,
+                                                             PF                    = pred_probs[3],
+                                                             PM                    = pred_probs[4],
+                                                             PhiF                  = pred_probs[1],
+                                                             PhiM                  = pred_probs[2])
+
+# Collect Results
+mean_bstrp_gamma      <- mean(gamma_bs)
+names(mean_bstrp_gamma) <- "Est_Btstrp"
+se_bstrp_gamma        <- sd(gamma_bs)
+names(se_bstrp_gamma) <- "SE"
+quantiles_gamma       <- quantile(gamma_bs, c(0.025, 0.5, 0.75, 0.975))
+summ_gamma <- c(gamma, mean_bstrp_gamma, se_bstrp_gamma, quantiles_gamma)

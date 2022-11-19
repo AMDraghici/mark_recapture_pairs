@@ -140,7 +140,8 @@ run_cjs_model_mark <- function(cjs_data       ,
                                PhiM     = NULL,
                                PF       = NULL,
                                PM       = NULL,
-                               Iter     = NULL){
+                               Iter     = NULL,
+                               scenario = NULL){
   
   #Choose Appropriate CJS Model Settings
   phi.grp     <- list(formula = ~sex)
@@ -199,7 +200,8 @@ run_cjs_model_mark <- function(cjs_data       ,
            Bias      = Est - param.true,
            Range     = UB - LB,
            Parameter = param.names,
-           Iter      = Iter)
+           Iter      = Iter,
+           Scenario  = scenario)
   
   mark_results <- cbind(mark.stats,gof.stats)
   #Return Output
@@ -210,6 +212,7 @@ run_cjs_model_mark <- function(cjs_data       ,
 
 # Execute Simulation Study 
 execute_iteration  <- function(iter,
+                               scenario,
                                PM,
                                PF,
                                PhiF,
@@ -255,7 +258,8 @@ execute_iteration  <- function(iter,
                                 PhiM     = PhiM,
                                 PF       = PF,
                                 PM       = PM,
-                                Iter     = iter)
+                                Iter     = iter,
+                                scenario = scenario)
   
   pred_probs <- cjs_out$Est
   
@@ -286,7 +290,9 @@ execute_iteration  <- function(iter,
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
   cat("Estimating recapture correlation rho...","\n")
   gamma <- compute_survival_correlation(ps_data = ps_data,
-                                        PFM     = compute_jbin_cjs(pred_probs[1], pred_probs[2], rho)$prob.mf,
+                                        PFM     = compute_jbin_cjs(prob.f = pred_probs[3],
+                                                                   prob.m = pred_probs[4],
+                                                                   corr   = rho)$prob.mf,
                                         PhiF    = pred_probs[1],
                                         PhiM    = pred_probs[2])
   names(gamma) <- "Est"
@@ -326,7 +332,8 @@ execute_iteration  <- function(iter,
            Bias_Btstrp2 = Est - Est_Btstrp,
            Range95     = `97.5%` - `2.5%`,
            Range50     = `75%`   - `50%`,
-           Iter        = iter)
+           Iter        = iter,
+           Scenario    = scenario)
   
   rownames(summ_corr) <- NULL
   
@@ -340,6 +347,7 @@ execute_iteration  <- function(iter,
 }
 
 execute_simulation <- function(niter,
+                               scenario,
                                PM,
                                PF,
                                PhiF,
@@ -353,6 +361,7 @@ execute_simulation <- function(niter,
   
   # Run niter replicates 
   results_list <- lapply(1:niter, function(iter) execute_iteration(iter,
+                                                                   scenario,
                                                                    PM,
                                                                    PF,
                                                                    PhiF,
@@ -376,4 +385,29 @@ execute_simulation <- function(niter,
   
   return(out)
   
+}
+
+# Get Scenario Grid
+# Convenient Function to get scenarios explored in this manuscript
+get_scenarios <- function(){
+  n <- c(150, 350)
+  k <- c(15,  30)
+  PF <- c(0.45, 0.75)
+  PM <- c(0.45, 0.75)
+  PhiF <- c(0.8)
+  PhiM <- c(0.8)
+  rho <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
+  gamma <-  sort(unique(c(0,seq(-0.1, 0.9, by = 0.25))))
+  
+  scenario_grid          <- expand.grid(n_obs    = n,
+                                        k        = k,
+                                        rho_true = rho,
+                                        gam_true = gamma, 
+                                        PhiF     = PhiF,
+                                        PhiM     = PhiM,
+                                        PF       = PF)
+  
+  scenario_grid$PM       <- scenario_grid$PF
+  scenario_grid$scenario <- 1:nrow(scenario_grid)
+  return(scenario_grid)
 }

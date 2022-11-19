@@ -29,7 +29,7 @@ construct_init_entry <- function(n, k, random = F, inits = NULL){
     if(!is.null(inits)){
       initial_entry <- inits 
       # If not just do fixed intervals across n and k 
-    } else {
+    } else { 
       initial_entry <- rep(1:(k-1),ceiling(n/(k-1)))
       initial_entry <- initial_entry[1:n]
       initial_entry <- sample(initial_entry, n, F) # then shuffle them
@@ -1206,8 +1206,11 @@ simulate_recapture <- function(recap_f,
   
   # Generate Male History 
   for(j in 1:nm){
+    
     if(first_capture_m[j] > 1) recap_m[j, 1:(first_capture_m[j]-1)] <- 0
+    
     recap_m[j, first_capture_m[j]] <- 1
+    
     for(t in (first_capture_m[j]+1):k){
       recap_m[j,t] <- rbinom(1,1,prob = p.m[t] * sm[j,t])
     }
@@ -1446,21 +1449,21 @@ simulate_cr_data <- function(n,
   # am <- sm
   # af <- sf
   
-  for(i in 1:nf){
-    for(t in 2:k){
-      if(!is.na(apairs_f[i,t-1])){
-        if(apairs_f[i,t-1] == (nm+1)) next
-        if(is.na(apairs_f[i,t])){
-          if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-            if(apairs_f[i,t-1] != pairs_f[i,t]) browser()
-            apairs_f[i,t] <- apairs_f[i,t-1]
-            apairs_m[apairs_f[i,t],t-1] <- i
-            apairs_m[apairs_f[i,t],t] <- i
-          }
-        }
-      }
-    }
-  }
+  # for(i in 1:nf){
+  #   for(t in 2:k){
+  #     if(!is.na(apairs_f[i,t-1])){
+  #       if(apairs_f[i,t-1] == (nm+1)) next
+  #       if(is.na(apairs_f[i,t])){
+  #         if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+  #           if(apairs_f[i,t-1] != pairs_f[i,t]) browser()
+  #           apairs_f[i,t] <- apairs_f[i,t-1]
+  #           apairs_m[apairs_f[i,t],t-1] <- i
+  #           apairs_m[apairs_f[i,t],t] <- i
+  #         }
+  #       }
+  #     }
+  #   }
+  # }
   
   az <- matrix(NA, nrow = nf, ncol = k)
   ar <- matrix(NA, nrow = nf, ncol = k)
@@ -1493,31 +1496,32 @@ simulate_cr_data <- function(n,
   
   ar[is.na(ar)] <- 0
   az[is.na(az)] <- 0
+  # browser()
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     
     # Known data 
-    n               = n, # Number of animals sampled
-    k               = k,  # Number of occasions
-    nf              = nf, # Number of females
-    nm              = nm, # Number of males
-    sex             = sex, # Sex of sampled individuals
-    initial_entry   = initial_entry, # When did they enter the population
-    first_capture_m = first_capture_m, # When did they enter the population
-    first_capture_f = first_capture_f, # When did they enter the population
+    n                    = n, # Number of animals sampled
+    k                    = k,  # Number of occasions
+    nf                   = nf, # Number of females
+    nm                   = nm, # Number of males
+    sex                  = sex, # Sex of sampled individuals
+    initial_entry        = initial_entry, # When did they enter the population
+    first_capture_m      = first_capture_m, # When did they enter the population
+    first_capture_f      = first_capture_f, # When did they enter the population
     # Latent States (true values - hidden in real data)
-    pairs_f         = pairs_f, # partners of females 
-    pairs_m         = pairs_m, # partners of males
-    sf              = sf, # true survival of females
-    sm              = sm, # true survival of males
+    pairs_f              = pairs_f, # partners of females 
+    pairs_m              = pairs_m, # partners of males
+    sf                   = sf, # true survival of females
+    sm                   = sm, # true survival of males
     
     # Observed /Inferred states (Missing Values are possible)
     ar_known            = ar,
     az_known            = az,
     af                  = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
     am                  = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
-    apairs_f            = apairs_f,
+    apairs_f            = apairs_f[1:nf, 1:k],
     apairs_m            = apairs_m[1:nm, 1:k],
     recap_f             = rbind(recap_f[1:nf,1:k],rep(1,k)), #recap_f[1:nf,1:k], # Observed Recapture of Females
     recap_m             = rbind(recap_m[1:nm,1:k],rep(1,k))  # Observed Recapture of Males
@@ -1539,7 +1543,7 @@ format_to_cjs <- function(model_data){
   
   x <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
   a <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
-  initial_entry <- c(model_data$first_capture_f,model_data$first_capture_m)
+  initial_entry <- c(model_data$first_capture_f[1:model_data$nf],model_data$first_capture_m[1:model_data$nm])
   
   
   # Number of females and males
@@ -1548,6 +1552,7 @@ format_to_cjs <- function(model_data){
   
   # Drop animals observed at final occasion (condition on first capture)
   if(any(initial_entry == model_data$k)){
+    browser()
     observed_at_k <- which(initial_entry == model_data$k)
     x <- x[-observed_at_k,]
     a <- a[-observed_at_k,]

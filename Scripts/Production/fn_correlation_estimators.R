@@ -24,8 +24,8 @@ compute_recapture_correlation <- function(ps_data,
                                           PM){
   
   # Unpack data
-  rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound
-  ru               <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
+  rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound + 1e-7
+  ru               <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound - 1e-7
   nf               <- ps_data$nf
   k                <- ps_data$k
   nm               <- ps_data$nm
@@ -190,6 +190,8 @@ compute_survival_correlation <- function(ps_data,
   pairs_taken <- (apairs_f[1:nf,1:k] != (nm+1)) 
   
   for(i in 1:nf){
+    if(first_capture_f[i] == k) next
+    
     for(j in (first_capture_f[i]+1):k){
       if(pairs_known[i,j-1]){
         if(pairs_taken[i,j-1]){
@@ -338,219 +340,227 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
 # Likehood Survival Correlation Approach (EXPERIMENTAL)
 
 # # Compute Survival Correlation for One Replicate Using Derived Formula
-# partial_likelihood_survival <- function(pars,
-#                                         ps_data, 
-#                                         PF,
-#                                         PM,
-#                                         rho,
-#                                         PhiF, 
-#                                         PhiM){
-#   
-#   # Unpack data 
-#   nm              <- ps_data$nm
-#   nf              <- ps_data$nf
-#   k               <- ps_data$k
-#   first_capture_f <- ps_data$first_capture_f
-#   recap_f         <- ps_data$recap_f
-#   recap_m         <- ps_data$recap_m
-#   apairs_f        <- ps_data$apairs_f
-#   apairs_m        <- ps_data$apairs_m
-#   af              <- ps_data$af
-#   am              <- ps_data$am
-#   
-#   # Condtion on a pair having been observed together in the last jump 
-#   pairs_known <- !is.na(apairs_f[1:nf,1:k])
-#   male_pairs_known <- !is.na(apairs_m[1:nm,1:k])
-#   pairs_observed <- matrix(F, nrow = nf, ncol = k-1)
-#   for(i in 1:nf){
-#     for(t in 1:(k-1)){
-#       if(pairs_known[i,t]){
-#         pairs_observed[i,t] <- (apairs_f[i,t] != (nm+1))# *(recap_f[i,t] == 1) & (recap_m[apairs_f[i,t],t] == 1)
-#       }
-#     }
-#   }
-#   
-#   # Recapute Probabilities (known)
-#   
-#   p <- rev(unlist(compute_jbin_cjs(PF,PM, rho)))
-#   p_lli   <- log(p)
-#   
-#   # Survival Probabilties (Proposed)
-#   phi <- rev(unlist(compute_jbin_cjs(PhiF,PhiM, pars)))
-#   phi_lli  <- log(phi)
-#   
-#   ll <- matrix(0, nrow = nf, ncol = k)
-#   
-#   for(i in 1:nf){
-#     for(t in (first_capture_f[i]+1):k){
-#       if(pairs_observed[i,t-1]){
-#         
-#         if(apairs_m[apairs_f[i,t-1],t-1] != i) browser()
-#         
-#         # Scenarios in which pairs at t are unknown
-#         if(pairs_known[i,t]){
-#           
-#           # Pair Seen again and is same
-#           if(apairs_f[i,t] == apairs_f[i,t-1]){
-#             
-#             if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 1){
-#               ll[i,t] <- phi_lli[4] + p_lli[4]
-#               next
-#             }
-#             
-#             if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 0){
-#               ll[i,t] <- phi_lli[4] + p_lli[3]
-#               next
-#             }
-#             
-#             if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t],t] == 1){
-#               ll[i,t] <- phi_lli[4] + p_lli[2]
-#               next
-#             }
-#             
-#             if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t],t] == 0){
-#               ll[i,t] <- phi_lli[4] + p_lli[1]
-#               next
-#             }
-#             
-#             browser()
-#             
-#             # Pair seen but they are different 
-#           } else {
-#           
-#             if(apairs_f[i,t] == (nm+1)){
-#               # next
-#               ll[i,t] <- phi_lli[3] + log(PF)
-#               next
-#             }
-#             
-#             
-#             if(apairs_f[i,t] != (nm+1)){
-#              
-#               ll[i,t] <- phi_lli[3] + p_lli[4]
-#               next
-#             }
-#             
-#             browser()
-#           }
-#           
-#           # Scenarios in which pairs at t are unknown for female i
-#         } else if(male_pairs_known[apairs_f[i,t-1],t]){
-#         
-#           if(apairs_m[apairs_f[i,t-1],t] == (nf+1)){
-#             # next
-#             ll[i,t] <- phi_lli[2] + log(PM)
-#             next
-#           }
-#           
-#           
-#           if(apairs_m[apairs_f[i,t-1],t] != (nf+1)){
-#            
-#             ll[i,t] <- phi_lli[2] + p_lli[4]
-#             next
-#           }
-#           
-#           
-#           browser()
-#           
-#           # If next set of pairs is missing for both male and female
-#         } else {
-#           
-#           # Both known survival states
-#           if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-#             
-#             if(af[i,t] == 1 & am[apairs_f[i,t-1],t] == 1){
-#               # Since there is only divorce upon death, the pair should be together, just not fully observed
-#               
-#               if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t-1],t] == 0){
-#                 ll[i,t] <- phi_lli[4] + p_lli[3]
-#                 next
-#               }
-#               
-#               if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t-1],t] == 1){
-#                 ll[i,t] <- phi_lli[4] + p_lli[4]
-#                 next
-#               }
-#               
-#               if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t-1],t] == 1){
-#                 ll[i,t] <- phi_lli[4] + p_lli[2]
-#                 next
-#               }
-#               
-#               if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t-1],t] == 0){
-#                 ll[i,t] <- phi_lli[4] + p_lli[1]
-#                 next
-#               }
-#             }
-#             
-#             browser()
-#           }
-#           
-#           # Male unknown female known
-#           if(is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-#             
-#             if(am[apairs_f[i,t-1],t] == 1){
-#               if(recap_m[apairs_f[i,t-1],t] == 1){
-#                 ll[i,t] <- log(phi[4] * p[2] + phi[2] * p[2])
-#                 next
-#                 
-#               } else {
-#                 ll[i,t] <- log(phi[4] * p[1] + phi[2] * ((1-PM) + p[1] + p[3]))
-#                 next
-#               }
-#             }
-#             
-#             browser()
-#           }
-#           
-# 
-#           # Female unknown male known
-#           if(!is.na(af[i,t]) & is.na(am[apairs_f[i,t-1],t])){
-#             
-#             
-#             if(af[i,t] == 1){
-#               if(recap_f[i,t] == 1){
-#                 ll[i,t] <- log(phi[4] * p[3] + phi[3] * p[3]) 
-#                 next
-#                 
-#               } else {
-#                 ll[i,t] <- log(phi[4] * p[1] + phi[3] * ((1-PF) + p[1] + p[2]))
-#                 next
-#               }
-#             }
-#             
-#             browser()
-#           }
-# 
-#           # Male unknown female unknown
-#           if(is.na(af[i,t]) & is.na(am[apairs_f[i,t-1],t])){
-#             ll[i,t] <- log(phi[4] * p[1] + phi[2] * ((1-PM) + p[1] + p[3]) + phi[3] * ((1-PF) + p[1] + p[2]) + phi[1])
-#             next
-#           }
-#           
-#           
-#           browser()
-#           
-#         }
-#       }
-#     }
-#   }
-#   
-#   if(any(ll > 0)) browser()
-#   
-#   return(-sum(ll))
-# }
-# # 
-# # Compute all relevant parameters
-# params_cjs <- compute_jbin_param_cjs(PhiF, PhiM)
-# 
-# # Standard Deviation of PhiF, PhiM
-# sigF <- params_cjs$sig.prob.f
-# sigM <- params_cjs$sig.prob.m
-# 
-# # Upper and Lower bounds of correlation
-# gl <- params_cjs$cor_lower_bound
-# gu <- params_cjs$cor_upper_bound
+partial_likelihood_survival <- function(pars,
+                                        ps_data,
+                                        PF,
+                                        PM,
+                                        rho,
+                                        PhiF,
+                                        PhiM){
+
+  # Unpack data
+  nm              <- ps_data$nm
+  nf              <- ps_data$nf
+  k               <- ps_data$k
+  first_capture_f <- ps_data$first_capture_f
+  recap_f         <- ps_data$recap_f
+  recap_m         <- ps_data$recap_m
+  apairs_f        <- ps_data$apairs_f
+  apairs_m        <- ps_data$apairs_m
+  af              <- ps_data$af
+  am              <- ps_data$am
+
+  # Condtion on a pair having been observed together in the last jump
+  pairs_known <- !is.na(apairs_f[1:nf,1:k])
+  male_pairs_known <- !is.na(apairs_m[1:nm,1:k])
+  pairs_observed <- matrix(F, nrow = nf, ncol = k-1)
+  for(i in 1:nf){
+    for(t in 1:(k-1)){
+      if(pairs_known[i,t]){
+        pairs_observed[i,t] <- (apairs_f[i,t] != (nm+1))# *(recap_f[i,t] == 1) & (recap_m[apairs_f[i,t],t] == 1)
+      }
+    }
+  }
+  
+  # Recapute Probabilities (known)
+
+  p <- rev(unlist(compute_jbin_cjs(PF,PM, rho)))
+  p_lli   <- log(p)
+
+  # Survival Probabilties (Proposed)
+  phi <- rev(unlist(compute_jbin_cjs(PhiF,PhiM, pars)))
+  phi_lli  <- log(phi)
+
+  ll <- matrix(0, nrow = nf, ncol = k)
+
+  for(i in 1:nf){
+    
+    if(first_capture_f[i] == k) next
+    
+    for(t in (first_capture_f[i]+1):k){
+      if(pairs_observed[i,t-1]){
+
+        if(apairs_m[apairs_f[i,t-1],t-1] != i) browser()
+
+        # Scenarios in which pairs at t are unknown
+        if(pairs_known[i,t]){
+
+          # Pair Seen again and is same
+          if(apairs_f[i,t] == apairs_f[i,t-1]){
+
+            if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 1){
+              ll[i,t] <- phi_lli[4] + p_lli[4]
+              next
+            }
+
+            if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t],t] == 0){
+              ll[i,t] <- phi_lli[4] + p_lli[3]
+              next
+            }
+
+            if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t],t] == 1){
+              ll[i,t] <- phi_lli[4] + p_lli[2]
+              next
+            }
+
+            if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t],t] == 0){
+              ll[i,t] <- phi_lli[4] + p_lli[1]
+              next
+            }
+
+            browser()
+
+            # Pair seen but they are different
+          } else {
+
+            if(apairs_f[i,t] == (nm+1)){
+              # next
+              ll[i,t] <- phi_lli[3] + log(PF)
+              next
+            }
+
+
+            if(apairs_f[i,t] != (nm+1)){
+
+              ll[i,t] <- phi_lli[3] + p_lli[4]
+              next
+            }
+
+            browser()
+          }
+
+          # Scenarios in which pairs at t are unknown for female i
+        } else if(male_pairs_known[apairs_f[i,t-1],t]){
+
+          if(apairs_m[apairs_f[i,t-1],t] == (nf+1)){
+            # next
+            ll[i,t] <- phi_lli[2] + log(PM)
+            next
+          }
+
+
+          if(apairs_m[apairs_f[i,t-1],t] != (nf+1)){
+
+            ll[i,t] <- phi_lli[2] + p_lli[4]
+            next
+          }
+
+
+          browser()
+
+          # If next set of pairs is missing for both male and female
+        } else {
+
+          # Both known survival states
+          if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+
+            if(af[i,t] == 1 & am[apairs_f[i,t-1],t] == 1){
+              # Since there is only divorce upon death, the pair should be together, just not fully observed
+
+              if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t-1],t] == 0){
+                ll[i,t] <- phi_lli[4] + p_lli[3]
+                next
+              }
+
+              if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t-1],t] == 1){
+                ll[i,t] <- phi_lli[4] + p_lli[4]
+                next
+              }
+
+              if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t-1],t] == 1){
+                ll[i,t] <- phi_lli[4] + p_lli[2]
+                next
+              }
+
+              if(recap_f[i,t] == 0 & recap_m[apairs_f[i,t-1],t] == 0){
+                ll[i,t] <- phi_lli[4] + p_lli[1]
+                next
+              }
+            }
+
+            browser()
+          }
+
+          # Male unknown female known
+          if(is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+
+            if(am[apairs_f[i,t-1],t] == 1){
+              if(recap_m[apairs_f[i,t-1],t] == 1){
+                ll[i,t] <- log(phi[4] * p[2] + phi[2] * p[2])
+                next
+
+              } else {
+                ll[i,t] <- log(phi[4] * p[1] + phi[2] * ((1-PM) + p[1] + p[3]))
+                next
+              }
+            }
+
+            browser()
+          }
+
+
+          # Female unknown male known
+          if(!is.na(af[i,t]) & is.na(am[apairs_f[i,t-1],t])){
+
+
+            if(af[i,t] == 1){
+              if(recap_f[i,t] == 1){
+                ll[i,t] <- log(phi[4] * p[3] + phi[3] * p[3])
+                next
+
+              } else {
+                ll[i,t] <- log(phi[4] * p[1] + phi[3] * ((1-PF) + p[1] + p[2]))
+                next
+              }
+            }
+
+            browser()
+          }
+
+          # Male unknown female unknown
+          if(is.na(af[i,t]) & is.na(am[apairs_f[i,t-1],t])){
+            ll[i,t] <- log(phi[4] * p[1] + phi[2] * ((1-PM) + p[1] + p[3]) + phi[3] * ((1-PF) + p[1] + p[2]) + phi[1])
+            next
+          }
+
+
+          browser()
+
+        }
+      }
+    }
+  }
+
+  if(any(ll > 0)) browser()
+
+  return(-sum(ll))
+}
+
+PhiF <- cjs_out %>% filter(Parameter == "phi.f") %>% pull(Est)
+PhiM <- cjs_out %>% filter(Parameter == "phi.m") %>% pull(Est)
+PM <- cjs_out %>% filter(Parameter == "p.m") %>% pull(Est)
+PF <- cjs_out %>% filter(Parameter == "p.f") %>% pull(Est)
+
+# Compute all relevant parameters
+params_cjs <- compute_jbin_param_cjs(PhiF, PhiM)
+
+# Standard Deviation of PhiF, PhiM
+sigF <- params_cjs$sig.prob.f
+sigM <- params_cjs$sig.prob.m
+
+# Upper and Lower bounds of correlation
+gl <- params_cjs$cor_lower_bound
+gu <- params_cjs$cor_upper_bound
 # #
 # 
 # i <- 5
@@ -585,17 +595,17 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
 # gamma2 <- rep(0,10)
 # 
 # for(i in 1:10){
-#   gamma2[i] <- nlminb(start            = runif(1, min = gl,max = gu),
-#                       objective        = partial_likelihood_survival,
-#                       ps_data          = ps_data_list[[i]],
-#                       PF               = PF,
-#                       PM               = PM,
-#                       rho              = rho[i],
-#                       PhiF             = PhiF,
-#                       PhiM             = PhiM,
-#                       lower            = gl,
-#                       upper            = gu)$par
-# 
+  gamma2[i] <- nlminb(start            = runif(1, min = gl,max = gu),
+                      objective        = partial_likelihood_survival,
+                      ps_data          = ps_data_list[[i]],
+                      PF               = PF,
+                      PM               = PM,
+                      rho              = rho[i],
+                      PhiF             = PhiF,
+                      PhiM             = PhiM,
+                      lower            = gl,
+                      upper            = gu)$par
+
 # }
 # 
 # plot(density(gamma2))
