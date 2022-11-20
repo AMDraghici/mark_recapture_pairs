@@ -34,18 +34,16 @@ cap.data <- cap.data %>%
   filter(!(animal_id %in% drop_id_yr_filter)) %>%
   assign_ids_bysex()
 
-ps_data  <- build_nimble_data(cap.data, F)
+ps_data  <- build_nimble_data(cap.data)
 cjs_data <- format_to_cjs(ps_data)
 
 # Run CJS Model MARK -----------------------------------------------------------------------------------------
 x <- Sys.time()
-cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
-                              PhiF     = 0,
-                              PhiM     = 0,
-                              PF       = 0,
-                              PM       = 0)
-
-pred_probs <- cjs_out$Est
+cjs_out <- run_cjs_model_mark(cjs_data = cjs_data)
+phim_mark <- cjs_out %>% filter(Parameter == "PhiM") %>% pull(Est)
+phif_mark <- cjs_out %>% filter(Parameter == "PhiF") %>% pull(Est)
+pm_mark   <- cjs_out %>% filter(Parameter == "PM") %>% pull(Est)
+pf_mark   <- cjs_out %>% filter(Parameter == "PF") %>% pull(Est)
 y <- Sys.time()
 difftime(y,x,units = "mins")
 #-------------------------------------------------------------------------------------------------------------
@@ -53,20 +51,20 @@ difftime(y,x,units = "mins")
 # Compute Recapture Correlation Estimate----------------------------------------------------------------------
 x <- Sys.time()
 rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                     PF      = pred_probs[3],
-                                     PM      = pred_probs[4])
+                                     PF      = pf_mark,
+                                     PM      = pm_mark)
 names(rho) <- "Mean"
 
 # Bootstrap To Estimate SE 
 rho_bs <- compute_bootstrap_estimates_recapture_correlation(ps_data = ps_data,
                                                             iter    = 10000,
-                                                            PF      = pred_probs[3],
-                                                            PM      = pred_probs[4])
+                                                            PF      = pf_mark,
+                                                            PM      = pm_mark)
 
 # Collect Results
 se_rho <- sd(rho_bs)
 names(se_rho) <- "SE"
-quantiles_rho <- quantile(rho_bs, c(0.025, 0.5, 0.75, 0.975))
+quantiles_rho <- quantile(rho_bs, c(0.025, 0.25, 0.5, 0.75, 0.975))
 summ_rho <- c(rho, se_rho, quantiles_rho)
 y <- Sys.time()
 difftime(y,x,units = "mins")
@@ -75,24 +73,24 @@ difftime(y,x,units = "mins")
 # Compute Survival Correlation Estimate-----------------------------------------------------------------------
 x <- Sys.time()
 gamma <- compute_survival_correlation(ps_data = ps_data,
-                                      PFM     = compute_jbin_cjs(pred_probs[3], pred_probs[4], rho)$prob.mf,
-                                      PhiF    = pred_probs[1],
-                                      PhiM    = pred_probs[2])
+                                      PFM     = compute_jbin_cjs(prob.f = pf_mark, prob.m = pm_mark, rho)$prob.mf,
+                                      PhiF    = phif_mark,
+                                      PhiM    = phim_mark)
 names(gamma) <- "Mean"
 
 # Bootstrap To Estimate SE 
 gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
                                                              iter                  = 10000,
                                                              recapture_correlation = rho,
-                                                             PF                    = pred_probs[3],
-                                                             PM                    = pred_probs[4],
-                                                             PhiF                  = pred_probs[1],
-                                                             PhiM                  = pred_probs[2])
+                                                             PF                    = pf_mark,
+                                                             PM                    = pm_mark,
+                                                             PhiF                  = phif_mark,
+                                                             PhiM                  = phim_mark)
 
 # Collect Results
 se_gamma <- sd(gamma_bs)
 names(se_gamma) <- "SE"
-quantiles_gamma <- quantile(gamma_bs, c(0.025, 0.5, 0.75, 0.975))
+quantiles_gamma <- quantile(gamma_bs, c(0.025, 0.25, 0.5, 0.75, 0.975))
 
 summ_gamma <- c(gamma, se_gamma, quantiles_gamma)
 y <- Sys.time()
@@ -104,7 +102,7 @@ difftime(y,x,units = "mins")
 # Gather Correlation Results
 summ_corr <- as.data.frame(rbind(summ_rho, summ_gamma))
 summ_corr$Parameter <- c("rho","gamma")
-summ_corr <- summ_corr[,c("Parameter","Mean", "SE", "2.5%","50%","75%","97.5%")]
+summ_corr <- summ_corr[,c("Parameter","Mean", "SE", "2.5%", "25%" ,"50%","75%","97.5%")]
 rownames(summ_corr) <- NULL
 
 
@@ -113,10 +111,10 @@ rownames(summ_corr) <- NULL
 ## Compile model PS-------------------------------------------------------------------------------------------
 
 ## MCMC parameters
-niter <- 1e4
+niter   <- 1e5
 nburnin <- niter/4
-nchains <- 5
-nthin <- 10
+nchains <- 6
+nthin   <- 10
 nimble_params <- c("PF","PM","PhiF","PhiM",
                    "gl","gu","gamma",
                    "ru","rl","rho")
@@ -131,9 +129,7 @@ fit <- run_pair_swap_nimble_parallel(data    = ps_data,
                                      nburnin = nburnin,
                                      ncores  = nchains)
 
-samples <- fit$samples
-inits <- fit$inits
-seeds <- fit$seed
+summary_ps_model <- gather_posterior_summary(fit$samples, nchains = nchains)
 y <- Sys.time()
 
 difftime(y,x,units = "hours")
@@ -141,21 +137,18 @@ difftime(y,x,units = "hours")
 # Run MCMC CJS Model ---------------------------------------------------------------------------------------
 
 ## Compile model CJS----------------------------------------------------------------------------------------
-nimble_params <- c("PF","PM","PhiF","PhiM")
+nimble_cjs_params <- c("PF","PM","PhiF","PhiM")
 
 # ACCOUNT FOR RECRUITMENT....
 x <- Sys.time()
-
 fit_cjs <- run_cjs_nimble_parallel(data    = cjs_data, 
-                                   params  = nimble_params,
+                                   params  = nimble_cjs_params,
                                    niter   = niter, 
                                    nthin   = nthin, 
                                    nburnin = nburnin,
                                    ncores  = nchains)
 
-samples_cjs <- fit_cjs$samples
-inits_cjs   <- fit_cjs$inits
-seeds_cjs   <- fit_cjs$seed
+summary_cjs_model <- gather_posterior_summary(fit_cjs$samples, nchains = nchains)
 y <- Sys.time()
 
 difftime(y,x,units = "hours")

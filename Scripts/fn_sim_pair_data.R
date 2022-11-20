@@ -1389,8 +1389,7 @@ simulate_cr_data <- function(n,
   mating_f         <- mating_list_init[["mating_f"]] 
   mating_m         <- mating_list_init[["mating_m"]]  
   pairs            <- initialize_partner_status(n = n, pairs = pairs, mating_f = mating_f, mating_m = mating_m, initial_entry = initial_entry, sex = sex)
-  histories        <- update_history(histories = histories, 
-                                     pairs = pairs, time = initial_time + 1, sex = sex)
+  histories        <- update_history(histories = histories, pairs = pairs, time = initial_time + 1, sex = sex)
   pairs_ind_list <- propogate_partner_state(pairs = pairs, sex =  sex, pairs_f = pairs_f, pairs_m = pairs_m, time = initial_time)
   pairs_f        <- pairs_ind_list[["pairs_f"]]
   pairs_m        <- pairs_ind_list[["pairs_m"]]
@@ -1532,39 +1531,36 @@ simulate_cr_data <- function(n,
   nf         <- sex_counts[1]
   nm         <- sex_counts[2]
   
-  
-  # # Construct fully imputed pairs vector
+  # Construct fully imputed pairs vector
   apairs_imputed_list <- populate_full_pairs_approximation(apairs_f, apairs_m, amating_f, amating_m, nf, nm, k)
   apairs_f_imputed <- apairs_imputed_list[["apairs_f_imputed"]]
   apairs_m_imputed <- apairs_imputed_list[["apairs_m_imputed"]]
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
-    
     # Known data 
-    n                    = n, # Number of animals sampled
-    k                    = k,  # Number of occasions
-    nf                   = nf, # Number of females
-    nm                   = nm, # Number of males
-    sex                  = sex, # Sex of sampled individuals
-    initial_entry        = initial_entry, # When did they enter the population
-    first_capture_m      = first_capture_m, # When did they enter the population
-    first_capture_f      = first_capture_f, # When did they enter the population
+    n                    = n,                          # Number of animals sampled
+    k                    = k,                          # Number of occasions
+    nf                   = nf,                         # Number of females
+    nm                   = nm,                         # Number of males
+    sex                  = sex,                        # Sex of sampled individuals
+    initial_entry        = initial_entry,              # When did ind enter the population
+    first_capture_m      = first_capture_m,            # When did M enter the population
+    first_capture_f      = first_capture_f,            # When did F enter the population
     # Latent States (true values - hidden in real data)
-    pairs_f              = pairs_f, # partners of females 
-    pairs_m              = pairs_m, # partners of males
-    sf                   = sf, # true survival of females
-    sm                   = sm, # true survival of males
-    
+    pairs_f              = pairs_f,                    # true partners of females 
+    pairs_m              = pairs_m,                    # true partners of males
+    sf                   = sf,                         # true survival of females
+    sm                   = sm,                         # true survival of males
     # Observed /Inferred states (Missing Values are possible)
-    af                  = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
-    am                  = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
-    apairs_f            = apairs_f[1:nf, 1:k],
-    apairs_m            = apairs_m[1:nm, 1:k],
-    apairs_f_imputed    = apairs_f_imputed[1:nf, 1:k],
-    apairs_m_imputed    = apairs_m_imputed[1:nm, 1:k],
-    recap_f             = rbind(recap_f[1:nf,1:k],rep(1,k)), #recap_f[1:nf,1:k], # Observed Recapture of Females
-    recap_m             = rbind(recap_m[1:nm,1:k],rep(1,k))  # Observed Recapture of Males
+    af                  = rbind(af[1:nf,1:k]),         # Female Survival with missing values
+    am                  = rbind(am[1:nm,1:k]),         # Male Survival with missing values
+    apairs_f            = apairs_f[1:nf, 1:k],         # Female pairs with inbetween imputing only
+    apairs_m            = apairs_m[1:nm, 1:k],         # Male pairs with inbetween imputing only
+    apairs_f_imputed    = apairs_f_imputed[1:nf, 1:k], # Female pairs with full imputation
+    apairs_m_imputed    = apairs_m_imputed[1:nm, 1:k], # Male pairs with full imputation 
+    recap_f             = rbind(recap_f[1:nf,1:k]),    # Observed Recapture of Females
+    recap_m             = rbind(recap_m[1:nm,1:k])     # Observed Recapture of Males
   )
   
   #Return Model object

@@ -1,4 +1,4 @@
-## Load scripts ------------------------------------------------------------------------------------------------
+
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()
 source(file.path(src_dir, "Scripts", "fn_generic.R"))

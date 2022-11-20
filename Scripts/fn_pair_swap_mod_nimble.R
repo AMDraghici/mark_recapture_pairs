@@ -266,7 +266,7 @@ generate_nimble_init_pairs <- function(ps_data){
 
   # Randomly Sample outcomes using initial values
   for(t in 1:(k-1)){
-    # Survival Outcome ----------------------------------------------------------
+    # Survival Outcome ---------------------------------------------------------------------------------------
     # Marginal Survival Event for Males in the Population (Y^M_T)---------------------------------------------
     for(j in 1:nm){
       if(t >= first_capture_m[j]){
@@ -279,14 +279,14 @@ generate_nimble_init_pairs <- function(ps_data){
     # Error check males
     if(any(is.na(am[j,t+1]))) browser()
     
-    
-    partner_state_f[1:nf,t] <-  nimble_map_partner_states(am[1:nm,t+1],
-                                                          am[1:nm,t],
-                                                          first_capture_m[1:nm],
-                                                          apairs_f[1:nf,t],
-                                                          nf,
-                                                          nm,
-                                                          t)
+    # Get female partner state
+    partner_state_f[1:nf,t] <-  nimble_map_partner_states(male_state            = am[1:nm,t+1],
+                                                          male_state_condition  = am[1:nm,t],
+                                                          first_capture_m       = first_capture_m[1:nm],
+                                                          pairs_f               = apairs_f[1:nf,t],
+                                                          nf                    = nf,
+                                                          nm                    = nm,
+                                                          t                     = t)
     
     
     
@@ -304,13 +304,13 @@ generate_nimble_init_pairs <- function(ps_data){
     
     # Add recapture status 
     for(t in 2:k){
-      partner_obs_f[1:nf,t] <-  nimble_map_partner_states(recap_m[1:nm,t],
-                                                          am[1:nm,t],
-                                                          first_capture_m[1:nm],
-                                                          apairs_f[1:nf,t],
-                                                          nf,
-                                                          nm,
-                                                          t-1)
+      partner_obs_f[1:nf,t] <-  nimble_map_partner_states(male_state            = recap_m[1:nm,t],
+                                                          male_state_condition  = am[1:nm,t],
+                                                          first_capture_m       = first_capture_m[1:nm],
+                                                          pairs_f               = apairs_f[1:nf,t],
+                                                          nf                    = nf,
+                                                          nm                    = nm,
+                                                          t                     = t-1)
     }
   }
   
@@ -321,12 +321,6 @@ generate_nimble_init_pairs <- function(ps_data){
     mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
     mat_final[is.na(ps_mat)] <- mat[is.na(ps_mat)]
     return(mat_final)
-  }
-  
-  build_NA_vec <- function(vec, ps_vec){
-    vec_final <- rep(NA, length(ps_vec))
-    vec_final[is.na(ps_vec)] <- vec[is.na(ps_vec)]
-    return(vec_final)
   }
   
   # Female Survival
@@ -392,7 +386,8 @@ compile_pair_swap_nimble <- function(ps_data,
     
     nimble_params <- params
   } else {
-    nimble_params <- c("PF","PM","PhiF","PhiM",
+    nimble_params <- c("PF","PM",
+                       "PhiF","PhiM",
                        "gl","gu","gamma", 
                        "ru","rl","rho")
     cat("Params argument is NULL...","\n")
@@ -422,7 +417,6 @@ compile_pair_swap_nimble <- function(ps_data,
   compile_ps <- compileNimble(psModel, showCompilerOutput = F)
   
   # [Note] SafeDepare.... warnings are annoying so suppress messages 
-  # Conjugacy is slow to detect and not useful here so turn off
   cat("Configuring Markov Chain Monte Carlo Process (SLOW)...", "\n")
   psConf  <- suppressMessages(configureMCMC(model        = psModel,
                                             print        = F,
@@ -430,11 +424,11 @@ compile_pair_swap_nimble <- function(ps_data,
                                             onlySlice    = F,
                                             useConjugacy = F))
   
-  cat("Adding AF-Slice Sampler to Recapture and Survival Parameters...", "\n")
-  psConf$removeSampler(c("PhiF","PhiM","raw_gamma"), print = F)
-  psConf$removeSampler(c("PF","PM","raw_rho"), print = F)
-  psConf$addSampler(target = c("PhiF","PhiM","raw_gamma"), type = 'AF_slice')
-  psConf$addSampler(target = c("PF","PM","raw_rho"), type = 'AF_slice')
+  # cat("Adding AF-Slice Sampler to Recapture and Survival Parameters...", "\n")
+  # psConf$removeSampler(c("PhiF","PhiM","raw_gamma"), print = F)
+  # psConf$removeSampler(c("PF","PM","raw_rho"), print = F)
+  # psConf$addSampler(target = c("PhiF","PhiM","raw_gamma"), type = 'AF_slice')
+  # psConf$addSampler(target = c("PF","PM","raw_rho"), type = 'AF_slice')
   
   # Display Samplers
   print(psConf)
@@ -494,13 +488,13 @@ execute_pair_swap_nimble_pipeline <- function(seed,
   # inits <- generate_nimble_init_pairs(data)
   samples <- run_nimble(CmdlMCMC = nimble_complied$CmdlMCMC,
                         niter    = niter,
-                        nthin     = nthin,
+                        nthin    = nthin,
                         nburnin  = nburnin,
                         nchains  = nchains,
                         inits    = nim_inits,
                         seed     = seed) 
   return(list(samples = samples,
-              inits   = nimble_complied$nimble_inits))
+              inits   = nim_inits))
   
 }
 
@@ -523,13 +517,13 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
   cat(paste0("Loading custom functions onto cluster...", "\n"))
   clusterEvalQ(cl, {
     #  Load Libraries
-    libs <- c("boot", "ggplot2", "nimble", "coda", "ggmcmc", "tidyverse")
+    libs <- c("nimble", "coda", "tidyverse")
     lapply(libs,require, character.only = T)
     source(paste0(getwd(), "/Scripts/fn_pair_swap_mod_nimble.R"))
     `%+%` <- function(a, b) paste0(a, b)
   })
   
-  seeds <-  1:ncores #sample(.Machine$integer.max,ncores)
+  seeds <-  1:ncores 
   
   cat(paste0("Running MCMC in Parallel (SLOW) ...", "\n"))
   out_list <- parLapply(cl      = cl,
@@ -548,8 +542,8 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
   stopCluster(cl)
   
   cat(paste0("Formatting and Returning output ...", "\n"))
-  samples <- as.mcmc.list(lapply(1:nchains, function(x) out_list[[x]]$samples))
-  inits   <- lapply(1:nchains, function(x) out_list[[x]]$inits)
+  samples <- as.mcmc.list(lapply(1:ncores, function(x) out_list[[x]]$samples))
+  inits   <- lapply(1:ncores, function(x) out_list[[x]]$inits)
   
   return(list(samples = samples,
               inits   = inits,

@@ -961,12 +961,8 @@ impute_between_known_states <- function(apairs_f,
                                         am,
                                         nf, 
                                         nm, 
-                                        k,
-                                        divorce_death = FALSE){
+                                        k){
   
-  
-  last_partner_matrix <- matrix(NA, nrow = nf, ncol = k)
-  next_partner_matrix <- matrix(NA, nrow = nf, ncol = k)
   
   # # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
   for(i in 1:nf){
@@ -1000,9 +996,6 @@ impute_between_known_states <- function(apairs_f,
         next_partner <- next_partner[1]
       }
       
-      last_partner_matrix[i,t] <- last_partner
-      next_partner_matrix[i,t] <- next_partner
-      
       if(!is.na(apairs_f[i,t])){
         if(apairs_f[i,t] == (nm+1)){
           if(next_partner == last_partner & next_partner != (nm+1)){
@@ -1025,26 +1018,6 @@ impute_between_known_states <- function(apairs_f,
         if(amating_f[i,t] == 0){
           apairs_f[i,t] <- (nm+1)
           next
-        }
-      }
-    }
-  }
-  
-  # Optional Assumption to include
-  # Assume that divorce only occurs upon death 
-  
-  if(divorce_death){
-    for(i in 1:nf){
-      for(t in 2:k){
-        if(!is.na(apairs_f[i,t-1])){
-          if(apairs_f[i,t-1] == (nm+1)) next
-          if(is.na(apairs_f[i,t])){
-            if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-              apairs_f[i,t] <- apairs_f[i,t-1]
-              apairs_m[apairs_f[i,t],t-1] <- i
-              apairs_m[apairs_f[i,t],t] <- i
-            }
-          }
         }
       }
     }
@@ -1214,40 +1187,62 @@ populate_full_pairs_approximation <- function(apairs_f,
 }
 
 # Prepare data for nimble
-build_nimble_data <- function(cap.data,
-                              divorce_death){
+build_nimble_data <- function(cap.data){
   
   # Index values
   nf <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="F") %>% distinct() %>% arrange(nimble_id) %>% nrow()
   nm <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="M") %>% distinct() %>% arrange(nimble_id) %>% nrow()
-  k <- cap.data %>% select(time) %>% distinct() %>% nrow()
+  k  <- cap.data %>% select(time) %>% distinct() %>% nrow()
   
   # Recruitment matrices
-  recruit_list <- populate_recruit(cap.data, nf, nm, k)
+  recruit_list <- populate_recruit(cap.data = cap.data,
+                                   nf       = nf,
+                                   nm       = nm,
+                                   k        = k)
   recruit_f <- recruit_list[["recruit_f"]]
   recruit_m <- recruit_list[["recruit_m"]]
   
   # Attempt to mate matrix
-  mating_list <- populate_mating(cap.data, nf,nm ,k)
+  mating_list <- populate_mating(cap.data = cap.data,
+                                 nf       = nf,
+                                 nm       = nm,
+                                 k        = k)
   amating_f <- mating_list[["amating_f"]]
   amating_m <-  mating_list[["amating_m"]]
   
   # Joint Pairs Matrices
-  apairs <- populate_pairs(cap.data, nf, nm, k)
+  apairs <- populate_pairs(cap.data = cap.data,
+                           nf       = nf,
+                           nm       = nm,
+                           k        = k)
   
   #Conditional Paired Survival matrices
-  surv_list <- populate_surv(cap.data, nf, nm, k)
+  surv_list <- populate_surv(cap.data = cap.data,
+                             nf       = nf,
+                             nm       = nm,
+                             k        = k)
   af <- surv_list[["af"]]
   am <- surv_list[["am"]]
   
   # Conditional Paired Recapture Matrices
-  recap_list <- populate_recap(cap.data, nf, nm, k)
+  recap_list <- populate_recap(cap.data = cap.data,
+                               nf       = nf,
+                               nm       = nm,
+                               k        = k)
   recap_f <- recap_list[["recap_f"]]
   recap_m <- recap_list[["recap_m"]]
   
   # Construct partner index by female
-  apairs_f_raw <- populate_apairs_f(apairs,amating_f,nf,nm,k)
-  apairs_m_raw <- populate_apairs_m(apairs_f_raw, nm, nf, k)
+  apairs_f_raw <- populate_apairs_f(apairs    = apairs,
+                                    amating_f = amating_f,
+                                    nf        = nf,
+                                    nm        = nm,
+                                    k         = k)
+  
+  apairs_m_raw <- populate_apairs_m(apairs_f = apairs_f_raw,
+                                    nm       = nm,
+                                    nf       = nf,
+                                    k        = k)
   
   # Add assumption that partners stay together if seen together on future sampling occasions
   apairs_list <- impute_between_known_states(apairs_f      = apairs_f_raw, 
@@ -1257,27 +1252,28 @@ build_nimble_data <- function(cap.data,
                                              am            = am,
                                              nf            = nf, 
                                              nm            = nm, 
-                                             k             = k,
-                                             divorce_death = divorce_death)
+                                             k             = k)
   apairs_f <- apairs_list[["apairs_f"]]
   apairs_m <- apairs_list[["apairs_m"]]
   
   # # Construct fully imputed pairs vector
-  apairs_imputed_list <- populate_full_pairs_approximation(apairs_f, apairs_m, amating_f, amating_m, nf, nm, k)
+  apairs_imputed_list <- populate_full_pairs_approximation(apairs_f  = apairs_f,
+                                                           apairs_m  = apairs_m,
+                                                           amating_f = amating_f,
+                                                           amating_m = amating_m, 
+                                                           nf        = nf,
+                                                           nm        = nm, 
+                                                           k         = k)
   apairs_f_imputed <- apairs_imputed_list[["apairs_f_imputed"]]
   apairs_m_imputed <- apairs_imputed_list[["apairs_m_imputed"]]
   
-  # Used to add dummy nm+1 and nf+1 rows for indexing of singles
-  add_dummy_row <- function(mat, x = 0){
-    return(rbind(mat,rep(x,ncol(mat))))
-  }
-  add_dummy_col <- function(mat, x = 0){
-    return(cbind(rep(x,nrow(mat)),mat))
-  }
-  
   # Add first capture vectors
-  first_capture_f <- get_first_capture(recruit_f, nf, k)
-  first_capture_m <- get_first_capture(recruit_m, nm, k)
+  first_capture_f <- get_first_capture(recruit = recruit_f, 
+                                       n       =  nf, 
+                                       k       = k)
+  first_capture_m <- get_first_capture(recruit = recruit_m, 
+                                       n       =  nm, 
+                                       k       = k)
     
   # Store results in list 
   nimble_data <- list(nf               = nf, 

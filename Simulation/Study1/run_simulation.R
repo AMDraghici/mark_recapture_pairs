@@ -1,8 +1,7 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
-proj_dir   <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-script_dir <- proj_dir %+% "/Scripts/"
-out_dir    <- proj_dir %+% "/Simulation/Study1/Output/"
+src_dir   <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
+out_dir    <- src_dir %+% "Simulation/Study1/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -45,5 +44,5 @@ difftime(y,x,units = "mins")
 # ----------------------------------------------------------------------------------------------------------------
 
 # Return Results -------------------------------------------------------------------------------------------------
-saveRDS(results, out_dir %+% "/results_" %+% i %+% ".rds")
+saveRDS(results, out_dir %+% "results_" %+% i %+% ".rds")
 # ----------------------------------------------------------------------------------------------------------------

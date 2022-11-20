@@ -193,8 +193,7 @@ run_cjs_model_mark <- function(cjs_data){
   
 }
 
-
-# Execute Simulation Study 
+# Execute one replicate of Simulation Study 
 execute_iteration  <- function(iter,
                                scenario,
                                PM,
@@ -346,6 +345,7 @@ execute_iteration  <- function(iter,
   return(results)
 }
 
+# Execute entire simulation study for correlation estimators
 execute_simulation <- function(niter,
                                scenario,
                                PM,
@@ -387,8 +387,7 @@ execute_simulation <- function(niter,
   
 }
 
-# Get Scenario Grid
-# Convenient Function to get scenarios explored in this manuscript
+# Get Scenario Grid for correlation estimator simulation study
 get_scenarios <- function(){
   n <- c(150, 350)
   k <- c(15,  30)

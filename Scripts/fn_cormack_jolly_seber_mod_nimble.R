@@ -51,30 +51,25 @@ generate_init_cjs <- function(cjs_data){
   PM   <- rbeta(1,1,1)
   PhiF <- rbeta(1,1,1)
   PhiM <- rbeta(1,1,1)
+  phi  <- PhiF * female + PhiM * (1-female) 
+  p    <- PF   * female + PM   * (1-female)
   
   # Sample Survival
   for(i in 1:n){
-    phi <- PhiF * female[i] + PhiM * (1-female[i]) 
-    
     for(t in initial_entry[i]:(k-1)){
       if(is.na(a[i, t+1])){
-        a[i, t+1] <- rbinom(1, 1, phi * a[i, t])
+        a[i, t+1] <- rbinom(1, 1, phi[i] * a[i, t])
       }
     }
   }
   
   # Add unknown status 
-  build_NA_mat <- function(mat, js_mat){
+  build_NA_mat <- function(mat, cjs_mat){
     mat_final <- matrix(NA,nrow = dim(mat)[1], ncol = dim(mat)[2])
-    mat_final[is.na(js_mat)] <- mat[is.na(js_mat)]
+    mat_final[is.na(cjs_mat)] <- mat[is.na(cjs_mat)]
     return(mat_final)
   }
   
-  build_NA_vec <- function(vec, js_vec){
-    vec_final <- rep(NA, length(js_vec))
-    vec_final[is.na(js_vec)] <- vec[is.na(js_vec)]
-    return(vec_final)
-  }
    # Survival Init
   a <- build_NA_mat(a, cjs_data$a)
   
@@ -87,8 +82,8 @@ generate_init_cjs <- function(cjs_data){
     PhiF    = PhiF,
     PhiM    = PhiM,
     a       = a,
-    p       = PF   * female + (1-female) * PM,
-    phi     = PhiF * female + (1-female) * PhiM
+    p       = p,
+    phi     = phi
   )
   
   # Return Initial Values for a single chain
@@ -213,16 +208,16 @@ execute_cjs_nimble_pipeline <- function(seed,
                                         nchains){
   
   nimble_complied <- compile_cjs_nimble(data, params)
-  inits <- generate_init_cjs(data)
+  nim_inits <- lapply(1:nchains, function(i) generate_init_cjs(data))
   samples <- run_nimble_cjs(CmdlMCMC = nimble_complied$CmdlMCMC,
                             niter    = niter,
                             thin     = nthin,
                             nburnin  = nburnin,
                             nchains  = nchains,
-                            inits    = inits,
+                            inits    = nim_inits,
                             seed     = seed) 
   return(list(samples = samples,
-              inits   = nimble_complied$nimble_inits))
+              inits   = nim_inits))
   
 }
 
@@ -238,20 +233,20 @@ run_cjs_nimble_parallel <- function(data, params, niter, nthin, nburnin, ncores)
     return(samples)
   }
   
-  cat(paste0("Building cluster with ",ncores , " sockets...", "\n"))
+  cat(paste0("Building cluster with ", ncores , " sockets...", "\n"))
   cl <- makeCluster(ncores)
   
   # Load packages necessary
   cat(paste0("Loading custom functions onto cluster...", "\n"))
   clusterEvalQ(cl, {
     #  Load Libraries
-    libs <- c("boot", "ggplot2", "nimble", "coda", "ggmcmc", "tidyverse")
+    libs <- c("nimble", "coda", "tidyverse")
     lapply(libs,require, character.only = T)
     source(paste0(getwd(), "/Scripts/fn_cormack_jolly_seber_mod_nimble.R"))
     `%+%` <- function(a, b) paste0(a, b)
   })
   
-  seeds <-  1:nchains# sample(.Machine$integer.max,ncores)
+  seeds <-  1:ncores
   
   cat(paste0("Running MCMC in Parallel (SLOW) ...", "\n"))
   out_list <- parLapply(cl      = cl,
@@ -270,8 +265,8 @@ run_cjs_nimble_parallel <- function(data, params, niter, nthin, nburnin, ncores)
   stopCluster(cl)
   
   cat(paste0("Formatting and Returning output ...", "\n"))
-  samples <- as.mcmc.list(lapply(1:nchains, function(x) out_list[[x]]$samples))
-  inits   <- lapply(1:nchains, function(x) out_list[[x]]$inits)
+  samples <- as.mcmc.list(lapply(1:ncores, function(x) out_list[[x]]$samples))
+  inits   <- lapply(1:ncores, function(x) out_list[[x]]$inits)
   
   return(list(samples = samples,
               inits   = inits,
