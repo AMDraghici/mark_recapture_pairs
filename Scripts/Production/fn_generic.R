@@ -146,13 +146,13 @@ run_cjs_model_mark <- function(cjs_data       ,
   #Choose Appropriate CJS Model Settings
   phi.grp     <- list(formula = ~sex)
   p.grp       <- list(formula = ~sex)
-  phi.name    <- c("phi.f","phi.m")
-  p.name      <- c("p.f","p.m")
+  phi.name    <- c("phi.m","phi.f")
+  p.name      <- c("p.m","p.f")
   param.names <- c(phi.name,p.name)
   
   # Add True Parameters if they exist
-  phi.true   <- c(PhiF,PhiM)
-  p.true     <- c(PF,PM)
+  phi.true   <- c(PhiM,PhiF)
+  p.true     <- c(PM,PF)
   param.true <- c(phi.true,p.true)
   
   #Process Mark Data (Extract Recapture/sex)
@@ -268,16 +268,16 @@ execute_iteration  <- function(iter,
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
   cat("Estimating recapture correlation rho...","\n")
   rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                       PF      = pred_probs[3],
-                                       PM      = pred_probs[4])
+                                       PF      = pred_probs[4],
+                                       PM      = pred_probs[3])
   names(rho) <- "Est"
   
   # Bootstrap To Estimate SE 
   cat("Bootstrapping to get standard error estimates of rho...","\n")
   rho_bs <- compute_bootstrap_estimates_recapture_correlation(ps_data = ps_data,
                                                               iter    = 10000,
-                                                              PF      = pred_probs[3],
-                                                              PM      = pred_probs[4])
+                                                              PF      = pred_probs[4],
+                                                              PM      = pred_probs[3])
   # Collect Results
   mean_bstrp_rho      <- mean(rho_bs)
   names(mean_bstrp_rho) <- "Est_Btstrp"
@@ -290,8 +290,8 @@ execute_iteration  <- function(iter,
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
   cat("Estimating recapture correlation rho...","\n")
   gamma <- compute_survival_correlation(ps_data = ps_data,
-                                        PFM     = compute_jbin_cjs(prob.f = pred_probs[3],
-                                                                   prob.m = pred_probs[4],
+                                        PFM     = compute_jbin_cjs(prob.f = pred_probs[4],
+                                                                   prob.m = pred_probs[3],
                                                                    corr   = rho)$prob.mf,
                                         PhiF    = pred_probs[1],
                                         PhiM    = pred_probs[2])
@@ -301,11 +301,11 @@ execute_iteration  <- function(iter,
   cat("Bootstrapping to get standard error estimates of gamma...","\n")
   gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
                                                                iter                  = 10000,
-                                                               recapture_correlation = NULL,
-                                                               PF                    = pred_probs[3],
-                                                               PM                    = pred_probs[4],
-                                                               PhiF                  = pred_probs[1],
-                                                               PhiM                  = pred_probs[2])
+                                                               recapture_correlation = rho,
+                                                               PF                    = pred_probs[4],
+                                                               PM                    = pred_probs[3],
+                                                               PhiF                  = pred_probs[2],
+                                                               PhiM                  = pred_probs[1])
   
   # Collect Results
   mean_bstrp_gamma      <- mean(gamma_bs)

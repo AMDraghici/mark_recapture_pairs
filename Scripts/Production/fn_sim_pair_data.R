@@ -621,6 +621,13 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
                                                   (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
     
     
+    if(single_check == 0){
+      first_j <- min(which(recruit_m[j,]==1))
+      if(first_j > (time-1)){
+        prob_cond_f <- phi.f[time]
+      } 
+    }
+    
     sf[i,time] <- rbinom(1,1, prob = prob_cond_f * sf[i,time-1] * recruit_f[i,time-1] + (1-recruit_f[i,time-1]))
   }
   
@@ -1227,9 +1234,16 @@ simulate_recapture <- function(recap_f,
       # Find partner info
       j <- pairs_f[i, t]
       single_check <- 1*(j == (nm + 1))
+      
       recap_prob_cond_f <- single_check * p.f[t] + 
         (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
                               (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
+      
+      if(single_check == 0){
+        if(first_capture_m[j] >= t){
+          recap_prob_cond_f <- p.f[t]
+        } 
+      }
       
       
       recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t])
@@ -1465,38 +1479,6 @@ simulate_cr_data <- function(n,
   #   }
   # }
   
-  az <- matrix(NA, nrow = nf, ncol = k)
-  ar <- matrix(NA, nrow = nf, ncol = k)
-  
-  # Add AR/AZ known
-  for(i in 1:nf){
-    for(t in first_capture_f[i]:(k-1)){
-      if(!is.na(apairs_f[i,t])){
-        if(apairs_f[i,t] == (nm+1)){
-          az[i,t] <- 1
-        } else  {
-          az[i,t] <- 2 + am[apairs_f[i,t],t+1]
-        }
-      }
-    }
-  }
-  
-  for(i in 1:nf){
-    for(t in (first_capture_f[i]):k){
-      if(!is.na(apairs_f[i,t])){
-        if(apairs_f[i,t] == (nm+1)){
-          ar[i,t] <- 1
-        } else  {
-          j <- apairs_f[i,t]
-          ar[i,t] <- 2 + recap_m[j,t]
-        }
-      }
-    }
-  }
-  
-  ar[is.na(ar)] <- 0
-  az[is.na(az)] <- 0
-  # browser()
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
@@ -1517,8 +1499,6 @@ simulate_cr_data <- function(n,
     sm                   = sm, # true survival of males
     
     # Observed /Inferred states (Missing Values are possible)
-    ar_known            = ar,
-    az_known            = az,
     af                  = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
     am                  = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
     apairs_f            = apairs_f[1:nf, 1:k],
@@ -1541,47 +1521,30 @@ sim_dat <- function(parameter_list){
 
 format_to_cjs <- function(model_data){
   
-  x <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
-  a <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
-  initial_entry <- c(model_data$first_capture_f[1:model_data$nf],model_data$first_capture_m[1:model_data$nm])
+  # Unpack data
+  recap_f         <- model_data$recap_f
+  recap_m         <- model_data$recap_m
+  k               <- model_data$k
+  af              <- model_data$af
+  am              <- model_data$am
+  first_capture_f <- model_data$first_capture_f
+  first_capture_m <- model_data$first_capture_m
+  nf              <- model_data$nf
+  nm              <- model_data$nm
   
+  # Build CJS data 
+  x <- rbind(recap_f[1:nf,1:k], recap_m[1:nm,1:k])
+  a <- rbind(af[1:nf,1:k],      am[1:nm,1:k])
   
-  # Number of females and males
-  nf <- model_data$nf
-  nm <- model_data$nm
-  
-  # Drop animals observed at final occasion (condition on first capture)
-  if(any(initial_entry == model_data$k)){
-    browser()
-    observed_at_k <- which(initial_entry == model_data$k)
-    x <- x[-observed_at_k,]
-    a <- a[-observed_at_k,]
-    initial_entry <- initial_entry[-observed_at_k]
-    
-    nf2 <- nf
-    nm2 <- nm
-    
-    # Lower amount of individuals for each one dropped
-    for(i in observed_at_k){
-      if(i > nf){
-        nm2 <- nm2- 1
-      } else {
-        nf2 <- nf2 - 1
-      }
-    }
-    
-  } else {
-    nf2 <- nf
-    nm2 <- nm
-  }
+  initial_entry <- c(first_capture_f[1:nf],first_capture_m[1:nm])
   
   # Store results in list
-  results <- list(n = nf2 + nm2,
-                  k = model_data$k,
-                  female = c(rep(1, nf2),rep(0, nm2)), 
+  results <- list(n             = nf + nm,
+                  k             = k,
+                  female        = c(rep(1, nf),rep(0, nm)), 
                   initial_entry = initial_entry,
-                  x = x,
-                  a = a)
+                  x             = x,
+                  a             = a)
   
   # Return Standard CJS Data
   return(results)

@@ -1,7 +1,7 @@
 # Extract Data From Excel Spreadsheets
 gather_hq_data <- function(dat_dir, 
-                            book1 = "Harlequin_Capture_Records_24Aug2020_modified.xls", 
-                            book2 = "HARD_Obs_20Aug94_08Sep20_revised.xls"){
+                           book1 = "Harlequin_Capture_Records_24Aug2020_modified.xls", 
+                           book2 = "HARD_Obs_20Aug94_08Sep20_revised.xls"){
   #Storage
   dat1 <- list()
   dat2 <- list()
@@ -10,7 +10,7 @@ gather_hq_data <- function(dat_dir,
   for(i in 1:9){
     dat1[[i]] <-  read_excel(dat_dir %+% book1, sheet = i)
   }
- 
+  
   # 5 sheets in book2
   for(j in 1:7){
     dat2[[j]] <- read_excel(dat_dir %+% book2, sheet = j)
@@ -333,8 +333,8 @@ process_capture_records <- function(hq_data){
                              ifelse(is.na(ID.y),0,ID.y),
                              ifelse(is.na(ID.x.x),0,ID.x.x),
                              ifelse(is.na(ID.y.y),0,ID.y.y)
-                             ),
-           time = year - 1993 + 1
+    ),
+    time = year - 1993 + 1
     ) %>% 
     select(-ID.x,-ID.y,-ID.x.x,-ID.y.y) %>% 
     select(capture_date,year,month,day,animal_id,sex,partner_id,
@@ -346,9 +346,9 @@ process_capture_records <- function(hq_data){
     left_join(na.omit(select(BandList,ID,third_plastic)),by=c("mother_id" = "third_plastic")) %>% 
     left_join(na.omit(select(BandList,ID,fourth_plastic)),by=c("mother_id" = "fourth_plastic")) %>% 
     mutate(mother_id = pmax(ifelse(is.na(ID.x),0,ID.x),
-                             ifelse(is.na(ID.y),0,ID.y),
-                             ifelse(is.na(ID.x.x),0,ID.x.x),
-                             ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
+                            ifelse(is.na(ID.y),0,ID.y),
+                            ifelse(is.na(ID.x.x),0,ID.x.x),
+                            ifelse(is.na(ID.y.y),0,ID.y.y))) %>% 
     select(-ID.x,-ID.y,-ID.x.x,-ID.y.y)
   
   # Drop hatchlings that only seen once (we only want adults)
@@ -360,8 +360,12 @@ process_capture_records <- function(hq_data){
     filter(newborn > 0 & nobs <= 1) %>% 
     pull(animal_id)
   
+  drop_captured_last <- CaptureRecords %>% 
+    filter(tolower(initial_entry) == "c" & year == 2020)  %>%
+    pull(animal_id) %>% unique()
+
   # Return Processed Data
-  return(CaptureRecords %>% filter(!(animal_id %in% drop_transient_hatchlings)))
+  return(CaptureRecords %>% filter(!(animal_id %in% drop_transient_hatchlings) & !(animal_id %in% drop_captured_last)))
 }
 
 build_cr_df <- function(hq_data){
@@ -373,11 +377,11 @@ build_cr_df <- function(hq_data){
     arrange(time)
   # 
   # extended.cap <- process_extensive_records(hq_data, year.dat)
-# 
-# 
-#   # Unite Capture Records
+  # 
+  # 
+  #   # Unite Capture Records
   # CaptureRecords <- rbind(CaptureRecords, extended.cap)
-
+  
   #Capture-Recapture format
   cap.data <- merge(unique(CaptureRecords$animal_id),year.dat$time) %>% 
     rename(animal_id = x,time = y) %>% 
@@ -454,8 +458,8 @@ populate_missing_mate_data <- function(cap.data){
     for(t in 1:k){
       id <- animal_ids[i]
       pid <- cap.data %>% 
-             filter(time == t, animal_id == id) %>% 
-             pull(partner_id)
+        filter(time == t, animal_id == id) %>% 
+        pull(partner_id)
       
       # Skip unmated case
       if(is.na(pid)) next
@@ -546,7 +550,7 @@ add_implied_states <- function(cap.data){
 
 
 add_last_capture <- function(cap.data){
-    endpoints <- cap.data %>%
+  endpoints <- cap.data %>%
     mutate(age = ifelse(is.na(age),1,age)) %>% 
     group_by(animal_id) %>% 
     summarize(initial_entry = min(which(recapture_individual==1)),
@@ -554,7 +558,7 @@ add_last_capture <- function(cap.data){
               min_age = min(age)) %>%
     ungroup() %>% 
     mutate(known_lifespan = final_entry-initial_entry + 1,
-           max_remaining = 20 - known_lifespan,
+           max_remaining = 30 - known_lifespan,
            first_possible = ifelse(min_age == 0, initial_entry + 1, 
                                    ifelse(initial_entry - max_remaining <= 1, 1, initial_entry - max_remaining)),
            last_possible = ifelse(final_entry + max_remaining >= 28, 28, final_entry + max_remaining)) 
@@ -578,9 +582,9 @@ clean_filtered <- function(cap.data){
   
   # Add minimum possible age and maximum possible age
   cap.data <- cap.data %>% 
-    mutate(upper_age = ifelse(time - first_possible + 1 < 20, time - first_possible + 1, 20),
+    mutate(upper_age = ifelse(time - first_possible + 1 < 30, time - first_possible + 1, 30),
            upper_age = ifelse(upper_age < 0, 0, upper_age),
-           lower_age = ifelse(time - initial_entry + 1 < 20, time - initial_entry + 1, 20),
+           lower_age = ifelse(time - initial_entry + 1 < 30, time - initial_entry + 1, 30),
            lower_age = ifelse(lower_age < 0, 0, lower_age))
   
   return(cap.data)
@@ -597,7 +601,7 @@ assign_ids_bysex <- function(cap.data){
     group_by(sex) %>% 
     summarize(nimble_id = 1:n(), animal_id = animal_id) %>% 
     ungroup() 
-
+  
   # Add gender specific ids (for nimble/nimble modelling)
   cap.data <- cap.data %>% 
     left_join(id_catalog, by = c("animal_id", "sex")) %>% 
@@ -623,7 +627,7 @@ populate_recruit <- function(cap.data, nf, nm, k){
     filter(sex == "F") %>% 
     arrange(nimble_id) %>% 
     distinct()
-
+  
   male_init <- cap.data %>%
     select(sex, nimble_id, initial_entry, first_possible) %>% 
     filter(sex == "M") %>%
@@ -643,7 +647,7 @@ populate_recruit <- function(cap.data, nf, nm, k){
     } else {
       recruit_f[f_id, 1:(first_possible-1)] <- 0
     }
-
+    
   }
   
   # Populate Male 
@@ -793,7 +797,7 @@ populate_pairs <- function(cap.data, nf, nm, k){
 
 # Build survival matrices
 populate_surv <- function(cap.data, nf, nm, k){
-
+  
   #Conditional Paired Survival matrices
   af <- matrix(NA, nrow = nf, ncol = k)
   am <- matrix(NA, nrow = nm, ncol = k)
@@ -813,7 +817,7 @@ populate_surv <- function(cap.data, nf, nm, k){
   
   surv_m <- cap.data %>% 
     select(sex, nimble_id, time, surv_individual_confounded, last_possible)  %>%
-   # mutate(surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded)) %>% 
+    # mutate(surv_individual_confounded = ifelse(time > last_possible, 0, surv_individual_confounded)) %>% 
     filter(sex == "M") %>% 
     arrange(nimble_id) %>%
     distinct()
@@ -930,40 +934,10 @@ populate_apairs_f <- function(apairs,amating_f,nf,nm,k){
   return(apairs_f)
 }
 
-# Prepare data for nimble
-build_nimble_data <- function(cap.data){
+# Generate Pairs for males 
+populate_apairs_m <- function(apairs_f, nm, nf, k){
   
-  # Index values
-  nf <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="F") %>% distinct() %>% arrange(nimble_id) %>% nrow()
-  nm <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="M") %>% distinct() %>% arrange(nimble_id) %>% nrow()
-  k <- cap.data %>% select(time) %>% distinct() %>% nrow()
   
-  # Recruitment matrices
-  recruit_list <- populate_recruit(cap.data, nf, nm, k)
-  recruit_f <- recruit_list[["recruit_f"]]
-  recruit_m <- recruit_list[["recruit_m"]]
-  
-  # Attempt to mate matrix
-  mating_list <- populate_mating(cap.data, nf,nm ,k)
-  amating_f <- mating_list[["amating_f"]]
-  amating_m <-  mating_list[["amating_m"]]
-  
-  # Joint Pairs Matrices
-  apairs <- populate_pairs(cap.data, nf, nm, k)
-  
-  #Conditional Paired Survival matrices
-  surv_list <- populate_surv(cap.data, nf, nm, k)
-  af <- surv_list[["af"]]
-  am <- surv_list[["am"]]
-  
-  # Conditional Paired Recapture Matrices
-  recap_list <- populate_recap(cap.data, nf, nm, k)
-  recap_f <- recap_list[["recap_f"]]
-  recap_m <- recap_list[["recap_m"]]
-  
-  # Construct partner index by female
-  apairs_f <- populate_apairs_f(apairs,amating_f,nf,nm,k)
- 
   apairs_m <- matrix(NA, nrow = nm, ncol = k)
   
   for(i in 1:nf){
@@ -975,6 +949,21 @@ build_nimble_data <- function(cap.data){
       }
     }
   }
+  
+  return(apairs_m)
+}
+
+# Add assumption that partnerships remain between intervals
+impute_between_known_states <- function(apairs_f, 
+                                        apairs_m, 
+                                        amating_f, 
+                                        af,
+                                        am,
+                                        nf, 
+                                        nm, 
+                                        k,
+                                        divorce_death = FALSE){
+  
   
   last_partner_matrix <- matrix(NA, nrow = nf, ncol = k)
   next_partner_matrix <- matrix(NA, nrow = nf, ncol = k)
@@ -1016,7 +1005,7 @@ build_nimble_data <- function(cap.data){
       
       if(!is.na(apairs_f[i,t])){
         if(apairs_f[i,t] == (nm+1)){
-          if(next_partner == last_partner & next_partner != nm+1){
+          if(next_partner == last_partner & next_partner != (nm+1)){
             apairs_f[i,t] <- next_partner
             apairs_m[next_partner,t] <- i
           }
@@ -1024,7 +1013,7 @@ build_nimble_data <- function(cap.data){
       }
       
       if(is.na(apairs_f[i,t])){
-        if(next_partner == last_partner & next_partner != nm+1){
+        if(next_partner == last_partner & next_partner != (nm+1)){
           apairs_f[i,t] <- next_partner
           apairs_m[next_partner,t] <- i
         } 
@@ -1040,23 +1029,245 @@ build_nimble_data <- function(cap.data){
       }
     }
   }
-
-  for(i in 1:nf){
-    for(t in 2:k){
-      if(!is.na(apairs_f[i,t-1])){
-        if(apairs_f[i,t-1] == (nm+1)) next
-        if(is.na(apairs_f[i,t])){
-          if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-            apairs_f[i,t] <- apairs_f[i,t-1]
-            apairs_m[apairs_f[i,t],t-1] <- i
-            apairs_m[apairs_f[i,t],t] <- i
+  
+  # Optional Assumption to include
+  # Assume that divorce only occurs upon death 
+  
+  if(divorce_death){
+    for(i in 1:nf){
+      for(t in 2:k){
+        if(!is.na(apairs_f[i,t-1])){
+          if(apairs_f[i,t-1] == (nm+1)) next
+          if(is.na(apairs_f[i,t])){
+            if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+              apairs_f[i,t] <- apairs_f[i,t-1]
+              apairs_m[apairs_f[i,t],t-1] <- i
+              apairs_m[apairs_f[i,t],t] <- i
+            }
           }
         }
       }
     }
   }
-
   
+  return(list(apairs_m = apairs_m,
+              apairs_f = apairs_f))
+}
+
+# Extract first capture from recruitment matrix
+get_first_capture <- function(recruit, n, k){
+  sapply(1:n, function(i) which(recruit[i,1:k] == 1)[1])
+}
+
+# Populate imputed pairs object based on set of assumptions 
+populate_full_pairs_approximation <- function(apairs_f,
+                                              apairs_m,
+                                              amating_f,
+                                              amating_m,
+                                              nf,
+                                              nm,
+                                              k){
+  for(i in 1:nf){
+    
+    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+    num_partners_i <- length(partners_i)
+    
+    first_partner <- partners_i[1]
+    
+    # If no pairs observed make no possible combos
+    if(num_partners_i == 0){
+      apairs_f[i,1:k] <- (nm+1)
+      amating_f[i,1:k] <- 0
+      next
+    }
+    
+    for(t in 1:k){
+      
+      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      if(length(last_partner)==0){
+        last_partner <- first_partner
+      } 
+      last_partner <- last_partner[length(last_partner)]
+      
+      if(t == k){
+        next_partner <- last_partner
+      } else {
+        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        if(length(next_partner)==0){
+          next_partner <- last_partner
+        } 
+        next_partner <- next_partner[1]
+        
+      }
+      
+      if(is.na(apairs_f[i,t])){
+        
+        if(t == 1){
+          
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == first_partner)|first_partner==(nm+1)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next 
+            }
+          }
+          
+          apairs_f[i,t] <- first_partner
+          apairs_m[first_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[first_partner,t] <- 1
+          
+          next
+        }
+        
+        if(next_partner == last_partner){
+          
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)|(last_partner==(nm+1))){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+          }
+          apairs_f[i,t] <- last_partner
+          apairs_m[last_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[last_partner,t] <- 1
+          next
+        }
+        
+        if(last_partner == (nm+1)){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+          }
+          apairs_f[i,t] <- next_partner
+          apairs_m[next_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[next_partner,t] <- 1
+          next
+        }
+        
+        if(next_partner == (nm+1)){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+          }
+          apairs_f[i,t] <- last_partner
+          apairs_m[last_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[last_partner,t] <- 1
+          next
+          
+        }
+        
+        if(next_partner != last_partner){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+            
+            
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != next_partner)){
+              apairs_f[i,t] <- next_partner
+              apairs_m[next_partner,t] <- i
+              amating_f[i,t] <- 1
+              amating_m[next_partner,t] <- 1
+              next
+            } 
+            
+            
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- last_partner
+              apairs_m[last_partner,t] <- i
+              amating_f[i,t] <- 1
+              amating_m[last_partner,t] <- 1
+              next
+            } 
+          }
+          
+          amating_f[i,t] <- 0
+          apairs_f[i,t] <- nm+1
+        }
+      } else {
+        if(apairs_f[i,t] == (nm+1)){
+          amating_f[i,t] <- 0
+        } else {
+          amating_f[i,t] <- 1
+          
+        }
+        
+      }
+    }
+  }
+  
+  return(list(apairs_f_imputed = apairs_f,
+              apairs_m_imputed = apairs_m))
+}
+
+# Prepare data for nimble
+build_nimble_data <- function(cap.data,
+                              divorce_death){
+  
+  # Index values
+  nf <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="F") %>% distinct() %>% arrange(nimble_id) %>% nrow()
+  nm <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="M") %>% distinct() %>% arrange(nimble_id) %>% nrow()
+  k <- cap.data %>% select(time) %>% distinct() %>% nrow()
+  
+  # Recruitment matrices
+  recruit_list <- populate_recruit(cap.data, nf, nm, k)
+  recruit_f <- recruit_list[["recruit_f"]]
+  recruit_m <- recruit_list[["recruit_m"]]
+  
+  # Attempt to mate matrix
+  mating_list <- populate_mating(cap.data, nf,nm ,k)
+  amating_f <- mating_list[["amating_f"]]
+  amating_m <-  mating_list[["amating_m"]]
+  
+  # Joint Pairs Matrices
+  apairs <- populate_pairs(cap.data, nf, nm, k)
+  
+  #Conditional Paired Survival matrices
+  surv_list <- populate_surv(cap.data, nf, nm, k)
+  af <- surv_list[["af"]]
+  am <- surv_list[["am"]]
+  
+  # Conditional Paired Recapture Matrices
+  recap_list <- populate_recap(cap.data, nf, nm, k)
+  recap_f <- recap_list[["recap_f"]]
+  recap_m <- recap_list[["recap_m"]]
+  
+  # Construct partner index by female
+  apairs_f_raw <- populate_apairs_f(apairs,amating_f,nf,nm,k)
+  apairs_m_raw <- populate_apairs_m(apairs_f_raw, nm, nf, k)
+  
+  # Add assumption that partners stay together if seen together on future sampling occasions
+  apairs_list <- impute_between_known_states(apairs_f      = apairs_f_raw, 
+                                             apairs_m      = apairs_m_raw, 
+                                             amating_f     = amating_f, 
+                                             af            = af,
+                                             am            = am,
+                                             nf            = nf, 
+                                             nm            = nm, 
+                                             k             = k,
+                                             divorce_death = divorce_death)
+  apairs_f <- apairs_list[["apairs_f"]]
+  apairs_m <- apairs_list[["apairs_m"]]
+  
+  # # Construct fully imputed pairs vector
+  apairs_imputed_list <- populate_full_pairs_approximation(apairs_f, apairs_m, amating_f, amating_m, nf, nm, k)
+  apairs_f_imputed <- apairs_imputed_list[["apairs_f_imputed"]]
+  apairs_m_imputed <- apairs_imputed_list[["apairs_m_imputed"]]
+  
+  # Used to add dummy nm+1 and nf+1 rows for indexing of singles
   add_dummy_row <- function(mat, x = 0){
     return(rbind(mat,rep(x,ncol(mat))))
   }
@@ -1064,22 +1275,29 @@ build_nimble_data <- function(cap.data){
     return(cbind(rep(x,nrow(mat)),mat))
   }
   
+  # Add first capture vectors
+  first_capture_f <- get_first_capture(recruit_f, nf, k)
+  first_capture_m <- get_first_capture(recruit_m, nm, k)
+    
   # Store results in list 
-  nimble_data <- list(nf         = nf, 
-                      nm         = nm,
-                      k          = k,
-                      first_capture_f  = sapply(1:nf, function(i) which(recruit_f[i,1:k] == 1)[1]),
-                      first_capture_m  = sapply(1:nm, function(i) which(recruit_m[i,1:k] == 1)[1]),
-                      amating_f  = add_dummy_row(amating_f),
-                      amating_m  = add_dummy_row(amating_m),
-                      apairs_f   = apairs_f,
-                      apairs_m   = apairs_m,
-                      af         = add_dummy_row(af),
-                      am         = add_dummy_row(am),
-                      recap_f    = add_dummy_row(recap_f, 0),
-                      recap_m    = add_dummy_row(recap_m, 0)) 
+  nimble_data <- list(nf               = nf, 
+                      nm               = nm,
+                      k                = k,
+                      first_capture_f  = first_capture_f,
+                      first_capture_m  = first_capture_m,
+                      amating_f        = amating_f,
+                      amating_m        = amating_m,
+                      apairs_f_raw     = apairs_f_raw,
+                      apairs_m_raw     = apairs_m_raw,
+                      apairs_f         = apairs_f,
+                      apairs_m         = apairs_m,
+                      apairs_f_imputed = apairs_f_imputed,
+                      apairs_m_imputed = apairs_m_imputed,
+                      af               = af,
+                      am               = am,
+                      recap_f          = recap_f,
+                      recap_m          = recap_m) 
   
   # Return model data
   return(nimble_data)
 }
-

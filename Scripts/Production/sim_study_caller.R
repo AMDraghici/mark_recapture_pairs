@@ -6,19 +6,21 @@ source(file.path(src_dir, "Scripts", "Production", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "Production", "fn_correlation_estimators.R"))
 
 # Load packages
-libs <- c("tidyverse","RMark")
+libs <- c("tidyverse","RMark", "nimble")
 load_packages(libs, FALSE)
 
+source(file.path(src_dir, "Scripts", "Production", "fn_pair_swap_mod_nimble.R"))
+source(file.path(src_dir, "Scripts", "Production", "fn_process_hduck_data.R"))
 # Simulate Data ------------------------------------------------------------------------------------------------
 x0 <- Sys.time()
-PM       <- 0.85
-PF       <- 0.85
-PhiF     <- 0.8
-PhiM     <- 0.8
-gam_true <- 0.25
-rho_true <- 0.4
-n_pop    <- 100
-k        <- 10
+PM       <- 0.4
+PF       <- 0.4
+PhiF     <- 0.75
+PhiM     <- 0.75
+gam_true <- 0
+rho_true <- 0
+n_pop    <- 350
+k        <- 30
 
 # Parameter Grid 
 param_list <- list(
@@ -35,7 +37,7 @@ param_list <- list(
   betas        = list(beta0 = 1000, 
                       beta1 = 1000), # logit pair reform params, beta1 is history coef, assume always repartner
   rand_init    = F,                  # Randomize Initial Entry (just leave as F)
-  init         = rep(1,n_pop),       # Initial Entry into population for individual n
+  init         = NULL,       # Initial Entry into population for individual n
   show_unmated = T                   # Include unmated observations in attempt to mate step 
 )
 
@@ -61,15 +63,15 @@ difftime(y,x,units = "mins")
 # Compute Recapture Correlation Estimate----------------------------------------------------------------------
 x <- Sys.time()
 rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                     PF      = pred_probs[3],
-                                     PM      = pred_probs[4])
+                                     PF      = pred_probs[4],
+                                     PM      = pred_probs[3])
 names(rho) <- "Mean"
 
 # Bootstrap To Estimate SE 
 rho_bs <- compute_bootstrap_estimates_recapture_correlation(ps_data = ps_data,
                                                             iter    = 10000,
-                                                            PF      = pred_probs[3],
-                                                            PM      = pred_probs[4])
+                                                            PF      = pred_probs[4],
+                                                            PM      = pred_probs[3])
 
 # Collect Results
 se_rho <- sd(rho_bs)
@@ -83,19 +85,19 @@ difftime(y,x,units = "mins")
 # Compute Survival Correlation Estimate-----------------------------------------------------------------------
 x <- Sys.time()
 gamma <- compute_survival_correlation(ps_data = ps_data,
-                                      PFM     = compute_jbin_cjs(pred_probs[1], pred_probs[2], rho)$prob.mf,
-                                      PhiF    = pred_probs[1],
-                                      PhiM    = pred_probs[2])
+                                      PFM     = compute_jbin_cjs(pred_probs[4], pred_probs[3], rho)$prob.mf,
+                                      PhiF    = pred_probs[2],
+                                      PhiM    = pred_probs[1])
 names(gamma) <- "Mean"
 
 # Bootstrap To Estimate SE 
 gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
                                                              iter                  = 10000,
                                                              recapture_correlation = NULL,
-                                                             PF                    = pred_probs[3],
-                                                             PM                    = pred_probs[4],
-                                                             PhiF                  = pred_probs[1],
-                                                             PhiM                  = pred_probs[2])
+                                                             PF                    = pred_probs[4],
+                                                             PM                    = pred_probs[3],
+                                                             PhiF                  = pred_probs[2],
+                                                             PhiM                  = pred_probs[1])
 
 # Collect Results
 se_gamma <- sd(gamma_bs)

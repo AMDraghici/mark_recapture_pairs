@@ -55,6 +55,7 @@ generate_init_cjs <- function(cjs_data){
   # Sample Survival
   for(i in 1:n){
     phi <- PhiF * female[i] + PhiM * (1-female[i]) 
+    
     for(t in initial_entry[i]:(k-1)){
       if(is.na(a[i, t+1])){
         a[i, t+1] <- rbinom(1, 1, phi * a[i, t])
@@ -246,7 +247,7 @@ run_cjs_nimble_parallel <- function(data, params, niter, nthin, nburnin, ncores)
     #  Load Libraries
     libs <- c("boot", "ggplot2", "nimble", "coda", "ggmcmc", "tidyverse")
     lapply(libs,require, character.only = T)
-    source(paste0(getwd(), "/Scripts/cormack_jolly_seber_mod_nimble.R"))
+    source(paste0(getwd(), "/Scripts/Production/fn_cormack_jolly_seber_mod_nimble.R"))
     `%+%` <- function(a, b) paste0(a, b)
   })
   
