@@ -135,25 +135,14 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
 # Functions to RUn Experiments --------------------------------------------------------------------------------------------
 
 # Run CJS Model using Mark
-run_cjs_model_mark <- function(cjs_data       , 
-                               PhiF     = NULL,
-                               PhiM     = NULL,
-                               PF       = NULL,
-                               PM       = NULL,
-                               Iter     = NULL,
-                               scenario = NULL){
+run_cjs_model_mark <- function(cjs_data){
   
   #Choose Appropriate CJS Model Settings
   phi.grp     <- list(formula = ~sex)
   p.grp       <- list(formula = ~sex)
-  phi.name    <- c("phi.m","phi.f")
-  p.name      <- c("p.m","p.f")
+  phi.name    <- c("PhiM","PhiF")
+  p.name      <- c("PM","PF")
   param.names <- c(phi.name,p.name)
-  
-  # Add True Parameters if they exist
-  phi.true   <- c(PhiM,PhiF)
-  p.true     <- c(PM,PF)
-  param.true <- c(phi.true,p.true)
   
   #Process Mark Data (Extract Recapture/sex)
   dat.process <- cjs_data$x %>% 
@@ -173,7 +162,7 @@ run_cjs_model_mark <- function(cjs_data       ,
   mark_out <- mark(mark.process,
                    mark.ddl,
                    model.parameters =list(Phi = phi.grp,
-                                         p   = p.grp),
+                                          p   = p.grp),
                    profile.int      = FALSE,
                    invisible        = TRUE,
                    brief            = TRUE,
@@ -196,12 +185,7 @@ run_cjs_model_mark <- function(cjs_data       ,
            "SE" = X2,
            "LB" = X3,
            "UB" = X4) %>%
-    mutate(Truth     = param.true,
-           Bias      = Est - param.true,
-           Range     = UB - LB,
-           Parameter = param.names,
-           Iter      = Iter,
-           Scenario  = scenario)
+    mutate(Parameter = param.names)
   
   mark_results <- cbind(mark.stats,gof.stats)
   #Return Output
@@ -247,54 +231,68 @@ execute_iteration  <- function(iter,
   # Store Seed information to be able to reproduce datasets if needed
   random_seed <- .Random.seed
   
-  # Generate One set of Data
-  ps_data <- sim_dat(param_list) # pair-swap data
+  # Generate One set of pair-swap data
+  ps_data <- sim_dat(param_list) 
   cjs_data <- format_to_cjs(ps_data)
-
+  
+  # Gather True Param DF 
+  ru_true            <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound
+  rl_true            <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
+  gu_true            <- compute_jbin_param_cjs(PhiF,PhiM)$cor_upper_bound
+  gl_true            <- compute_jbin_param_cjs(PhiF,PhiM)$cor_upper_bound
+  true_params        <- c(PF,PM,PhiF, PhiM, gam_true, gl_true, gu_true, rho_true, rl_true, ru_true)
+  param_names        <- c("PF","PM", "PhiF", "PhiM", "gamma", "gl", "gu", "rho", "rl", "ru")
+  true_param_df      <- data.frame(Truth = true_params, Parameter = param_names)
+  
   # Run CJS Model MARK -----------------------------------------------------------------------------------------
   cat("Estimate standard CJS estimates with program MARK...","\n")
-  cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
-                                PhiF     = PhiF,
-                                PhiM     = PhiM,
-                                PF       = PF,
-                                PM       = PM,
-                                Iter     = iter,
-                                scenario = scenario)
+  cjs_out <- run_cjs_model_mark(cjs_data = cjs_data) %>% 
+             left_join(true_param_df,
+                       by = "Parameter") %>% 
+             mutate(Bias     = Truth - Est,
+                    In95     = 1*(Truth <= UB & Truth >= LB),
+                    Range95  = UB - LB,
+                    iter     = iter,
+                    scenario = scenario) 
   
-  pred_probs <- cjs_out$Est
   
+  # Get Predicted Probs for Correlation Estimators 
+  phim_mark <- cjs_out %>% filter(Parameter == "PhiM") %>% pull(Est)
+  phif_mark <- cjs_out %>% filter(Parameter == "PhiF") %>% pull(Est)
+  pm_mark   <- cjs_out %>% filter(Parameter == "PM") %>% pull(Est)
+  pf_mark   <- cjs_out %>% filter(Parameter == "PF") %>% pull(Est)
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
   cat("Estimating recapture correlation rho...","\n")
   rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                       PF      = pred_probs[4],
-                                       PM      = pred_probs[3])
+                                       PF      = pf_mark,
+                                       PM      = pm_mark)
   names(rho) <- "Est"
   
   # Bootstrap To Estimate SE 
   cat("Bootstrapping to get standard error estimates of rho...","\n")
   rho_bs <- compute_bootstrap_estimates_recapture_correlation(ps_data = ps_data,
                                                               iter    = 10000,
-                                                              PF      = pred_probs[4],
-                                                              PM      = pred_probs[3])
+                                                              PF      = pf_mark,
+                                                              PM      = pm_mark)
   # Collect Results
   mean_bstrp_rho      <- mean(rho_bs)
   names(mean_bstrp_rho) <- "Est_Btstrp"
   se_bstrp_rho        <- sd(rho_bs)
   names(se_bstrp_rho) <- "SE"
-  quantiles_rho       <- quantile(rho_bs, c(0.025, 0.5, 0.75, 0.975))
+  quantiles_rho       <- quantile(rho_bs, c(0.025, 0.25, 0.5, 0.75, 0.975))
   summ_rho <- c(rho, mean_bstrp_rho, se_bstrp_rho, quantiles_rho)
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
   cat("Estimating recapture correlation rho...","\n")
   gamma <- compute_survival_correlation(ps_data = ps_data,
-                                        PFM     = compute_jbin_cjs(prob.f = pred_probs[4],
-                                                                   prob.m = pred_probs[3],
+                                        PFM     = compute_jbin_cjs(prob.f = pf_mark,
+                                                                   prob.m = pm_mark,
                                                                    corr   = rho)$prob.mf,
-                                        PhiF    = pred_probs[1],
-                                        PhiM    = pred_probs[2])
+                                        PhiF    = phif_mark,
+                                        PhiM    = phim_mark)
   names(gamma) <- "Est"
   
   # Bootstrap To Estimate SE 
@@ -302,17 +300,17 @@ execute_iteration  <- function(iter,
   gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
                                                                iter                  = 10000,
                                                                recapture_correlation = rho,
-                                                               PF                    = pred_probs[4],
-                                                               PM                    = pred_probs[3],
-                                                               PhiF                  = pred_probs[2],
-                                                               PhiM                  = pred_probs[1])
+                                                               PF                    = pf_mark,
+                                                               PM                    = pm_mark,
+                                                               PhiF                  = phif_mark,
+                                                               PhiM                  = phim_mark)
   
   # Collect Results
   mean_bstrp_gamma      <- mean(gamma_bs)
   names(mean_bstrp_gamma) <- "Est_Btstrp"
   se_bstrp_gamma        <- sd(gamma_bs)
   names(se_bstrp_gamma) <- "SE"
-  quantiles_gamma       <- quantile(gamma_bs, c(0.025, 0.5, 0.75, 0.975))
+  quantiles_gamma       <- quantile(gamma_bs, c(0.025, 0.25, 0.5, 0.75, 0.975))
   summ_gamma <- c(gamma, mean_bstrp_gamma, se_bstrp_gamma, quantiles_gamma)
   #-------------------------------------------------------------------------------------------------------------
   
@@ -324,16 +322,18 @@ execute_iteration  <- function(iter,
   summ_corr           <- as.data.frame(rbind(summ_rho, summ_gamma))
   param_true          <- c(rho_true, gam_true)
   summ_corr$Parameter <- c("rho","gamma")
-  summ_corr           <- summ_corr[,c("Parameter","Est", "Est_Btstrp", "SE", "2.5%","50%","75%","97.5%")]
+  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%")]
   summ_corr           <- summ_corr %>% 
-    mutate(Truth        = param_true,
-           Bias         = Est - param_true,
-           Bias_Btstrp1 = Est_Btstrp - param_true,
-           Bias_Btstrp2 = Est - Est_Btstrp,
-           Range95     = `97.5%` - `2.5%`,
-           Range50     = `75%`   - `50%`,
-           Iter        = iter,
-           Scenario    = scenario)
+                         left_join(true_param_df, by = "Parameter") %>% 
+                         mutate(Bias         = Truth - Est,
+                                Bias_Btstrp1 = Est_Btstrp - Truth,
+                                Bias_Btstrp2 = Est - Est_Btstrp,
+                                In95         = 1*(Truth <= `97.5%` & Truth >= `2.5%`),
+                                In50         = 1*(Truth <= `75%`  & Truth  >= `25%`),
+                                Range95      = `97.5%` - `2.5%`,
+                                Range50      = `75%` - `25%`,
+                                iter         = iter,
+                                Scenario    = scenario) 
   
   rownames(summ_corr) <- NULL
   
@@ -410,4 +410,68 @@ get_scenarios <- function(){
   scenario_grid$PM       <- scenario_grid$PF
   scenario_grid$scenario <- 1:nrow(scenario_grid)
   return(scenario_grid)
+}
+
+
+# Compact ifelse for NA
+convert_na <- function(x,y=0){
+  ifelse(is.na(x), y, x)
+}
+
+# Get Summary Statistics from CODA MCMC object
+gather_posterior_summary <- function(fit, nchains){
+  
+  # Summarize Results
+  summ <- summary(fit)
+  # nchains <- length(fit)
+  
+  if(nchains > 1){
+    niter   <- nrow(fit[[1]])
+  } else {
+    niter <- nrow(fit)
+  }
+  
+  # Put results into dataframe
+  summ_stats <- as.data.frame(summ$statistics) %>%
+    tibble::rownames_to_column(var = "Parameter")
+  summ_quant <- as.data.frame(summ$quantiles)  %>% 
+    tibble::rownames_to_column(var = "Parameter")
+  
+  if(nchains > 1){
+    rhat <- gelman.diag(fit,multivariate = FALSE) 
+    rhat_df <- rhat$psrf %>% 
+      as.data.frame() %>%
+      tibble::rownames_to_column(var = "Parameter") %>% 
+      rename("rhat" = "Point est.", 
+             rhat_upper = "Upper C.I.")
+  }
+  
+  effective_vector <- effectiveSize(fit) 
+  effective_df <- data.frame(Parameter = names(effective_vector),
+                             n_eff = unname(effective_vector)) %>% 
+    mutate(normalized_n_eff = n_eff/(nchains * niter))
+  
+  summ_stats <- as.data.frame(summ$statistics) %>%
+    tibble::rownames_to_column(var = "Parameter")
+  
+  summ_quant <- as.data.frame(summ$quantiles)  %>%
+    tibble::rownames_to_column(var = "Parameter")
+  
+  post_stats <- suppressWarnings(inner_join(summ_stats, 
+                                            summ_quant, 
+                                            by = "Parameter") %>% 
+                                   mutate(unique_pars      = as.factor(gsub(Parameter, pattern = "\\[.*]", replacement = "")),
+                                          par_index        = convert_na(as.double(sub("^.*\\[(.*?)\\]","\\1",Parameter)))) %>% 
+                                   inner_join(effective_df, by = "Parameter") %>%
+                                   mutate(mcse_n_eff = SD/sqrt(n_eff)) %>% 
+                                   rename(mcse = "Naive SE",
+                                          mcse_ts = "Time-series SE"))
+  
+  if(nchains > 1){
+    post_stats <- post_stats %>% 
+      inner_join(rhat_df, by = "Parameter")
+  }
+  
+  # Return Results
+  return(post_stats)
 }

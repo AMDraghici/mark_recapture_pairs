@@ -1,17 +1,17 @@
 ## Load scripts ------------------------------------------------------------------------------------------------
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()
-source(file.path(src_dir, "Scripts", "Production", "fn_generic.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_sim_pair_data.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_correlation_estimators.R"))
+source(file.path(src_dir, "Scripts", "fn_generic.R"))
+source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
+source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
 
 # Load packages
 libs <- c("tidyverse","RMark", "nimble", "readxl", "lubridate", "parallel", "coda")
 load_packages(libs, FALSE)
 
-source(file.path(src_dir, "Scripts", "Production", "fn_cormack_jolly_seber_mod_nimble.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_pair_swap_mod_nimble.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_process_hduck_data.R"))
+source(file.path(src_dir, "Scripts", "fn_cormack_jolly_seber_mod_nimble.R"))
+source(file.path(src_dir, "Scripts", "fn_pair_swap_mod_nimble.R"))
+source(file.path(src_dir, "Scripts", "fn_process_hduck_data.R"))
 
 
 # Pull/Process Data ---------------------------------------------------------------------------------------------------------------------------

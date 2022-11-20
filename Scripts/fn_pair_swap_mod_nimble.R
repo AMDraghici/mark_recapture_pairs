@@ -1,178 +1,31 @@
 # Nimble Functions for Running Pair Swap Model ------------------------------------------------------------------------------------------------------------ 
-
-# Produce vector of 1s and 0s to check for matching value in an existing vector
-vectorMatch <- nimbleFunction(
-  run = function(x= double(1),
-                 y = double(0)){
+nimble_map_partner_states <- nimbleFunction(
+  run = function(male_state           = double(1),
+                 male_state_condition = double(1),
+                 first_capture_m      = double(1),
+                 pairs_f              = double(1),
+                 nf                   = integer(0),
+                 nm                   = integer(0),
+                 t                    = integer(0)){
+    
     returnType(double(1))
-    output <- 1*(y == x)
-    return(output)}
-)
-
-dpair <- nimbleFunction(
-  run = function(x = double(1),
-                 prob = double(0),
-                 male_state = double(1),
-                 male_state_previous = double(1),
-                 female_state_previous = double(1),
-                 known_states = double(1),
-                 partner_state_recap = double(1),
-                 nf = integer(0),
-                 log = integer(0, default = 1)){
-    returnType(double(0))
-    ll <- 0
-    if(!log) ll <- exp(ll)
-    return(ll)
-  }
-)
-
-rpair <- nimbleFunction(
-  run = function(n = integer(0),
-                 prob = double(0),
-                 male_state = double(1),
-                 male_state_previous = double(1),
-                 female_state_previous = double(1),
-                 known_states = double(1),
-                 partner_state_recap = double(1),
-                 nf = integer(0)){
-    returnType(double(1))
-    if(n != 1) print("rpair only allows n = 1; using n = 1.")
     
+    x <- rep(1,nf)
+    female_single  <- (pairs_f[1:nf] == (nm+1))
+    male_recruited <- (first_capture_m[1:nm] <= t)
     
-    # Initialize Counts for +1/0 partners 
-    x <- known_states
-    
-    # Number of females who have been observed with a state 2 or 3 partner
-    num_2 <- sum(vectorMatch(x,2))
-    num_3 <- sum(vectorMatch(x,3))
-    
-    # Number of Males in State 2 & state 3, conditional on survival
-    NM <- sum(male_state_previous)
-    N3 <- sum(male_state) 
-    N2 <- NM - N3
-    
-    # Number of males who are in state 2/3 but have NOT been observed with a female
-    N3 <- max(0, N3 - num_3)
-    N2 <- max(0, N2 - num_2)
-    
-    # Randomly order females 
-    prob_arrival <- rep(1, nf) 
-    arrivals <- rep(0, nf)
     for(i in 1:nf){
-      arrivals[i] <- rcat(n = 1, prob = prob_arrival)
-      prob_arrival[arrivals[i]] <- 0
-    }
-    
-    # Go through random order and assign possible states
-    for(i in 1:nf){
-      
-      # Which female arrived at i? 
-      it <- arrivals[i]
-      
-      # If X[it] is unknown then assign partner status
-      if(x[it] == 0){
-        
-        # If only state 2 males exist 
-        if(N3 == 0 & N2 != 0){
-          x[it] <- 1 + female_state_previous[it]
-        }
-        
-        # If only state 3 males exist
-        if(N3 != 0 & N2 == 0){
-          x[it] <- 1 +  2 * female_state_previous[it]
-        }
-        
-        # If both state 2 and state 3 males are available
-        if(N3 > 0 & N2 > 0){
-          x[it] <- 1 + female_state_previous[it] * (1 + rbinom(1, 1, prob))
-        }
-        
-        
-        # If no males are left then sample single
-        if(N3 == 0 & N2 == 0){
-          x[it] <- 1
-        }
-        
-        # If during a recapture draw, the survival status of f's partner was 1/2 then she must be single
-        if(partner_state_recap[it] == 1){
-          x[it] <- 1
-        }
-        
-        # If during a recapture draw, the survival status of f's partner was 3 then she must be paired 
-        if(partner_state_recap[it] > 1 & x[it] == 1){
-          x[it] <- 1 + female_state_previous[it] * (1 + rbinom(1, 1, prob))
-        }
-        
-        # Update availability 
-        # For females who are known this is done outside of the loop
-        if(x[it] == 3){
-          N3 <- max(0, N3 - 1)
-        }
-        
-        if(x[it] == 2){
-          N2 <- max(0, N2 - 1)
+      if(!female_single[i]){
+        if(male_recruited[pairs_f[i]]){
+          x[i] <- (2 + male_state[pairs_f[i]]) * male_state_condition[pairs_f[i]] + (1-male_state_condition[pairs_f[i]])
         }
       }
-      
     }
     
     return(x)
     
   }
 )
-
-
-sampler_pairs <- nimbleFunction(
-  name = 'sampler_pairs',
-  contains = sampler_BASE,
-  setup = function(model, mvSaved, target, control) {
-    ## node list generation
-    targetAsScalar <- model$expandNodeNames(target, returnScalarComponents = TRUE)
-    calcNodes <- model$getDependencies(target)
-    calcNodesNoSelf <- model$getDependencies(target, self = FALSE)
-    isStochCalcNodesNoSelf <- model$isStoch(calcNodesNoSelf)
-    calcNodesNoSelfDeterm <- calcNodesNoSelf[!isStochCalcNodesNoSelf]
-    calcNodesNoSelfStoch <- calcNodesNoSelf[isStochCalcNodesNoSelf]
-    # Vars
-    prob <- model$getParam(target, 'prob')
-    male_state <- model$getParam(target, 'male_state')
-    male_state_previous <- model$getParam(target, 'male_state_previous')
-    female_state_previous <- model$getParam(target, 'female_state_previous')
-    known_states  <- model$getParam(target, 'known_states')
-    partner_state_recap <- model$getParam(target, "partner_state_recap")
-    nf <- model$getParam(target, 'nf')
-    ## checks
-    if(model$getDistribution(target) != 'dpair') stop('can only use pair categorical sampler on node with dpair distribution')
-  },
-  run = function() {
-    currentLogProb <- model$getLogProb(calcNodes)
-    model[[target]] <<- rpair(1,prob, male_state, male_state_previous, female_state_previous, known_states, partner_state_recap, nf)
-    otherLogProbPrior <- model$calculate(target)
-    
-    if(otherLogProbPrior == -Inf) {
-      otherLogProb <- otherLogProbPrior
-    } else {
-      otherLogProb <- otherLogProbPrior + model$calculate(calcNodesNoSelf)
-    }
-    
-    acceptanceProb <- 1/(exp(currentLogProb - otherLogProb) + 1)
-    jump <- (!is.nan(acceptanceProb)) & (runif(1,0,1) < acceptanceProb)
-    if(jump) {
-      nimCopy(from = model, to = mvSaved, row = 1, nodes = target, logProb = TRUE)
-      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-      nimCopy(from = model, to = mvSaved, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
-    } else {
-      nimCopy(from = mvSaved, to = model, row = 1, nodes = target, logProb = TRUE)
-      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfDeterm, logProb = FALSE)
-      nimCopy(from = mvSaved, to = model, row = 1, nodes = calcNodesNoSelfStoch, logProbOnly = TRUE)
-    }
-  },
-  methods = list(
-    reset = function() { }
-  )
-)
-
-
 
 # BUGS/JAGS Code
 nimble_ps_model <- nimbleCode({
@@ -188,13 +41,19 @@ nimble_ps_model <- nimbleCode({
   
   # Apply potential partner status
   for(t in 1:(k-1)){
-    az[1:nf, t] ~ dpair(0, am[1:nm,t+1], am[1:nm,t],af[1:nf,t], az_known[1:nf,t], ar[1:nf,t], nf) 
+    partner_state_f[1:nf, t] <- nimble_map_partner_states(am[1:nm,t+1],
+                                                          am[1:nm,t],
+                                                          first_capture_m[1:nm],
+                                                          apairs_f[1:nf,t],
+                                                          nf,
+                                                          nm,
+                                                          t)
   }
   
   # Draw conditional Survival Event
   for(i in 1:nf){
     for(t in first_capture_f[i]:(k-1)){
-      af[i, t+1] ~ dbern(Phi_Vector_f[az[i,t]] * af[i,t])
+      af[i, t+1] ~ dbern(Phi_Vector_f[partner_state_f[i,t]] * af[i,t])
     }
   }
   
@@ -202,23 +61,27 @@ nimble_ps_model <- nimbleCode({
   
   # Marginal Recapture Event for Males in the Population (P[X^M_T])
   for(j in 1:nm){
-    for(t in (first_capture_m[j]+1):(k)){
+    for(t in (first_capture_m[j]+1):k){
       recap_m[j,t] ~ dbern(PM * am[j,t])
     }
   }
   
   
   # Apply potential partner status
-  for(t in 1:k){
-    ar[1:nf, t] ~ dpair(0, recap_m[1:nm,t], am[1:nm,t],af[1:nf,t],ar_known[1:nf,t], ar_known[1:nf,t] * 0 , nf) 
+  for(t in 2:k){
+    partner_obs_f[1:nf, t] <-  nimble_map_partner_states(recap_m[1:nm,t],
+                                                         am[1:nm,t],
+                                                         first_capture_m[1:nm],
+                                                         apairs_f[1:nf,t],
+                                                         nf,
+                                                         nm,
+                                                         t-1)
   }
-  
   
   # Draw Recapture Probability
   for(i in 1:nf){
-    for(t in (first_capture_f[i]+1):(k)){
-      # ar[i, t-1] ~ dcat(r_xi[1:3])
-      recap_f[i, t] ~ dbern(P_Vector_f[ar[i, t]] * af[i,t])
+    for(t in (first_capture_f[i]+1):k){
+      recap_f[i, t] ~ dbern(P_Vector_f[partner_obs_f[i, t]] * af[i,t])
     }
   }
   
@@ -248,9 +111,7 @@ nimble_ps_model <- nimbleCode({
   constraint_data[2] ~ dconstraint(gamma <= gu & gamma >= gl)
   gamma <- 2*raw_gamma - 1
   raw_gamma ~ dbeta(2,2)
-  # gamma <- (gu-gl) * raw_gamma + gl
-  # raw_gamma ~ dbeta(1,1)
-  
+ 
   # Bounds for Correlation
   
   # Survival Rates (Gamma)
@@ -292,9 +153,6 @@ nimble_ps_model <- nimbleCode({
   constraint_data[1] ~ dconstraint(rho <= ru & rho >= rl)
   rho <- 2 * raw_rho - 1
   raw_rho ~ dbeta(2,2)
-  # rho <- (ru-rl) * raw_rho + rl
-  # raw_rho ~ dbeta(1,1)
-  # Bounds for Correlation
   
   # Recapture Rates (Rho)
   ru <-  min(sqrt(OR.P), 1/sqrt(OR.P)) 
@@ -320,19 +178,19 @@ generate_nimble_init_pairs <- function(ps_data){
 
   #Unpack Variables -----------------------------------------------------------------
   # Indexes
-  k               <- ps_data$k
-  nf              <- ps_data$nf
-  nm              <- ps_data$nm
-  first_capture_f <- ps_data$first_capture_f
-  first_capture_m <- ps_data$first_capture_m  
-  recap_f         <- ps_data$recap_f
-  recap_m         <- ps_data$recap_m 
-  af              <- ps_data$af
-  am              <- ps_data$am
-  az_known        <- ps_data$az_known
-  ar_known        <- ps_data$ar_known
-  ar              <- matrix(NA, nrow = nf, ncol = k)
-  az              <- matrix(NA, nrow = nf, ncol = k) 
+  k                 <- ps_data$k
+  nf                <- ps_data$nf
+  nm                <- ps_data$nm
+  first_capture_f   <- ps_data$first_capture_f
+  first_capture_m   <- ps_data$first_capture_m  
+  recap_f           <- ps_data$recap_f
+  recap_m           <- ps_data$recap_m 
+  af                <- ps_data$af
+  am                <- ps_data$am
+  apairs_f          <- ps_data$apairs_f_imputed
+  apairs_m          <- ps_data$apairs_m_imputed
+  partner_state_f   <- matrix(NA, nrow = nf, ncol = k)
+  partner_obs_f     <- matrix(NA, nrow = nf, ncol = k) 
   
   # Recapture Prob and Correlation -------------------------------------------------
   PM <- rbeta(1,1,1)
@@ -351,7 +209,7 @@ generate_nimble_init_pairs <- function(ps_data){
   rl <- -min(sqrt(OP.P), 1/sqrt(OP.P))
   
   ##Correlation using four parameter beta (with FH bounds)
-  raw_rho <-  -rl/(ru-rl)#rbeta(1,1,1)
+  raw_rho <-  rbeta(1,1,1)
   rho <- (ru - rl)*raw_rho + rl
   raw_rho <- (rho+1)/2
   
@@ -387,7 +245,7 @@ generate_nimble_init_pairs <- function(ps_data){
   gl <- -min(sqrt(OP.Phi), 1/sqrt(OP.Phi))
   
   ##Correlation using four parameter beta (with FH bounds)
-  raw_gamma <- -gl/(gu-gl) # rbeta(1,1,1)
+  raw_gamma <- rbeta(1,1,1)
   gamma <- (gu - gl)*raw_gamma + gl
   raw_gamma <- (gamma+1)/2
   
@@ -407,47 +265,54 @@ generate_nimble_init_pairs <- function(ps_data){
   Phi_Vector_f <- c(PhiF, Phif_M0, Phif_M1)
 
   # Randomly Sample outcomes using initial values
-  for(t in 1:k){
+  for(t in 1:(k-1)){
     # Survival Outcome ----------------------------------------------------------
-    if(t < k){
-      # Marginal Survival Event for Males in the Population (Y^M_T)---------------------------------------------
-      for(j in 1:nm){
-        if(t >= first_capture_m[j]){
-          am[j,t+1] <- ifelse(is.na(am[j,t+1]),
-                              rbinom(1,1, PhiM * am[j,t]),
-                              am[j,t+1])
-        }
+    # Marginal Survival Event for Males in the Population (Y^M_T)---------------------------------------------
+    for(j in 1:nm){
+      if(t >= first_capture_m[j]){
+        am[j,t+1] <- ifelse(is.na(am[j,t+1]),
+                            rbinom(1,1, PhiM * am[j,t]),
+                            am[j,t+1])
       }
-      
-      # Error check males
-      if(any(is.na(am[j,t+1]))) browser()
-      
-      # Assign male partners via states to females
-      ar[1:nf, t] <- rpair(n = 1, 0, recap_m[1:nm,t], am[1:nm,t],af[1:nf,t], ar_known[1:nf,t], rep(0,nf), nf) 
-      az[1:nf,t] <- rpair(n = 1, 0, am[1:nm,t+1], am[1:nm,t],af[1:nf,t], az_known[1:nf,t], ar[1:nf,t], nf) 
+    }
     
-      
-      # Conditional Survival Event for Females in the Population ([X^F_T|X^M_T])
-      for(i in 1:nf){
-        if(t >= first_capture_f[i]){
-          af[i, t+1] <- ifelse(is.na(af[i,t+1]),
-                               rbinom(1,1, (Phi_Vector_f[az[i,t]]) * af[i,t]),
-                               af[i,t+1])
-        }
-        
-        # Error check females
-        if(any(is.na(af[i,t+1]))) browser()
+    # Error check males
+    if(any(is.na(am[j,t+1]))) browser()
+    
+    
+    partner_state_f[1:nf,t] <-  nimble_map_partner_states(am[1:nm,t+1],
+                                                          am[1:nm,t],
+                                                          first_capture_m[1:nm],
+                                                          apairs_f[1:nf,t],
+                                                          nf,
+                                                          nm,
+                                                          t)
+    
+    
+    
+    # Conditional Survival Event for Females in the Population ([X^F_T|X^M_T])
+    for(i in 1:nf){
+      if(t >= first_capture_f[i]){
+        af[i, t+1] <- ifelse(is.na(af[i,t+1]),
+                             rbinom(1,1, (Phi_Vector_f[partner_state_f[i,t]]) * af[i,t]),
+                             af[i,t+1])
       }
-    } else {
-      ar[1:nf, t] <- rpair(n = 1, 0, recap_m[1:nm,t], am[1:nm,t],af[1:nf,t], ar_known[1:nf,t], rep(0,nf), nf) 
+      
+      # Error check females
+      if(any(is.na(af[i,t+1]))) browser()
+    }
+    
+    # Add recapture status 
+    for(t in 2:k){
+      partner_obs_f[1:nf,t] <-  nimble_map_partner_states(recap_m[1:nm,t],
+                                                          am[1:nm,t],
+                                                          first_capture_m[1:nm],
+                                                          apairs_f[1:nf,t],
+                                                          nf,
+                                                          nm,
+                                                          t-1)
     }
   }
-  
-  # # Add male partners via observations to females
-  # for(t in 2:k){
-  #   ar[1:nf, t] <- rpair(n = 1, 0.4, recap_m[1:nm,t], am[1:nm,t],af[1:nf,t], ar_known[1:nf,t], nf) 
-  # }
-  # 
   
   # Update Initial Values to follow NIMBLE structure -----------------------------------------------------------------
   
@@ -484,8 +349,8 @@ generate_nimble_init_pairs <- function(ps_data){
     gamma             = gamma,
     af                = af,
     am                = am,
-    az                = az,
-    ar                = ar
+    partner_state_f   = partner_state_f,
+    partner_obs_f     = partner_obs_f
   )
   
   # Return Initial Values for a single chain
@@ -495,28 +360,6 @@ generate_nimble_init_pairs <- function(ps_data){
 # Compile Model
 compile_pair_swap_nimble <- function(ps_data,
                                      params = NULL){
-  
-  
-  
-  # Registering Random Pair-Swap Distribution
-  cat("Registering Random Pair-Swap Distribution...", "\n")
-  
-  registerDistributions(list(
-    dpair = list(
-      BUGSdist = "dpair(prob, male_state, male_state_previous, female_state_previous, known_states, partner_state_recap, nf)",
-      Rdist = "dpair(prob, male_state, male_state_previous, female_state_previous, known_states, partner_state_recap, nf)",
-      discrete = TRUE,
-      range = c(1, 3),
-      types = c('value = double(1)', 
-                'prob = double(0)', 
-                'male_state = double(1)',
-                'male_state_previous = double(1)',
-                'female_state_previous = double(1)',
-                'known_states = double(1)',
-                'partner_state_recap = double(1)',
-                'nf = integer(0)'),
-      pqAvail = FALSE)
-  ))
   
   
   # Generating Initial Values
@@ -531,8 +374,7 @@ compile_pair_swap_nimble <- function(ps_data,
     k               = ps_data$k,
     first_capture_f = ps_data$first_capture_f,
     first_capture_m = ps_data$first_capture_m,
-    az_known        = ps_data$az_known,
-    ar_known        = ps_data$ar_known
+    apairs_f        = ps_data$apairs_f_imputed
   )
   
   nimble_ps_dat <- list(
@@ -540,8 +382,6 @@ compile_pair_swap_nimble <- function(ps_data,
     am              = ps_data$am,
     recap_f         = ps_data$recap_f,
     recap_m         = ps_data$recap_m,
-    az              = matrix(NA, nrow = ps_data$nf, ncol = ps_data$k), 
-    ar              = matrix(NA, nrow = ps_data$nf, ncol = ps_data$k), 
     constraint_data = c(1,1)
   )
   
@@ -561,8 +401,10 @@ compile_pair_swap_nimble <- function(ps_data,
   }
   
   nimble_dims <- list(
-    P_Vector_f    = c(3),
-    Phi_Vector_f  = c(3)
+    P_Vector_f      = c(3),
+    Phi_Vector_f    = c(3),
+    partner_state_f = c(ps_data$nf, ps_data$k),
+    partner_obs_f   = c(ps_data$nf, ps_data$k)
   )
   
   cat("Building Model Nodes in Nimble (SLOW)...", "\n")
@@ -582,37 +424,15 @@ compile_pair_swap_nimble <- function(ps_data,
   # [Note] SafeDepare.... warnings are annoying so suppress messages 
   # Conjugacy is slow to detect and not useful here so turn off
   cat("Configuring Markov Chain Monte Carlo Process (SLOW)...", "\n")
-  psConf  <- suppressMessages(configureMCMC(model = psModel,
-                                            print = F,
-                                            multivariateNodesAsScalars = T, 
-                                            monitors = nimble_params,
-                                            onlySlice = F,
+  psConf  <- suppressMessages(configureMCMC(model        = psModel,
+                                            print        = F,
+                                            monitors     = nimble_params,
+                                            onlySlice    = F,
                                             useConjugacy = F))
   
-  #Assign dpair sampler to the global environment
-  assign('sampler_pairs', sampler_pairs, envir = .GlobalEnv)
-  
-  cat("Adding custom random pair sampler to az and ar...", "\n")
-
-  # Default sampler wont work here....
-  psConf$removeSampler("az", print = F)
-  psConf$removeSampler("ar", print = F)
-  
-  for(t in 1:(ps_data$k-1)){
-    temp_name_cat <- "az[1:" %+% ps_data$nf %+% "," %+% t %+% "]"
-    psConf$addSampler(target = temp_name_cat, type = "sampler_pairs", print = F)
-    rm(temp_name_cat)
-  }
-  
-  for(t in 2:ps_data$k){
-    temp_name_cat <- "ar[1:" %+% ps_data$nf %+% "," %+% t %+% "]"
-    psConf$addSampler(target = temp_name_cat, type = "sampler_pairs", print = F)
-    rm(temp_name_cat)
-  }
-  
-  cat("Adding AF-Slice Sampler to Recapture and Survival Parameters")
-  psConf$removeSampler(c("PhiF","PhiM","raw_gamma"), print = T)
-  psConf$removeSampler(c("PF","PM","raw_rho"), print = T)
+  cat("Adding AF-Slice Sampler to Recapture and Survival Parameters...", "\n")
+  psConf$removeSampler(c("PhiF","PhiM","raw_gamma"), print = F)
+  psConf$removeSampler(c("PF","PM","raw_rho"), print = F)
   psConf$addSampler(target = c("PhiF","PhiM","raw_gamma"), type = 'AF_slice')
   psConf$addSampler(target = c("PF","PM","raw_rho"), type = 'AF_slice')
   
@@ -640,7 +460,7 @@ run_nimble <- function(CmdlMCMC,
                        niter,
                        nburnin,
                        nthin,
-                       # inits,
+                       inits,
                        nchains=3,
                        seed = F){
   
@@ -649,7 +469,7 @@ run_nimble <- function(CmdlMCMC,
                      niter             = niter,
                      nburnin           = nburnin, 
                      thin              = nthin,
-                     # inits             = inits,
+                     inits             = inits,
                      nchains           = nchains,
                      setSeed           = seed,
                      samplesAsCodaMCMC = TRUE)
@@ -669,7 +489,7 @@ execute_pair_swap_nimble_pipeline <- function(seed,
                                               nchains){
   
   nimble_complied <- compile_pair_swap_nimble(data, params)
-  # nim_inits <- lapply(1:nchains, function(i) generate_nimble_init_pairs(data))
+  nim_inits <- lapply(1:nchains, function(i) generate_nimble_init_pairs(data))
   
   # inits <- generate_nimble_init_pairs(data)
   samples <- run_nimble(CmdlMCMC = nimble_complied$CmdlMCMC,
@@ -677,7 +497,7 @@ execute_pair_swap_nimble_pipeline <- function(seed,
                         nthin     = nthin,
                         nburnin  = nburnin,
                         nchains  = nchains,
-                        # inits    = nim_inits,
+                        inits    = nim_inits,
                         seed     = seed) 
   return(list(samples = samples,
               inits   = nimble_complied$nimble_inits))
@@ -690,7 +510,8 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
   ncores <- min(ncores, detectCores()-2)
   
   if(ncores == 1){
-    cat("Only one core specified, not bothering with parallelization. Set ncores > 1 if so desired.")
+    cat("Only one core specified, not bothering with parallelization...", "\n")
+    cat("Set ncores > 1 if so desired...", "\n")
     samples <- execute_pair_swap_nimble_pipeline(F, data, params, niter, nthin, nburnin, 1)
     return(samples)
   }
@@ -704,7 +525,7 @@ run_pair_swap_nimble_parallel <- function(data, params, niter, nthin, nburnin, n
     #  Load Libraries
     libs <- c("boot", "ggplot2", "nimble", "coda", "ggmcmc", "tidyverse")
     lapply(libs,require, character.only = T)
-    source(paste0(getwd(), "/Scripts/pair_swap_mod_nimble8.R"))
+    source(paste0(getwd(), "/Scripts/fn_pair_swap_mod_nimble.R"))
     `%+%` <- function(a, b) paste0(a, b)
   })
   

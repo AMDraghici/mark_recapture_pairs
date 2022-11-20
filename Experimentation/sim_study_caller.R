@@ -1,32 +1,34 @@
 ## Load scripts ------------------------------------------------------------------------------------------------
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()
-source(file.path(src_dir, "Scripts", "Production", "fn_generic.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_sim_pair_data.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_correlation_estimators.R"))
+source(file.path(src_dir, "Scripts", "fn_generic.R"))
+source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
+source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
 
 # Load packages
-libs <- c("tidyverse","RMark", "nimble")
+libs <- c("tidyverse","RMark", "nimble", "readxl", "lubridate", "parallel", "coda")
 load_packages(libs, FALSE)
-
-source(file.path(src_dir, "Scripts", "Production", "fn_pair_swap_mod_nimble.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_process_hduck_data.R"))
+source(file.path(src_dir, "Scripts", "fn_cormack_jolly_seber_mod_nimble.R"))
+source(file.path(src_dir, "Scripts", "fn_pair_swap_mod_nimble.R"))
+source(file.path(src_dir, "Scripts", "fn_process_hduck_data.R"))
 # Simulate Data ------------------------------------------------------------------------------------------------
 x0 <- Sys.time()
-PM       <- 0.4
-PF       <- 0.4
-PhiF     <- 0.75
+PM       <- 0.7
+PF       <- 0.7
+PhiF     <- 0.72
 PhiM     <- 0.75
-gam_true <- 0
-rho_true <- 0
-n_pop    <- 350
+gam_true <- 0.8
+rho_true <- 0.43
+n_pop    <- 312
 k        <- 30
+
+set.seed(42)
 
 # Parameter Grid 
 param_list <- list(
   n            = n_pop,              # Number of Animals
   k            = k,                  # Occasions
-  prop.female  = 0.45,               # Proportion of simulated individuals to be female
+  prop.female  = 0.5,               # Proportion of simulated individuals to be female
   delta        = rep(1, k),          # Probability that mating is attempted
   phi.f        = rep(PhiF, k),       # Marginal Prob of Female Survival
   phi.m        = rep(PhiM, k),       # Marginal Prob of Male Survival
@@ -85,7 +87,9 @@ difftime(y,x,units = "mins")
 # Compute Survival Correlation Estimate-----------------------------------------------------------------------
 x <- Sys.time()
 gamma <- compute_survival_correlation(ps_data = ps_data,
-                                      PFM     = compute_jbin_cjs(pred_probs[4], pred_probs[3], rho)$prob.mf,
+                                      PFM     = compute_jbin_cjs(prob.f = pred_probs[4],
+                                                                 prob.m = pred_probs[3],
+                                                                 cor    = rho)$prob.mf,
                                       PhiF    = pred_probs[2],
                                       PhiM    = pred_probs[1])
 names(gamma) <- "Mean"
@@ -93,7 +97,7 @@ names(gamma) <- "Mean"
 # Bootstrap To Estimate SE 
 gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
                                                              iter                  = 10000,
-                                                             recapture_correlation = NULL,
+                                                             recapture_correlation = rho,
                                                              PF                    = pred_probs[4],
                                                              PM                    = pred_probs[3],
                                                              PhiF                  = pred_probs[2],
@@ -116,16 +120,111 @@ summ_corr <- as.data.frame(rbind(summ_rho, summ_gamma))
 summ_corr$Parameter <- c("rho","gamma")
 summ_corr <- summ_corr[,c("Parameter","Mean", "SE", "2.5%","50%","75%","97.5%")]
 rownames(summ_corr) <- NULL
-
-results <- list(ps_data   = ps_data,
-                cjs_data  = cjs_data,
-                cjs_out   = cjs_out,
-                summ_corr = summ_corr,
-                rho_bs    = unname(rho_bs),
-                gamma_bs  = unname(gamma_bs))
-
-saveRDS(results, out_dir %+% "results.rds")
-
-y0 <- Sys.time()
-difftime(y0,x0,units = "mins")
 #-------------------------------------------------------------------------------------------------------------
+
+# Run Nimble Model with Imputed Fates ------------------------------------------------------------------------
+
+## Compile model PS-------------------------------------------------------------------------------------------
+
+## MCMC parameters
+niter <- 1e4
+nburnin <- niter/4
+nchains <- 5
+nthin <- 10
+nimble_params <- c("PF","PM","PhiF","PhiM",
+                   "gl","gu","gamma",
+                   "ru","rl","rho")
+
+
+# ACCOUNT FOR RECRUITMENT....
+x <- Sys.time()
+fit <- run_pair_swap_nimble_parallel(data    = ps_data, 
+                                     params  = nimble_params,
+                                     niter   = niter, 
+                                     nthin   = nthin, 
+                                     nburnin = nburnin,
+                                     ncores  = nchains)
+
+samples <- fit$samples
+inits <- fit$inits
+seeds <- fit$seed
+y <- Sys.time()
+
+difftime(y,x,units = "hours")
+
+## Compile model with TRUTH PS--------------------------------------------------------------------------------
+
+## MCMC parameters
+ps_data2 <- ps_data
+ps_data2$apairs_f_imputed <- ps_data$pairs_f
+ps_data2$apairs_m_imputed <- ps_data$pairs_m
+
+# ACCOUNT FOR RECRUITMENT....
+x <- Sys.time()
+fit2 <- run_pair_swap_nimble_parallel(data    = ps_data2, 
+                                      params  = nimble_params,
+                                      niter   = niter, 
+                                      nthin   = nthin, 
+                                      nburnin = nburnin,
+                                      ncores  = nchains)
+
+samples2 <- fit2$samples
+inits2 <- fit2$inits
+seeds2 <- fit2$seed
+y <- Sys.time()
+
+difftime(y,x,units = "hours")
+
+
+# Run MCMC CJS Model ---------------------------------------------------------------------------------------
+
+## Compile model CJS----------------------------------------------------------------------------------------
+nimble_cjs_params <- c("PF","PM","PhiF","PhiM")
+
+# ACCOUNT FOR RECRUITMENT....
+x <- Sys.time()
+
+fit_cjs <- run_cjs_nimble_parallel(data    = cjs_data, 
+                                   params  = nimble_cjs_params,
+                                   niter   = niter, 
+                                   nthin   = nthin, 
+                                   nburnin = nburnin,
+                                   ncores  = nchains)
+
+samples_cjs <- fit_cjs$samples
+inits_cjs   <- fit_cjs$inits
+seeds_cjs   <- fit_cjs$seed
+y <- Sys.time()
+
+difftime(y,x,units = "hours")
+# ---------------------------------------------------------------------------------------------------------
+
+# Review Results ------------------------------------------------------------------------------------------
+
+# Base Model Run
+cjs_out
+summ_corr
+
+# MCMC Summary
+summary(samples_cjs)
+summary(samples)
+summary(samples2)
+
+# Convergence Diagnostics
+gelman.diag(samples)
+gelman.diag(samples2)
+gelman.diag(samples_cjs)
+
+# Plot Densities (Imputed)
+ggmcmc::ggs(samples) %>% ggmcmc::ggs_density("P")
+ggmcmc::ggs(samples) %>% ggmcmc::ggs_density("gamma")
+ggmcmc::ggs(samples) %>% ggmcmc::ggs_density("rho")
+
+# Plot Densities (Known)
+ggmcmc::ggs(samples2) %>% ggmcmc::ggs_density("P")
+ggmcmc::ggs(samples2) %>% ggmcmc::ggs_density("gamma")
+ggmcmc::ggs(samples2) %>% ggmcmc::ggs_density("rho")
+# ---------------------------------------------------------------------------------------------------------
+
+
+

@@ -1,10 +1,10 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%` <- function(a, b) paste0(a, b)
 src_dir <- getwd()
-out_dir <- getwd()
-source(file.path(src_dir, "Scripts", "Production", "fn_generic.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_sim_pair_data.R"))
-source(file.path(src_dir, "Scripts", "Production", "fn_correlation_estimators.R"))
+out_dir <- getwd() %+% "/Output/"
+source(file.path(src_dir, "Scripts", "fn_generic.R"))
+source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
+source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
 
 # Load packages ---------------------------------------------------------------------------------------------------
 libs <- c("tidyverse","RMark")
@@ -17,7 +17,7 @@ scenario_grid <- get_scenarios()
 i <- 20
 
 x <- Sys.time()
-results <- execute_simulation(niter      = 1e3,
+results <- execute_simulation(niter      = 3,
                               scenario   = scenario_grid[i,"scenario"],
                               PM         = scenario_grid[i,"PM"],
                               PF         = scenario_grid[i,"PF"],

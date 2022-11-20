@@ -1,116 +1,3 @@
-## Generic Functions -------------------------------------------------------------------------------------
-
-#Inline Paste0 function
-`%+%` <- function(a, b) paste0(a, b)
-
-#Odds function
-odds <- function(p){
-  out <- p/(1-p)
-  return(out)
-}
-
-# odds ratio
-or <- function(p,q){
-  odds_p <- odds(p)
-  odds_q <- odds(q)
-  out <- odds_p/odds_q
-  return(out)
-}
-
-# odds product
-op <- function(p,q){
-  odds_p <- odds(p)
-  odds_q <- odds(q)
-  out <- odds_p*odds_q
-  return(out)
-}
-
-#Logistic Function for probability
-logit <- function(p){
-  out <- log(odds(p))
-  return(out)
-}
-
-# #Inverse Logistic Function
-inv.logit <- function(x){
-  out <- (1+exp(-x))^(-1)
-  return(out)
-}
-
-
-# Numerically Stable Version
-softmax <- function(par){
-  n.par <- length(par)
-  par1  <- sort(par, decreasing = TRUE)
-  Lk    <- par1[1]
-  for (k in 1:(n.par-1)) {
-    Lk <- max(par1[k+1], Lk) + log1p(exp(-abs(par1[k+1] - Lk))) 
-  }
-  val <- exp(par - Lk)
-  return(val)
-}
-
-## S/R Distribution Functions -------------------------------------------------------------------------------------
-
-#Extract joint binomial parameters
-compute_jbin_param_cjs <- function(prob.f,prob.m){
-  #Compute Components
-  prob.prod  <- prob.m * prob.f
-  sig.prob.f <- sqrt(prob.f*(1-prob.f))
-  sig.prob.m <- sqrt(prob.m*(1-prob.m))
-  sig.prod   <- sig.prob.f*sig.prob.m
-  ##Upper and Lower bounds for cov of joint binomial
-  lub        <-  sqrt(pmin(or(prob.f,prob.m),1/or(prob.f,prob.m)))
-  glb        <- -sqrt(pmin(op(prob.f,prob.m),1/op(prob.f,prob.m)))
-  #Return values
-  out <- list(prob.prod       = prob.prod,
-              sig.prob.f      = sig.prob.f,
-              sig.prob.m      = sig.prob.m,
-              sig.prod        = sig.prod,
-              cor_lower_bound = glb,
-              cor_upper_bound = lub)
-  return(out)
-}
-
-#Generate Derived Probabilities
-compute_jbin_cjs <- function(prob.f,prob.m,corr){
- 
-  parameters      <- compute_jbin_param_cjs(prob.f,prob.m)
-  cor_upper_bound <- parameters[["cor_upper_bound"]]
-  cor_lower_bound <- parameters[["cor_lower_bound"]]
-  sig.prob.f      <- parameters[["sig.prob.f"]]
-  sig.prob.m      <- parameters[["sig.prob.m"]]
-  
-  # If we are on a boundary condition update correlation structure 
-  boundary_f                <-  which(prob.f == 1| prob.f == 0)
-  boundary_m                <-  which(prob.m == 1| prob.m == 0)
-  boundary                  <-  sort(unique(c(boundary_f, boundary_m)))
-  corr[boundary]            <- 0 #correlation is zero if 1 or 0 for both probs
-  cor_upper_bound[boundary] <- 0
-  cor_lower_bound[boundary] <- 0
-  
-  if(any(round(corr,3) > round(cor_upper_bound,3)) || any(round(corr,3) < round(cor_lower_bound,3))){
-    stop("Correlation " %+% corr %+% " is outside of the bounds [" %+% 
-           as.character(cor_lower_bound) %+% " , " %+%
-           as.character(cor_upper_bound) %+% "]")
-  }
-  
-  ###Joint Probability Distn 
-  prob.mf <- corr * sig.prob.m * sig.prob.f + (prob.f*prob.m)
-  prob.f0 <- prob.f - prob.mf
-  prob.m0 <- prob.m - prob.mf
-  prob.00 <- 1 - prob.f0 - prob.m0 - prob.mf
-  
-  #List of parameters
-  out <- list(prob.mf = prob.mf,
-              prob.f0 = prob.f0,
-              prob.m0 = prob.m0,
-              prob.00 = prob.00)
-  
-  #Return values
-  return(out)
-}
-
 # Construct Model Matrices------------------------------------------------------------------------------------
 
 # Build out data structures and do easy initialization 
@@ -142,7 +29,7 @@ construct_init_entry <- function(n, k, random = F, inits = NULL){
     if(!is.null(inits)){
       initial_entry <- inits 
       # If not just do fixed intervals across n and k 
-    } else {
+    } else { 
       initial_entry <- rep(1:(k-1),ceiling(n/(k-1)))
       initial_entry <- initial_entry[1:n]
       initial_entry <- sample(initial_entry, n, F) # then shuffle them
@@ -168,7 +55,6 @@ construct_recruit <- function(n, k, sex){ n
   #Male's recruits
   recruit_m <- matrix(NA, nrow = (nm+1), ncol = k)
   recruit_m[nm+1,1:k] <- 1 # dummy spots for single pairs
-  
   
   # Group as list
   recruit_list <- list(recruit_f = recruit_f, 
@@ -334,7 +220,7 @@ initialize_mating_choice <- function(n, k, initial_entry, delta, mating_f, matin
   # initial entry for males and females
   initial_entry_female <- initial_entry[1:nf]
   initial_entry_male <- initial_entry[(nf+1):n]
-
+  
   # Choose whether to mate or not
   initial_mating_choice <- rbinom(n, 1, delta[initial_entry])
   
@@ -366,7 +252,7 @@ initialize_partner_status <- function(n, pairs, mating_f, mating_m, initial_entr
   
   nf <- length(sex[sex == "F"]) # Number of females
   nm <- length(sex[sex == "M"]) # Number of males
-
+  
   prob_mate <- matrix(0, nrow = nf+1, ncol = nm+1)
   # Flat probability of partnerships
   for(i in 1:nf){
@@ -444,7 +330,7 @@ initialize_survival_status <- function(sex, k, initial_entry, sf, sm){
   nf <- length(sex[sex == "F"]) # Number of females
   nm <- length(sex[sex == "M"]) # Number of males
   n  <- length(sex)
-
+  
   # Survival females
   # Assign survival status to initial entry
   for(t in 1:(k-1)){
@@ -478,7 +364,6 @@ initialize_survival_status <- function(sex, k, initial_entry, sf, sm){
   # Return Survival states
   init_surv_list <- list(sf = sf, sm = sm)
   return(init_surv_list)
-  
 }
 
 # 6. Update Data structures from [t,t+1)------------------------------------------------------------------------
@@ -587,18 +472,18 @@ compute_partnerships <- function(sex, pairs, mating_f, mating_m, time, repartner
   nm <- length(sex[sex == "M"]) # Number of males
   
   prob_mate <- matrix(0, nrow = nf+1, ncol = nm+1)
-
+  
   male_taken <- rep(0,nm)
   
   for(j in 1:nm){
     male_taken[j] <- sum(pairs[1:nf,j,time-1] * repartner[1:nf, time])
-    if(any(male_taken > 1|male_taken <0)) browser()
+    if(male_taken[j] > 1|male_taken[j] <0) browser()
   }
   
   for(i in 1:nf){
     for(j in 1:nm){
       prob_mate[i,j] <-  mating_f[i,time] * mating_m[j,time] *(1-pairs[i,j,time-1])* (1 - repartner[i,time]) *(1-male_taken[j])  + 
-        pairs[i,j,time-1] * repartner[i,time]
+        pairs[i,j,time-1] * male_taken[j] * repartner[i,time]
     }
   }
   
@@ -712,7 +597,7 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
   # Sample conditional females next 
   for(i in 1:nf){
     # Always alive at time 1
-    # First entry needs to survive (small hack)
+    # First entry needs to survive 
     first_i <- min(which(recruit_f[i,]==1))
     if(time == 1|first_i == time){
       sf[i,time] <- 1
@@ -727,13 +612,20 @@ compute_survival <- function(sf, sm, pairs_f, pairs_m, recruit_f, recruit_m, tim
     } else {
       male_previous_alive <- 0
     }
-   
+    
     
     # Conditional Probability of survival given pair status
     prob_cond_f <- (single_check + (1-single_check) * (1-male_previous_alive)) * phi.f[time] + 
-                   (1-single_check) * male_previous_alive * (sm[j,time] * joint_surv_pmf$prob.mf/phi.m[time]  + 
-                                          (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
+      (1-single_check) * male_previous_alive * (sm[j,time] * joint_surv_pmf$prob.mf/phi.m[time]  + 
+                                                  (1-sm[j,time]) * joint_surv_pmf$prob.f0/(1-phi.m[time]))
     
+    # Case handling for initial entry
+    if(single_check == 0){
+      first_j <- min(which(recruit_m[j,]==1))
+      if(first_j > (time-1)){
+        prob_cond_f <- phi.f[time]
+      } 
+    }
     
     sf[i,time] <- rbinom(1,1, prob = prob_cond_f * sf[i,time-1] * recruit_f[i,time-1] + (1-recruit_f[i,time-1]))
   }
@@ -791,7 +683,14 @@ compute_hidden_recruitment <- function(recruit_f, recruit_m, recap_f, recap_m){
 }
 
 
-compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
+compute_hidden_survival <- function(recap_f,
+                                    recap_m, 
+                                    first_capture_f,
+                                    first_capture_m,
+                                    sf,
+                                    sm, 
+                                    k, 
+                                    sex){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -807,19 +706,12 @@ compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
   
   # Females
   for(i in 1:nf){
-    
     # Add observed status iteratively--------------------------------------
-    for(t in 1:k){
+    for(t in first_capture_f[i]:k){
       if(recap_f[i,t]==1){
         af[i,t] <- sf[i,t]
       } 
     }
-    
-    # If never seen just skip 
-    if(all(is.na(af[i,1:k])) & sum(recap_f[i,1:k]) == 0) next
-    
-    # If seen but no survival info then theres a bug 
-    if(all(is.na(af[i,1:k])) & sum(recap_f[i,1:k]) > 0) browser()
     
     # Go back and add inferred states based on time-------------------------
     # Last time seen alive
@@ -829,10 +721,11 @@ compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
     if(last_alive == 1) next
     
     # Change all other states prior to last alive to alive
-    af[i, 1:last_alive] <- 1    
+    if(first_capture_f[i] > 1)  af[i,  1:(first_capture_f[i]-1)] <- 0   
+    af[i,  first_capture_f[i]:last_alive] <- 1    
     
     rm(last_alive)
-
+    
   }
   
   rm(i)
@@ -841,18 +734,11 @@ compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
   for(j in 1:nm){
     
     # Add observed status iteratively--------------------------------------
-    for(t in 1:k){
+    for(t in first_capture_m[j]:k){
       if(recap_m[j,t]==1){
         am[j,t] <- sm[j,t]
       } 
     }
-    
-    # Go back and add inferred states based on time-------------------------
-    # If never seen just skip 
-    if(all(is.na(am[j,])) & sum(recap_m[j,]) == 0) next
-    
-    # If seen but no survival info then theres a bug 
-    if(all(is.na(am[j,])) & sum(recap_m[j,]) > 0) browser()
     
     # Last time seen alive
     last_alive <- max(which(am[j,]==1))
@@ -861,20 +747,15 @@ compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
     if(last_alive == 1) next 
     
     # Change all other states prior to last alive to alive
-    am[j, 1:last_alive] <- 1    
+    if(first_capture_m[j] > 1)  am[j,  1:(first_capture_m[j]-1)] <- 0   
+    am[j, first_capture_m[j]:last_alive] <- 1    
     
     rm(last_alive)
   }
   
-  # Must be alive at time 1 (if not recruited considered alive (or going to be alive) but not in pop)
-  # This line is necessary because of the fact that some animals will be unobserved throughout the whole study//
-  # and we need to force their first survival to 1
-  af[,1] <- 1
-  am[,1] <- 1
-  
   # Set dummy states to known ones (used for indexing in nimble model)
-  af[(nf+1),] <- 1
-  am[(nm+1),] <- 1
+  af[(nf+1),] <- 0
+  am[(nm+1),] <- 0
   
   # Store results in a list
   # add dummy row 1 for the repartner mechanism (in model index t is t+1)
@@ -885,43 +766,14 @@ compute_hidden_survival <- function(recap_f, recap_m, sf, sm, k, sex){
   return(state_list)
 }
 
-
-filter_impossible_matchs <- function(psi,
-                                     apairs_f,
-                                     pairs_f,
-                                     k,
-                                     recap_f,
-                                     recap_m,
-                                     nf,
-                                     nm){
-  for(t in 1:k){
-    for(i in 1:nf){
-      for(j in 1:nm){
-        if(recap_f[i,t]==1 & recap_m[j,t]==1 & is.na(apairs_f[i,t])){
-          
-          # sum_i <- sum(psi[i,,t])
-          # sum_j <- sum(psi[,j,t])
-          # 
-          # if((sum_i==1|sum_j==1) & psi[i,j,t]==1) browser()
-          
-          psi[i,j,t] <- 1 * (pairs_f[i,t] == j)
-          
-        }  
-      }
-    }
-  }
-  
-  
-  return(psi)
-  
-}
-
 compute_hidden_pairs <- function(pairs_f,
                                  pairs_m, 
                                  recap_f,
                                  recap_m, 
                                  recruit_f,
                                  recruit_m,
+                                 first_capture_f,
+                                 first_capture_m,
                                  k,
                                  sex, 
                                  repartner, 
@@ -949,6 +801,12 @@ compute_hidden_pairs <- function(pairs_f,
   for(i in 1:nf){
     
     for(t in 1:k){
+      
+      if(t < first_capture_f[i]){
+        amating_f[i,t] <- 0
+        apairs_f[i,t] <- nm+1
+        arepartner[i,t] <- 0
+      }
       
       # If female in unobserved, move to next time step
       if(recap_f[i,t] == 0) next 
@@ -1019,6 +877,12 @@ compute_hidden_pairs <- function(pairs_f,
   
   for(j in 1:nm){
     for(t in 1:k){
+      
+      if(t < first_capture_m[j]){
+        amating_m[j,t] <- 0
+        apairs_m[j,t] <- nf+1
+      }
+      
       # If male in unobserved, move to next time step
       if(recap_m[j,t] == 0) next 
       
@@ -1115,7 +979,7 @@ compute_hidden_pairs <- function(pairs_f,
         # Need to check if current partner had a different mate last time, if so then set to zero
         
         # Grab all known pairings from before
-        previous_partners <- apairs_f[1:nf,time-1]  # Grab data 
+        previous_partners <- apairs_f[(1:nf)[-i],time-1]  # Grab data 
         previous_partners <- previous_partners[!is.na(previous_partners)] # remove NA
         previous_partners <- previous_partners[previous_partners != (nm + 1)] # drop single designation 
         
@@ -1133,7 +997,7 @@ compute_hidden_pairs <- function(pairs_f,
         # Need to check if previous has a new partner, if so then arepartner = 0
         
         # Grab known pairings at 
-        current_partners <- apairs_f[1:nf,time]  # Grab data 
+        current_partners <- apairs_f[(1:nf)[-i],time]  # Grab data 
         current_partners <- current_partners[!is.na(current_partners)] # remove NA
         current_partners <- current_partners[current_partners != (nm + 1)] # drop single designation 
         
@@ -1165,242 +1029,6 @@ compute_hidden_pairs <- function(pairs_f,
     }
   }
   
-  # Special Interpolation logic (lack of info we assume longevity of pairs)
-  psi <- apairs
-  psi[is.na(psi)] <- 1
-  psi <- psi[1:nf+1,1:nm+1,]
-  psi <- psi[,,1:k+1] 
-  psi_array <- array(NA,dim = c(nf,nm+1,k))
- 
-  for(t in 1:k){
-    psi_array[,,t] <- cbind(psi[,,t],rep(0,nf))
-  }
-  
-  psi <- psi_array
-  
-  # browser()
-  for(i in 1:nf){
-    
-    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
-    num_partners_i <- length(partners_i)
-    
-    first_partner <- partners_i[1]
-    
-    # If no pairs observed make no possible combos
-    if(num_partners_i == 0){
-      apairs_f[i,1:k] <- (nm+1)
-      arepartner[i,1:k] <- 0
-      amating_f[i,1:k] <- 0
-      psi[i,,1:k] <- 0
-      psi[i,(nm+1),1:k] <- 1
-      next
-    }
-    
-    for(t in 1:k){
-      
-      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
-      if(length(last_partner)==0){
-        last_partner <- nm+1#first_partner
-      } 
-      last_partner <- last_partner[length(last_partner)]
-      
-      if(t == k){
-        next_partner <- last_partner
-      } else {
-        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
-        if(length(next_partner)==0){
-          next_partner <- nm+1#last_partner
-        } 
-        next_partner <- next_partner[1]
-        
-      }
-      
-      mating_f_t <- amating_f[i,t]
-      if(!is.na(mating_f_t)){
-        if(mating_f_t == 0){
-          apairs_f[i,t] <- (nm+1)
-          psi[i,,t] <- 0
-          next
-        }
-      }
-      
-      if(is.na(apairs_f[i,t])){
-        
-        if(t == 1){
-          
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == first_partner)|first_partner==(nm+1)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,(nm+1),t] <- 1
-              next 
-            }
-          }
-          
-          apairs_f[i,t] <- first_partner
-          apairs_m[first_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[first_partner,t] <- 1
-          psi[,first_partner,t] <- 0
-          psi[i,,t] <- 0
-          psi[i,first_partner,t] <- 1
-      
-          next
-        }
-        
-        if(next_partner == last_partner){
-          
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)|(last_partner==(nm+1))){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,(nm+1),t] <- 1
-              next
-            } 
-          }
-          apairs_f[i,t] <- last_partner
-          apairs_m[last_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[last_partner,t] <- 1
-          psi[,last_partner,t] <- 0
-          psi[i,,t] <- 0
-          psi[i,last_partner,t] <- 1
-          next
-        }
-        
-        if(last_partner == (nm+1)){
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,(nm+1),t] <- 1
-              next
-            } 
-          }
-          apairs_f[i,t] <- next_partner
-          apairs_m[next_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[next_partner,t] <- 1
-          psi[,next_partner,t] <- 0
-          psi[i,,t] <- 0
-          psi[i,next_partner,t] <- 1
-          next
-        }
-        
-        if(next_partner == (nm+1)){
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,(nm+1),t] <- 1
-              next
-            } 
-          }
-          apairs_f[i,t] <- last_partner
-          apairs_m[last_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[last_partner,t] <- 1
-          psi[,last_partner,t] <- 0
-          psi[i,,t] <- 0
-          psi[i,last_partner,t] <- 1
-          next
-          
-        }
-        
-        if(next_partner != last_partner){
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,(nm+1),t] <- 1
-              next
-            } 
-            
-            
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != next_partner)){
-              apairs_f[i,t] <- next_partner
-              apairs_m[next_partner,t] <- i
-              amating_f[i,t] <- 1
-              amating_m[next_partner,t] <- 1
-              psi[,next_partner,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,next_partner,t] <- 1
-              next
-            } 
-            
-            
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
-              apairs_f[i,t] <- last_partner
-              apairs_m[last_partner,t] <- i
-              amating_f[i,t] <- 1
-              amating_m[last_partner,t] <- 1
-              psi[,last_partner,t] <- 0
-              psi[i,,t] <- 0
-              psi[i,last_partner,t] <- 1
-              next
-            } 
-          }
-         
-          
-          time_last <- max(which(last_partner==apairs_f[i,1:(t-1)]))
-          time_next <- min(which(next_partner==apairs_f[i,(t+1):k])) + t
-          
-          if(time_last == t-1 & time_next == t+1){
-            amating_f[i,t] <- 0
-            apairs_f[i,t] <- nm+1
-            psi[i,,t] <- 0
-            next
-          } 
-          
-          length_time <- time_next-time_last - 1
-          
-          if((length_time %% 2) == 0){
-            mid_point <- t + (length_time/2 - 1)
-            psi[i,,t:time_next] <- 0
-            apairs_f[i, t:mid_point] <- last_partner
-            psi[i, last_partner, t:mid_point] <- 1
-            amating_f[i,t:time_next] <- 1
-            apairs_f[i, (mid_point + 1):time_next] <- next_partner
-            psi[i, next_partner, (mid_point + 1):time_next] <- 1
-            next
-          } else {
-            psi[i,,t:time_next] <- 0
-            mid_point <- t + ((length_time-1)/2 - 1)
-            apairs_f[i, t:mid_point] <- last_partner
-            psi[i, last_partner, t:mid_point] <- 1
-            amating_f[i,t:time_next] <- 1
-            apairs_f[i,mid_point + 1] <- nm+1
-            amating_f[i,mid_point + 1] <- 0
-            apairs_f[i, (mid_point + 2):time_next] <- next_partner
-            psi[i, next_partner, (mid_point + 2):time_next] <- 1
-            next
-          }
-          # psi[i,(nm+1),t] <- 1
-        
-          # psi[i,c(next_partner),t] <- 1
-          # psi[i,c(next_partner,last_partner),t] <- 1
-        }
-      } else {
-        if(apairs_f[i,t] == (nm+1)){
-          amating_f[i,t] <- 0
-          psi[i,,t] <- 0
-          psi[i,(nm+1),t] <- 1
-        } else {
-          amating_f[i,t] <- 1
-          psi[i,,t] <- 0
-          psi[,apairs_f[i,t],t] <- 0
-          psi[i,apairs_f[i,t],t] <- 1
-          
-        }
-        
-      }
-    }
-  }
   
   # Special Arepartner Logic ------------------------------------------------------------------------------------------
   # Dummy states 
@@ -1411,34 +1039,238 @@ compute_hidden_pairs <- function(pairs_f,
   apairs[,,1] <- 0 
   arepartner[,1] <- 0 
   
-  if(show_unmated){
-    psi <- filter_impossible_matchs(psi = psi,
-                                    apairs_f = apairs_f,
-                                    pairs_f = pairs_f,
-                                    k = k,
-                                    recap_f = recap_f,
-                                    recap_m = recap_m,
-                                    nf = nf,
-                                    nm = nm)
+  
+  # Filter Down to Pairs that were observed 
+  possible_partners <- lapply(1:nf, function(i) unique(c(nm+1, apairs_f[i, 1:k][!is.na(apairs_f[i,1:k])])))
+  
+  # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
+  for(i in 1:nf){
+    
+    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+    first_partner <- partners_i[1]
+    
+    # If no pairs observed make no possible combos
+    if(length(partners_i) == 0) next
+    
+    for(t in 1:k){
+      # Who was individual i's last partner?
+      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      if(length(last_partner)==0){
+        last_partner <- nm+1
+      }
+      last_partner <- last_partner[length(last_partner)]
+      
+      # Who was individual i's next partner?
+      # If t == k and unknown then just grab last partner
+      if(t == k){
+        next_partner <-  unique(apairs_f[i,k][!is.na(apairs_f[i,k])])
+        if(length(next_partner) == 0){
+          next_partner <- nm+1
+        }
+      } else {
+        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        if(length(next_partner)==0){
+          next_partner <- nm+1
+        }
+        next_partner <- next_partner[1]
+      }
+      
+      # If observed unmated set to unmated
+      if(!is.na(amating_f[i,t])){
+        if(amating_f[i,t] == 0){
+          apairs_f[i,t] <- (nm+1)
+          next
+        }
+      }
+      
+      if(is.na(apairs_f[i,t])){
+        
+        if(next_partner == last_partner & next_partner != nm+1){
+          potential_partners_i <- c(next_partner)
+          apairs_f[i,t] <- next_partner
+          apairs_m[next_partner,t] <- i
+        } else{
+          potential_partners_i <- c(nm+1, last_partner, next_partner)
+        }
+        
+      }
+    }
   }
   
+  
+  # -----------------------------------------------------------------------------------------------------------------------------------------------------------
+  
   # Store results in a list
-  pairs_list <- list(apairs_m = apairs_m,
-                     apairs_f = pairs_f,#apairs_f, # HERE#
-                     apairs = apairs,
-                     amating_f = mating_f,
-                     amating_m = mating_m,
-                     arepartner = arepartner,
-                     psi = psi)
+  pairs_list <- list(apairs_m            = apairs_m,
+                     apairs_f            = apairs_f,
+                     apairs              = apairs,
+                     amating_f           = amating_f,
+                     amating_m           = amating_m,
+                     arepartner          = arepartner)
   
   # Return List
   return(pairs_list)
 }
 
+
+# Populate imputed pairs object based on set of assumptions 
+populate_full_pairs_approximation <- function(apairs_f,
+                                              apairs_m,
+                                              amating_f,
+                                              amating_m,
+                                              nf,
+                                              nm,
+                                              k){
+  for(i in 1:nf){
+    
+    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+    num_partners_i <- length(partners_i)
+    
+    first_partner <- partners_i[1]
+    
+    # If no pairs observed make no possible combos
+    if(num_partners_i == 0){
+      apairs_f[i,1:k] <- (nm+1)
+      amating_f[i,1:k] <- 0
+      next
+    }
+    
+    for(t in 1:k){
+      
+      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      if(length(last_partner)==0){
+        last_partner <- first_partner
+      } 
+      last_partner <- last_partner[length(last_partner)]
+      
+      if(t == k){
+        next_partner <- last_partner
+      } else {
+        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        if(length(next_partner)==0){
+          next_partner <- last_partner
+        } 
+        next_partner <- next_partner[1]
+        
+      }
+      
+      if(is.na(apairs_f[i,t])){
+        
+        if(t == 1){
+          
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == first_partner)|first_partner==(nm+1)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next 
+            }
+          }
+          
+          apairs_f[i,t] <- first_partner
+          apairs_m[first_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[first_partner,t] <- 1
+          
+          next
+        }
+        
+        if(next_partner == last_partner){
+          
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)|(last_partner==(nm+1))){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+          }
+          apairs_f[i,t] <- last_partner
+          apairs_m[last_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[last_partner,t] <- 1
+          next
+        }
+        
+        if(last_partner == (nm+1)){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+          }
+          apairs_f[i,t] <- next_partner
+          apairs_m[next_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[next_partner,t] <- 1
+          next
+        }
+        
+        if(next_partner == (nm+1)){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+          }
+          apairs_f[i,t] <- last_partner
+          apairs_m[last_partner,t] <- i
+          amating_f[i,t] <- 1
+          amating_m[last_partner,t] <- 1
+          next
+          
+        }
+        
+        if(next_partner != last_partner){
+          if(!all(is.na(apairs_f[1:nf,t]))){
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- (nm+1)
+              amating_f[i,t] <- 0
+              next
+            } 
+            
+            
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != next_partner)){
+              apairs_f[i,t] <- next_partner
+              apairs_m[next_partner,t] <- i
+              amating_f[i,t] <- 1
+              amating_m[next_partner,t] <- 1
+              next
+            } 
+            
+            
+            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+              apairs_f[i,t] <- last_partner
+              apairs_m[last_partner,t] <- i
+              amating_f[i,t] <- 1
+              amating_m[last_partner,t] <- 1
+              next
+            } 
+          }
+          
+          amating_f[i,t] <- 0
+          apairs_f[i,t] <- nm+1
+        }
+      } else {
+        if(apairs_f[i,t] == (nm+1)){
+          amating_f[i,t] <- 0
+        } else {
+          amating_f[i,t] <- 1
+          
+        }
+        
+      }
+    }
+  }
+  
+  return(list(apairs_f_imputed = apairs_f,
+              apairs_m_imputed = apairs_m))
+}
+
 simulate_recapture <- function(recap_f, 
                                recap_m, 
-                               recruit_f, 
-                               recruit_m, 
+                               first_capture_f, 
+                               first_capture_m, 
                                sf, 
                                sm, 
                                pairs_f, 
@@ -1456,15 +1288,21 @@ simulate_recapture <- function(recap_f,
   
   # Generate Male History 
   for(j in 1:nm){
-    for(t in 1:k){
-      recap_m[j,t] <- rbinom(1,1,prob = p.m[t] * sm[j,t] * recruit_m[j, t])
+    
+    if(first_capture_m[j] > 1) recap_m[j, 1:(first_capture_m[j]-1)] <- 0
+    
+    recap_m[j, first_capture_m[j]] <- 1
+    
+    for(t in (first_capture_m[j]+1):k){
+      recap_m[j,t] <- rbinom(1,1,prob = p.m[t] * sm[j,t])
     }
   }
   
   # Generate female History
   for(i in 1:nf){
-    
-    for(t in 1:k){
+    if(first_capture_f[i] > 1) recap_f[i, 1:(first_capture_f[i]-1)] <- 0
+    recap_f[i, first_capture_f[i]] <- 1
+    for(t in (first_capture_f[i]+1):k){
       # Joint density 
       joint_recap_pmf <- compute_jbin_cjs(p.f[t],p.m[t],rho[t])
       
@@ -1472,266 +1310,30 @@ simulate_recapture <- function(recap_f,
       j <- pairs_f[i, t]
       single_check <- 1*(j == (nm + 1))
       
-      if(single_check != 1){
-        male_alive <- recruit_m[j,t] * sm[j,t]
-      } else {
-        male_alive <- 0
-      }
-     
-      
-      recap_prob_cond_f <- (single_check + (1-single_check) * (1-male_alive)) * p.f[t] + 
-        (1-single_check) * male_alive * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
+      recap_prob_cond_f <- single_check * p.f[t] + 
+        (1-single_check) * (recap_m[j,t] * joint_recap_pmf$prob.mf/p.m[t] + 
                               (1-recap_m[j,t]) * joint_recap_pmf$prob.f0/(1-p.m[t]))
       
+      # Case handling for initial entry
+      if(single_check == 0){
+        if(first_capture_m[j] >= t){
+          recap_prob_cond_f <- p.f[t]
+        } 
+      }
       
-      recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t] * recruit_f[i,t])
+      
+      recap_f[i,t] <- rbinom(1,1, prob = recap_prob_cond_f * sf[i,t])
     }
   }
+  
   
   return(list(recap_f = recap_f,
               recap_m = recap_m))
-  
-}
-
-
-
-add_data_augmentation <- function(lf,
-                                  lm,
-                                  k,
-                                  recruit_f,
-                                  recruit_m,
-                                  amating_f,
-                                  amating_m,
-                                  apairs_f,
-                                  apairs_m,
-                                  arepartner,
-                                  af,
-                                  am,
-                                  recap_f,
-                                  recap_m,
-                                  psi){
-  
-  # M represents number of extra individuals to add
-  nf <- nrow(recruit_f)-1
-  nm <- nrow(recruit_m)-1
-
-  # First captures
-  exists_female <- 1*(rowSums(recap_f[1:(nrow(recap_f)-1),]) > 0)
-  exists_male   <- 1*(rowSums(recap_m[1:(nrow(recap_m)-1),]) > 0)
-  
-  # Gather Sampled Data Statistics
-  true_pop_f <- nf 
-  true_pop_m <- nm
-  sample_size_f <- sum(exists_female) 
-  sample_size_m <- sum(exists_male)
-  
-  unobs_f <- true_pop_f - sample_size_f
-  unobs_m <- true_pop_m - sample_size_m
-  
-  # Females: Update Data Augmentation to match user specified standards
-  if(lf < unobs_f){
-    # this case should never happen lf needs to be a big number for this to make sense
-    lf <- 0 
-
-    warning("Expanding Female Data AUgmentation by " %+% as.character(unobs_f-lf) %+% " individuals. Consider increasing lf for this simulation and re-running.")
-  } else if(lf >= unobs_f){
-    # take out all the "augmented" individuals we have organically
-    lf <- lf - unobs_f
-  }
-  
-  # MALES: Update Data Augmentation to match user specified standards
-  if(lm < unobs_m){
-    # this case should never happen lm needs to be a big number for this to make sense
-    lm <- 0 
-    
-    warning("Expanding Male Data AUgmentation by " %+% as.character(unobs_m - lm) %+% " individuals. \n Consider increasing lf for this simulation and re-running.")
-  } else if(lm >= unobs_m){
-    # take out all the "augmented" individuals we have organically
-    lm <- lm - unobs_m 
-  }
-
-  # Whether animal is in pop or not
-  zf <- rep(NA,nf+lf)
-  zm <- rep(NA,nm+lm)
-  
-  # Observed individuals are known to be in pop
-  zf[1:nf] <- ifelse(exists_female == 1, 1, NA)
-  zm[1:nm] <- ifelse(exists_male == 1, 1, NA)
-  
-  # If individuals arent already in there add the new females 
-  if(lf != 0){
-    # Add rows for augmented females
-    recruit_f <- rbind(recruit_f[1:nf,],
-                       matrix(NA, nrow = lf, ncol = ncol(recruit_f)),
-                       recruit_f[(nf+1),])
-    
-    # Need to have been recruited by end of study 
-    recruit_f[,k] <- 1
-    
-    amating_f <- rbind(amating_f[1:nf,],
-                       matrix(NA,nrow = lf, ncol = ncol(amating_f)),
-                       amating_f[(nf+1),])
-    
-    arepartner <- rbind(arepartner[1:nf,],
-                        matrix(NA,nrow = lf, ncol = ncol(arepartner)))
-    # Cant be observed before t=1 so no repartnership is possible
-    arepartner[,1] <- 0
-    
-    apairs_f <- rbind(apairs_f[1:nf,],
-                      matrix(NA,nrow = lf, ncol = ncol(apairs_f)))
-    
-    # Update the new single index to include augmentation
-    apairs_f[apairs_f == (nm+1)] <- (nm+1) + lm 
-    
-    af <- rbind(af[1:nf,],
-                matrix(NA,nrow = lf, ncol = ncol(af)),
-                af[(nf+1),])
-    
-    # Need to be not dead at time 1 
-    af[,1] <- 1 
-    
-    recap_f <- rbind(recap_f[1:nf,],
-                     matrix(0,nrow = lf, ncol = ncol(recap_f)),
-                     recap_f[(nf+1),])
-    
-  }
-  
-  # If individuals arent already in there add the new males 
-  if(lm != 0){
-    # Add rows for augmented males
-    recruit_m <- rbind(recruit_m[1:nm,],
-                       matrix(NA,nrow = lm, ncol = ncol(recruit_m)),
-                       recruit_m[(nm+1),])
-    
-    
-    # Need to have been recruited by end of study 
-    recruit_m[,k] <- 1
-    
-    amating_m <- rbind(amating_m[1:nm,],
-                       matrix(NA,nrow = lm, ncol = ncol(amating_m)),
-                       amating_m[(nm+1),])
-    
-    apairs_m <- rbind(apairs_m[1:nm,],
-                      matrix(NA,nrow = lm, ncol = ncol(apairs_m)))
-    
-    # Update the new single index to include augmentation
-    apairs_m[apairs_m == (nf+1)] <- (nf+1) + lf 
-    
-    am <- rbind(am[1:nm,],
-                matrix(NA,nrow = lm, ncol = ncol(am)),
-                am[(nm+1),])
-    
-    # Need to be alive at time 1 
-    am[,1] <- 1 
-    
-    recap_m <- rbind(recap_m[1:nm,],
-                     matrix(0,nrow = lm, ncol = ncol(recap_m)),
-                     recap_m[(nm+1),])
-  }
-  
-  # Possible partnerships --------------------------------------------
-  # Drop dummy row for now
-  # browser()
-  psi <- psi[1:(nf),1:(nm),1:k]
-  psi2 <- array(NA,dim = c(nf+lf,nm+lm+1,k))
-  if(lm != 0) psi2[,(nm+1):(nm+lm),1:k] <- 0 # aug males
-  if(lf != 0) psi2[(nf+1):(nf+lf),,1:k] <- 0 # aug females
-  # if(lm != 0 & lf != 0){
-  #   for(t in 1:k){
-  #     diag_augmented <- diag(psi2[(nf+1):(nf+lf),(nm+1):(nm+lm),t])
-  #     if((length(diag_augmented) %% 2) == 0){
-  #       diag_augmented <- c(rep(1, length(diag_augmented)/2), rep(0, length(diag_augmented)/2))
-  #     } else{
-  #       diag_augmented <- c(1,rep(1, (length(diag_augmented)-1)/2), rep(0, (length(diag_augmented)-1)/2))
-  #     }
-  #     diag(psi2[(nf+1):(nf+lf),(nm+1):(nm+lm),t]) <- diag_augmented
-  #     
-  #     for(i in (nf+1):(nf+lf)){
-  #       apairs_f[i,t] <- ifelse(diag_augmented[i-nf]==1, which(psi2[i,1:(lm+nm+1),t]==1) ,(nm+lm+1))
-  #     }
-  #   }
-  # }
-  
-  psi2[,(nm+lm+1),1:k] <- 0 # dummy entry
-  psi2[1:nf,1:nm,1:k] <- psi
-  
-  # Remove possible pairs for mated individuals
-  for(i in 1:nf){
-    for(t in 1:k){
-      
-      if(is.na(amating_f[i,t])) next # if we dont know..
-      
-      if(amating_f[i,t] == 0){ # are not they mating
-        psi2[i,,t] <- 0 
-      } else { # if yes 
-        
-        if(is.na(apairs_f[i,t])) next  # if we dont know..
-        
-        if(apairs_f[i,t] == (nm+lm+1)){ # are they not able to find a partner(seen alone) 
-          psi2[i,,t] <- 0 
-          #if(arepartner[i,t]==1) browser()
-        } else{
-          psi2[i,,t] <- 0
-          psi2[i,apairs_f[i,t],t] <- 1
-        }
-      }
-    }
-  }
-  
-  for(j in 1:nm){
-    for(t in 1:k){
-      
-      if(is.na(amating_m[j,t])) next # if we dont know..
-      
-      if(amating_m[j,t] == 0){ # are they not mating
-        psi2[,j,t] <- 0 
-      } else { # if yes 
-        
-        if(is.na(apairs_m[j,t])) next # if dont know..
-        
-        if(apairs_m[j,t] == (nf+lf+1)){ # are they not able to find a partner(seen alone) 
-          psi2[,j,t] <- 0 
-        } else{
-          psi2[,j,t] <- 0
-          psi2[apairs_m[j,t],j,t] <- 1 # only their partner
-        }
-      }
-    }
-  }
-  
-  
-  
-  apairs_f[is.na(apairs_f)] <- (nm+lm+1)
-  
-  # Return augmented data
-  return(list(recruit_f     = recruit_f,
-              recruit_m     = recruit_m,
-              amating_f     = amating_f,
-              amating_m     = amating_m,
-              apairs_f      = apairs_f,
-              apairs_m      = apairs_m,
-              arepartner    = arepartner,
-              af            = af,
-              am            = am,
-              recap_f       = recap_f,
-              recap_m       = recap_m,
-              zf            = zf,
-              zm            = zm,
-              psi           = psi2,
-              true_pop_f    = true_pop_f,
-              true_pop_m    = true_pop_m,
-              sample_size_m = sample_size_m,
-              sample_size_f = sample_size_f,
-              lf            = lf,
-              lm            = lm))
 }
 
 # 7. Simulate Data ---------------------------------------------------------------------------------------------
-
 simulate_cr_data <- function(n,
                              k, 
-                             lf,
-                             lm,
                              prop.female,
                              delta,
                              phi.f, 
@@ -1754,32 +1356,29 @@ simulate_cr_data <- function(n,
     }
   }
   
-  if(!data_aug){
-    lf <- 0
-    lm <- 0
-  } 
-
   # Generate SKeleton Data Structures
-  sex           <- construct_sexes(n = n, prop.female = prop.female)
-  initial_entry <- construct_init_entry(n = n, k = k, random = rand_init, init = init) 
-  recruit_list  <- construct_recruit(n = n, k = k, sex = sex)
-  recruit_f     <- recruit_list[["recruit_f"]]
-  recruit_m     <- recruit_list[["recruit_m"]]
-  mating_list   <- construct_mated(n=n, k=k, sex = sex)
-  mating_f      <- mating_list[["mating_f"]] 
-  mating_m      <- mating_list[["mating_m"]]  
-  repartner     <- construct_repartner(sex = sex, k = k)
-  pairs_list    <- construct_pairs(sex = sex, k = k)
-  pairs_f       <- pairs_list[["pairs_f"]]
-  pairs_m       <- pairs_list[["pairs_m"]]
-  pairs         <- pairs_list[["pairs"]]
-  histories     <- construct_histories(sex = sex, k = k)
-  survival_list <- construct_survival(sex = sex, k = k)
-  sf            <- survival_list[["sf"]]
-  sm            <- survival_list[["sm"]]
-  recap_list    <- construct_recapture(sex = sex, k = k)
-  recap_f       <- recap_list[["recap_f"]]
-  recap_m       <- recap_list[["recap_m"]]
+  sex             <- construct_sexes(n = n, prop.female = prop.female)
+  initial_entry   <- construct_init_entry(n = n, k = k, random = rand_init, init = init) 
+  first_capture_f <- initial_entry[sex == "F"]
+  first_capture_m <- initial_entry[sex == "M"]
+  recruit_list    <- construct_recruit(n = n, k = k, sex = sex)
+  recruit_f       <- recruit_list[["recruit_f"]]
+  recruit_m       <- recruit_list[["recruit_m"]]
+  mating_list     <- construct_mated(n=n, k=k, sex = sex)
+  mating_f        <- mating_list[["mating_f"]] 
+  mating_m        <- mating_list[["mating_m"]]  
+  repartner       <- construct_repartner(sex = sex, k = k)
+  pairs_list      <- construct_pairs(sex = sex, k = k)
+  pairs_f         <- pairs_list[["pairs_f"]]
+  pairs_m         <- pairs_list[["pairs_m"]]
+  pairs           <- pairs_list[["pairs"]]
+  histories       <- construct_histories(sex = sex, k = k)
+  survival_list   <- construct_survival(sex = sex, k = k)
+  sf              <- survival_list[["sf"]]
+  sm              <- survival_list[["sm"]]
+  recap_list      <- construct_recapture(sex = sex, k = k)
+  recap_f         <- recap_list[["recap_f"]]
+  recap_m         <- recap_list[["recap_m"]]
   
   # Initialize Data 
   initial_time     <- min(initial_entry)
@@ -1791,7 +1390,7 @@ simulate_cr_data <- function(n,
   mating_m         <- mating_list_init[["mating_m"]]  
   pairs            <- initialize_partner_status(n = n, pairs = pairs, mating_f = mating_f, mating_m = mating_m, initial_entry = initial_entry, sex = sex)
   histories        <- update_history(histories = histories, 
-                              pairs = pairs, time = initial_time + 1, sex = sex)
+                                     pairs = pairs, time = initial_time + 1, sex = sex)
   pairs_ind_list <- propogate_partner_state(pairs = pairs, sex =  sex, pairs_f = pairs_f, pairs_m = pairs_m, time = initial_time)
   pairs_f        <- pairs_ind_list[["pairs_f"]]
   pairs_m        <- pairs_ind_list[["pairs_m"]]
@@ -1838,7 +1437,7 @@ simulate_cr_data <- function(n,
     
     mating_f <- mating_list_t[["mating_f"]] 
     mating_m <- mating_list_t[["mating_m"]]  
-
+    
     # Will previous pairs from time t-1 reform? 
     repartner <- compute_re_partner(repartner = repartner, 
                                     sex       =  sex, 
@@ -1872,48 +1471,36 @@ simulate_cr_data <- function(n,
     pairs_f <- pairs_ind_list[["pairs_f"]]
     pairs_m <- pairs_ind_list[["pairs_m"]]
     
-
+    
   }
-
-  # Update animals without observed histories
-  recap_ind_list <- simulate_recapture(recap_f   = recap_f, 
-                                       recap_m   = recap_m, 
-                                       recruit_f = recruit_f, 
-                                       recruit_m = recruit_m, 
-                                       sf        = sf, 
-                                       sm        = sm, 
-                                       pairs_f   = pairs_f, 
-                                       pairs_m   = pairs_m,
-                                       k         = k,
-                                       sex       = sex,
-                                       p.f       = p.f,
-                                       p.m       = p.m, 
-                                       rho       = rho)
+  
+  # Update animals without observed histories 
+  recap_ind_list <- simulate_recapture(recap_f         = recap_f, 
+                                       recap_m         = recap_m, 
+                                       first_capture_f = first_capture_f, 
+                                       first_capture_m = first_capture_m, 
+                                       sf              = sf, 
+                                       sm              = sm, 
+                                       pairs_f         = pairs_f, 
+                                       pairs_m         = pairs_m,
+                                       k               = k,
+                                       sex             = sex,
+                                       p.f             = p.f,
+                                       p.m             = p.m, 
+                                       rho             = rho)
   
   recap_f <- recap_ind_list[["recap_f"]] 
   recap_m <- recap_ind_list[["recap_m"]] 
   
-  # Build partially observed/latent data variables
-  
-  # Hidden recruitment (Mask unknown states for recruitment variables)
-  recruit_list <- compute_hidden_recruitment(recruit_f = recruit_f, 
-                                             recruit_m = recruit_m,
-                                             recap_f   = recap_f,
-                                             recap_m   = recap_m)
-  # Now they have can NAs
-  recruit_f_true <- recruit_f
-  recruit_m_true <- recruit_m
-  
-  recruit_f <- recruit_list[["recruit_f"]]
-  recruit_m <- recruit_list[["recruit_m"]]
-  
   # Hidden Survival
-  asurv_list <- compute_hidden_survival(recap_f = recap_f,
-                                        recap_m = recap_m,
-                                        sf      = sf, 
-                                        sm      = sm, 
-                                        k       = k, 
-                                        sex     = sex)
+  asurv_list <- compute_hidden_survival(recap_f         = recap_f,
+                                        recap_m         = recap_m,
+                                        first_capture_f = first_capture_f,
+                                        first_capture_m = first_capture_m,
+                                        sf              = sf, 
+                                        sm              = sm, 
+                                        k               = k, 
+                                        sex             = sex)
   af <- asurv_list[["af"]]
   am <- asurv_list[["am"]]
   
@@ -1924,6 +1511,8 @@ simulate_cr_data <- function(n,
                                       recap_m            = recap_m,
                                       recruit_f          = recruit_f,
                                       recruit_m          = recruit_m,
+                                      first_capture_f    = first_capture_f,
+                                      first_capture_m    = first_capture_m,
                                       k                  = k,
                                       sex                = sex,
                                       repartner          = repartner,
@@ -1931,114 +1520,51 @@ simulate_cr_data <- function(n,
                                       mating_f           = mating_f,
                                       show_unmated       = show_unmated)
   
-  apairs     <- apairs_list[["apairs"]]
-  amating_f  <- apairs_list[["amating_f"]]
-  amating_m  <- apairs_list[["amating_m"]]
-  arepartner <- apairs_list[["arepartner"]]
-  apairs_f   <- apairs_list[["apairs_f"]]
-  apairs_m   <- apairs_list[["apairs_m"]]
-  psi        <- apairs_list[["psi"]]
+  apairs              <- apairs_list[["apairs"]]
+  amating_f           <- apairs_list[["amating_f"]]
+  amating_m           <- apairs_list[["amating_m"]]
+  arepartner          <- apairs_list[["arepartner"]]
+  apairs_f            <- apairs_list[["apairs_f"]]
+  apairs_m            <- apairs_list[["apairs_m"]]
   
   # nf and nm
   sex_counts <- table(sex)
   nf         <- sex_counts[1]
   nm         <- sex_counts[2]
-
-  # FOR TESTING
-  psi_check  <- psi 
   
-  # Add data augmentation
-  data_augmented_list <- add_data_augmentation(lf         = lf,
-                                               lm         = lm,
-                                               k          = k,
-                                               recruit_f  = recruit_f,
-                                               recruit_m  = recruit_m,
-                                               amating_f  = amating_f,
-                                               amating_m  = amating_m,
-                                               apairs_f   = apairs_f,
-                                               apairs_m   = apairs_m,
-                                               arepartner = arepartner,
-                                               af         = af,
-                                               am         = am,
-                                               recap_f    = recap_f,
-                                               recap_m    = recap_m,
-                                               psi        = psi)
   
-  # Return updated list
-  recruit_f     <- data_augmented_list[["recruit_f"]]
-  recruit_m     <- data_augmented_list[["recruit_m"]]
-  amating_f     <- data_augmented_list[["amating_f"]]
-  amating_m     <- data_augmented_list[["amating_m"]]
-  apairs_f      <- data_augmented_list[["apairs_f"]]
-  apairs_m      <- data_augmented_list[["apairs_m"]]
-  arepartner    <- data_augmented_list[["arepartner"]]
-  af            <- data_augmented_list[["af"]]
-  am            <- data_augmented_list[["am"]]
-  recap_f       <- data_augmented_list[["recap_f"]]
-  recap_m       <- data_augmented_list[["recap_m"]]
-  zf            <- data_augmented_list[["zf"]]
-  zm            <- data_augmented_list[["zm"]]
-  psi           <- data_augmented_list[["psi"]]
-  true_pop_f    <- data_augmented_list[["true_pop_f"]]
-  true_pop_m    <- data_augmented_list[["true_pop_m"]]
-  sample_size_f <- data_augmented_list[["sample_size_f"]]
-  sample_size_m <- data_augmented_list[["sample_size_m"]]
-  lf            <- data_augmented_list[["lf"]]
-  lm            <- data_augmented_list[["lm"]]
-  nf            <- length(sex[sex == "F"]) + lf
-  nm            <- length(sex[sex == "M"]) + lm
+  # # Construct fully imputed pairs vector
+  apairs_imputed_list <- populate_full_pairs_approximation(apairs_f, apairs_m, amating_f, amating_m, nf, nm, k)
+  apairs_f_imputed <- apairs_imputed_list[["apairs_f_imputed"]]
+  apairs_m_imputed <- apairs_imputed_list[["apairs_m_imputed"]]
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     
     # Known data 
-    n              = n + lf + lm, # Number of animals sampled
-    true_pop_f     = true_pop_f,
-    true_pop_m     = true_pop_m,
-    sample_size_f  = sample_size_f,
-    sample_size_m  = sample_size_m,
-    k              = k,  # Number of occasions
-    nf             = nf, # Number of females
-    nm             = nm, # Number of males
-    sex            = sex, # Sex of sampled individuals
-    initial_entry  = initial_entry, # When did they enter the population
-    single_female  = do.call(cbind, lapply(1:k, function(t) 1*(apairs_f[1:nf,t] == (nm+1)))),
+    n                    = n, # Number of animals sampled
+    k                    = k,  # Number of occasions
+    nf                   = nf, # Number of females
+    nm                   = nm, # Number of males
+    sex                  = sex, # Sex of sampled individuals
+    initial_entry        = initial_entry, # When did they enter the population
+    first_capture_m      = first_capture_m, # When did they enter the population
+    first_capture_f      = first_capture_f, # When did they enter the population
     # Latent States (true values - hidden in real data)
-    mating_f       = mating_f, # Mate status of females at t (+ dummy)
-    mating_m       = mating_m, # Mate status of males at t (+ dummy)
-    pairs_f        = pairs_f, # partners of females 
-    pairs_m        = pairs_m, # partners of males
-    pairs          = pairs, # pair histories
-    histories      = histories, # number of occasions a pair occurred
-    sf             = sf, # true survival of females
-    sm             = sm, # true survival of males
-    repartner      = repartner, # whether partner from time t-1 was repicked (female x time)
+    pairs_f              = pairs_f, # partners of females 
+    pairs_m              = pairs_m, # partners of males
+    sf                   = sf, # true survival of females
+    sm                   = sm, # true survival of males
     
     # Observed /Inferred states (Missing Values are possible)
-    zf             = zf,
-    zm             = zm,
-    recruit_f      = rbind(recruit_f[1:nf,1:k],rep(0,k)),
-    recruit_m      = rbind(recruit_m[1:nm,1:k],rep(0,k)),
-    recruit_f_true = recruit_f_true,
-    recruit_m_true = recruit_m_true,
-    psi            = psi, # Pairs that may exist (not excluded due to already formed pairs)
-    af             = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
-    am             = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
-    apairs         = apairs, # Joint Pairs Matrices (array across time)
-    apf            = apairs_f,
-    apairs_f       = matrix(NA, nrow=nrow(apairs_f), 
-                                ncol =ncol(apairs_f)), # Information lives in psi (nimble doesnt accept MV mixed with NA)
-    arrivals       = matrix(NA, nrow = nf, ncol = k),
-    apairs_m       = apairs_m[1:nm, 1:k],
-    arepartner     = arepartner[,2:k], # repartner with inferred states 
-    na_repartner   = 1*is.na(arepartner[,2:k]),
-    amating_f      = rbind(amating_f[1:nf,1:k],rep(0,k)), # Mating Status Females at T
-    amating_m      = rbind(amating_m[1:nm,1:k],rep(0,k)),  # Mating Status Males at T
-    recap_f        = rbind(recap_f[1:nf,1:k],rep(0,k)), #recap_f[1:nf,1:k], # Observed Recapture of Females
-    recap_m        = rbind(recap_m[1:nm,1:k],rep(0,k)),  # Observed Recapture of Males
-    
-    lf = lf,
-    lm = lm
+    af                  = rbind(af[1:nf,1:k],rep(0,k)),  # Female Survival with missing values
+    am                  = rbind(am[1:nm,1:k],rep(0,k)),  # Male Survival with missing values
+    apairs_f            = apairs_f[1:nf, 1:k],
+    apairs_m            = apairs_m[1:nm, 1:k],
+    apairs_f_imputed    = apairs_f_imputed[1:nf, 1:k],
+    apairs_m_imputed    = apairs_m_imputed[1:nm, 1:k],
+    recap_f             = rbind(recap_f[1:nf,1:k],rep(1,k)), #recap_f[1:nf,1:k], # Observed Recapture of Females
+    recap_m             = rbind(recap_m[1:nm,1:k],rep(1,k))  # Observed Recapture of Males
   )
   
   #Return Model object
@@ -2050,236 +1576,38 @@ sim_dat <- function(parameter_list){
   model_data <- do.call(simulate_cr_data, parameter_list)
 }
 
-# 
-check_sim_output <- function(model_data){
-#   
-  # UNIT TESTS
-  
-  # Repartner check
-  cat("TESTING arepartner","\n")
-  x <- list()
-  for(t in 1:(model_data$k-1)){
-    index <- which(!is.na(model_data$arepartner[,t]))
-    x[[t]] <- all(model_data$arepartner[index,t] == model_data$repartner[index,t+1])
-  } 
-  
-  if(!all(unlist(x))){
-    cat(paste0("X-test Failure at ", which(unlist(x) == F), " ..."), "\n") 
-    browser()
-  } 
-  # apairs check
-  cat("TESTING apairs_f","\n")
-  x <- list()
-  for(t in 1:model_data$k){
-    index <- which(!is.na(model_data$apf[,t]))
-    pairs_f_check <- model_data$pairs_f[index,t]
-    pairs_f_check[pairs_f_check == model_data$true_pop_m + 1] <- model_data$true_pop_m + model_data$lm + 1
-    x[[t]] <- all(pairs_f_check == model_data$apf[index,t])
-  } 
-  
-  if(!all(unlist(x))){
-    cat(paste0("X-test Failure at ", which(unlist(x) == F), " ..."), "\n") 
-    browser()
-  } 
-  
-  cat("TESTING apairs_m","\n")
-  x <- list()
-  for(t in 1:model_data$k){
-    index <- which(!is.na(model_data$apairs_m[,t]))
-    pairs_m_check <- model_data$apairs_m[index,t]
-    pairs_m_check[pairs_m_check == model_data$true_pop_f + 1] <- model_data$true_pop_f + model_data$lf + 1
-    x[[t]] <- all(pairs_m_check == model_data$apairs_m[index,t])
-  } 
-  
-  if(!all(unlist(x))){
-    cat(paste0("X-test Failure at ", which(unlist(x) == F), " ..."), "\n") 
-    browser()
-  } 
-  
-  cat("TESTING amating_f","\n")
-  x <- list()
-  for(t in 1:model_data$k){
-    index <- which(!is.na(model_data$amating_f[1:model_data$nf,t]))
-    x[[t]] <- all(model_data$amating_f[index,t] == model_data$mating_f[index,t])
-    if(!all(unlist(x))) cat(paste0("X-test Failure at ", which(unlist(x) == F), " ..."), "\n") 
-  } 
-  
-  if(!all(unlist(x))){
-    cat(paste0("X-test Failure at ", which(unlist(x) == F), " ..."), "\n") 
-    browser()
-  } 
-  
-  cat("TESTING amating_m","\n")
-  x <- list()
-  for(t in 1:model_data$k){
-    index <- which(!is.na(model_data$amating_m[1:model_data$nm,t]))
-    x[[t]] <- all(model_data$amating_m[index,t] == model_data$mating_m[index,t])
-  } 
-  
-  if(!all(unlist(x))){
-    cat(paste0("X-test Failure at ", which(unlist(x) == F), " ..."), "\n") 
-    browser()
-  } 
-  
-  cat("TESTING PSI","\n")
-  for(i in 1:model_data$nf){
-    for(t in 1:model_data$k){
-      if(is.na(model_data$apf[i,t])) next
-      if(model_data$apf[i,t] == model_data$nm+1 & sum(model_data$psi[i,1:model_data$nm,t]) == 0){
-        next
-      } else if(model_data$apf[i,t] == model_data$nm+1 & sum(model_data$psi[i,1:model_data$nm,t]) > 0){
-        stop(paste0("single female with partner options at time", t, "and index i:", i))
-      }
-      
-      j <- model_data$apf[i,t]
-      
-      if(j != which(model_data$psi[i,,t]==1)|sum(model_data$psi[i,,t]) > 1) print(paste0("Female i:", i, "time ", t, " mismatch partner j:", j))
-    }
-  }
-  
-  
-  cat("TESTING RECAPTURE FLOW MATING...","\n")
-  yf <- list()
-  ym <- list()
-  
-  qf <- list()
-  qm <- list()
-  
-  for(t in 1:model_data$k){
-    
-    nf <- model_data$nf
-    nm <- model_data$nm
-    
-    index_f <- which(model_data$recap_f[1:nf,t] == 1)
-    index_m <- which(model_data$recap_m[1:nm,t] == 1)
-    
-    index_q_f <- which(model_data$recap_f[1:nf,t] != 1)
-    index_q_m <- which(model_data$recap_m[1:nm,t] != 1)
-    
-    yf[[t]] <- (all(model_data$amating_f[index_f,t] == model_data$mating_f[index_f,t]))
-    ym[[t]] <- (all(model_data$amating_m[index_m,t] == model_data$mating_m[index_m,t]))  
-    
-    qf[[t]] <-  (all(is.na(model_data$amating_f[index_q_f,t])))
-    qm[[t]] <-  (all(is.na(model_data$amating_m[index_q_m,t])))
-  } 
-  
-  if(!all(unlist(yf))) cat(paste0("yf-test Failure at ", which(unlist(yf) == F), " ..."), "\n") 
-  if(!all(unlist(ym))) cat(paste0("ym-test Failure at ", which(unlist(ym) == F), " ..."), "\n") 
-  if(!all(unlist(qf))) cat(paste0("qf-test Failure at ", which(unlist(qf) == F), " ..."), "\n") 
-  if(!all(unlist(qm))) cat(paste0("qm-test Failure at ", which(unlist(qm) == F), " ..."), "\n") 
-  
-  
-  cat("TESTING RECAPTURE FLOW SURVIVAL","\n")
-  yf <- list()
-  ym <- list()
-  
-  qf <- list()
-  qm <- list()
-  
-  for(t in 1:model_data$k){
-    
-    nf <- model_data$nf
-    nm <- model_data$nm
-    
-    index_f <- which(model_data$recap_f[1:nf,t] == 1)
-    index_m <- which(model_data$recap_m[1:nm,t] == 1)
-    
-    index_q_f <- which(model_data$recap_f[1:nf,t] != 1)
-    index_q_m <- which(model_data$recap_m[1:nm,t] != 1)
-    
-    yf[[t]] <- (all(model_data$sf[index_f,t] == model_data$af[index_f,t]))
-    ym[[t]] <- (all(model_data$sm[index_m,t] == model_data$am[index_m,t]))  
-    
-  } 
-  
-  if(!all(unlist(yf))) cat(paste0("yf-test Failure at ", which(unlist(yf) == F), " ..."), "\n") 
-  if(!all(unlist(ym))) cat(paste0("ym-test Failure at ", which(unlist(ym) == F), " ..."), "\n") 
-  if(!all(unlist(qf))) cat(paste0("qf-test Failure at ", which(unlist(qf) == F), " ..."), "\n") 
-  if(!all(unlist(qm))) cat(paste0("qm-test Failure at ", which(unlist(qm) == F), " ..."), "\n") 
-  
-  
-  
-}
-  
 # 8. Format Data for Alternate Models -------------------------------------------------------------------------------
 
 
 format_to_cjs <- function(model_data){
   
-  x <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
-  a <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
-  initial_entry <- c()
+  # Unpack data
+  recap_f         <- model_data$recap_f
+  recap_m         <- model_data$recap_m
+  k               <- model_data$k
+  af              <- model_data$af
+  am              <- model_data$am
+  first_capture_f <- model_data$first_capture_f
+  first_capture_m <- model_data$first_capture_m
+  nf              <- model_data$nf
+  nm              <- model_data$nm
   
-  # Add female initial capture
-  for(i in 1:model_data$nf){
-    initial_entry[i] <- min(which(model_data$recruit_f[i,] == 1))
-  }
+  # Build CJS data 
+  x <- rbind(recap_f[1:nf,1:k], recap_m[1:nm,1:k])
+  a <- rbind(af[1:nf,1:k],      am[1:nm,1:k])
   
-  # Add male initial capture
-  for(j in (model_data$nf+1):(model_data$nf + model_data$nm)){
-    initial_entry[j] <- min(which(model_data$recruit_m[j-model_data$nf,] == 1))
-  }
-  
-  # Number of females and males
-  nf <- model_data$nf
-  nm <- model_data$nm
-  
-  # Drop animals observed at final occasion (condition on first capture)
-  if(any(initial_entry == model_data$k)){
-    observed_at_k <- which(initial_entry == model_data$k)
-    x <- x[-observed_at_k,]
-    a <- a[-observed_at_k,]
-    initial_entry <- initial_entry[-observed_at_k]
-    
-    nf2 <- nf
-    nm2 <- nm
-    
-    # Lower amount of individuals for each one dropped
-    for(i in observed_at_k){
-      if(i > nf){
-        nm2 <- nm2- 1
-      } else {
-        nf2 <- nf2 - 1
-      }
-    }
-    
-  } else {
-    nf2 <- nf
-    nm2 <- nm
-  }
+  initial_entry <- c(first_capture_f[1:nf],first_capture_m[1:nm])
   
   # Store results in list
-  results <- list(n = nf2 + nm2,
-                  k = model_data$k,
-                  female = c(rep(1, nf2),rep(0, nm2)), 
+  results <- list(n             = nf + nm,
+                  k             = k,
+                  female        = c(rep(1, nf),rep(0, nm)), 
                   initial_entry = initial_entry,
-                  x = x,
-                  a = a)
+                  x             = x,
+                  a             = a)
   
   # Return Standard CJS Data
   return(results)
-}
-
-
-
-format_to_js <- function(model_data){
-  
-  x       <- rbind(model_data$recap_f[1:model_data$nf,],model_data$recap_m[1:model_data$nm,])
-  a       <- rbind(model_data$af[1:model_data$nf,],model_data$am[1:model_data$nm,])
-  recruit <- rbind(model_data$recruit_f[1:model_data$nf,],model_data$recruit_m[1:model_data$nm,])
-  z       <- c(model_data$zf[1:model_data$nf],model_data$zm[1:model_data$nm])
-  
-  # Store results in list
-  model_data <- list(n = model_data$nf + model_data$nm,
-                     k = model_data$k,
-                     female = c(rep(1, model_data$nf),rep(0, model_data$nm)), 
-                     recruit = recruit,
-                     x = x,
-                     a = a,
-                     z = z)
-  
-  # Return Standard CJS Data
-  return(model_data)
 }
 
 #----------------------------------------------------------------------------------------------------------------------
