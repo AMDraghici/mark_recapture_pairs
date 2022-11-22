@@ -135,8 +135,12 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
 # Functions to RUn Experiments --------------------------------------------------------------------------------------------
 
 # Run CJS Model using Mark
-run_cjs_model_mark <- function(cjs_data){
+run_cjs_model_mark <- function(cjs_data,
+                               title = NULL){
+
   
+  if(is.null(title)) title <- "mark_out"
+    
   #Choose Appropriate CJS Model Settings
   phi.grp     <- list(formula = ~sex)
   p.grp       <- list(formula = ~sex)
@@ -167,6 +171,7 @@ run_cjs_model_mark <- function(cjs_data){
                    invisible        = TRUE,
                    brief            = TRUE,
                    delete           = TRUE,
+                   title            = title,
                    output           = FALSE)
   
   mark_out <- mark_out$results
@@ -245,7 +250,8 @@ execute_iteration  <- function(iter,
   
   # Run CJS Model MARK -----------------------------------------------------------------------------------------
   cat("Estimate standard CJS estimates with program MARK...","\n")
-  cjs_out <- run_cjs_model_mark(cjs_data = cjs_data) %>% 
+  cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
+                                title    = "mark_" %+% iter %+% "_" %+% scenario) %>% 
              left_join(true_param_df,
                        by = "Parameter") %>% 
              mutate(Bias     = Truth - Est,
