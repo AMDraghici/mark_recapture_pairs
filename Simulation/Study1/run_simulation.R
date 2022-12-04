@@ -1,6 +1,6 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
-src_dir   <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
+src_dir    <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
 out_dir    <- src_dir %+% "Simulation/Study1/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
@@ -17,15 +17,19 @@ load_packages(libs, FALSE)
 # Read command line arguments--------------------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
 scenario <- as.numeric(args[1])
+scenario_grid <- get_scenarios()
 
 cat("Running scenario #" %+% scenario_grid[scenario,"scenario"] %+% "...", "\n")
 cat("Settings are...","\n")
 head(scenario_grid[scenario,])
 
 # Execute Simulation ----------------------------------------------------------------------------------------------
-scenario_grid <- get_scenarios()
-
 x <- Sys.time()
+
+# Initialize Seed
+runif(1)
+
+# Run Simulation
 results <- execute_simulation(niter      = 1e3,
                               scenario   = scenario_grid[scenario,"scenario"],
                               PM         = scenario_grid[scenario,"PM"],
@@ -40,9 +44,8 @@ results <- execute_simulation(niter      = 1e3,
 
 y <- Sys.time()
 difftime(y,x,units = "mins")
-
 # ----------------------------------------------------------------------------------------------------------------
 
 # Return Results -------------------------------------------------------------------------------------------------
-saveRDS(results, out_dir %+% "results_" %+% i %+% ".rds")
+saveRDS(results, out_dir %+% "results_" %+% scenario %+% ".rds")
 # ----------------------------------------------------------------------------------------------------------------

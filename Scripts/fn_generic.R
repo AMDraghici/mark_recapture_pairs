@@ -137,10 +137,10 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
 # Run CJS Model using Mark
 run_cjs_model_mark <- function(cjs_data,
                                title = NULL){
-
+  
   
   if(is.null(title)) title <- "mark_out"
-    
+  
   #Choose Appropriate CJS Model Settings
   phi.grp     <- list(formula = ~sex)
   p.grp       <- list(formula = ~sex)
@@ -157,7 +157,7 @@ run_cjs_model_mark <- function(cjs_data,
   
   mark.process <- process.data(data   = dat.process,
                                model  = "CJS",
-                               groups = "sex") 
+                               groups = "sex")
   
   #Design Data List
   mark.ddl <- make.design.data(mark.process) 
@@ -171,7 +171,7 @@ run_cjs_model_mark <- function(cjs_data,
                    invisible        = TRUE,
                    brief            = TRUE,
                    delete           = TRUE,
-                   title            = title,
+                   # title            = title,
                    output           = FALSE)
   
   mark_out <- mark_out$results
@@ -252,13 +252,13 @@ execute_iteration  <- function(iter,
   cat("Estimate standard CJS estimates with program MARK...","\n")
   cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
                                 title    = "mark_" %+% iter %+% "_" %+% scenario) %>% 
-             left_join(true_param_df,
-                       by = "Parameter") %>% 
-             mutate(Bias     = Truth - Est,
-                    In95     = 1*(Truth <= UB & Truth >= LB),
-                    Range95  = UB - LB,
-                    iter     = iter,
-                    scenario = scenario) 
+    left_join(true_param_df,
+              by = "Parameter") %>% 
+    mutate(Bias     = Truth - Est,
+           In95     = 1*(Truth <= UB & Truth >= LB),
+           Range95  = UB - LB,
+           iter     = iter,
+           scenario = scenario) 
   
   
   # Get Predicted Probs for Correlation Estimators 
@@ -275,48 +275,105 @@ execute_iteration  <- function(iter,
                                        PM      = pm_mark)
   names(rho) <- "Est"
   
-  # Bootstrap To Estimate SE 
-  cat("Bootstrapping to get standard error estimates of rho...","\n")
-  rho_bs <- compute_bootstrap_estimates_recapture_correlation(ps_data = ps_data,
-                                                              iter    = 10000,
-                                                              PF      = pf_mark,
-                                                              PM      = pm_mark)
+  # Non-Parametric Bootstrap To Estimate SE 
+  cat("Non-Parametric Bootstrapping to get standard error estimates of rho...","\n")
+  rho_bs_np <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                 iter       = 1000,
+                                                                 PF         = pf_mark,
+                                                                 PM         = pm_mark,
+                                                                 rho        = rho,
+                                                                 parametric = F)
   # Collect Results
-  mean_bstrp_rho      <- mean(rho_bs)
-  names(mean_bstrp_rho) <- "Est_Btstrp"
-  se_bstrp_rho        <- sd(rho_bs)
-  names(se_bstrp_rho) <- "SE"
-  quantiles_rho       <- quantile(rho_bs, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  summ_rho <- c(rho, mean_bstrp_rho, se_bstrp_rho, quantiles_rho)
+  mean_bstrp_rho_np        <- mean(rho_bs_np)
+  names(mean_bstrp_rho_np) <- "Est_Btstrp"
+  se_bstrp_rho_np          <- sd(rho_bs_np)
+  names(se_bstrp_rho_np)   <- "SE"
+  quantiles_rho_np         <- quantile(rho_bs_np, c(0.025, 0.25, 0.5, 0.75, 0.975))
+  status_np                <- 0
+  names(status_np)         <- "Parametric"
+  summ_rho_np              <- c(rho, mean_bstrp_rho_np, se_bstrp_rho_np, quantiles_rho_np, status_np)
+  
+  # Parametric Bootstrap To Estimate SE 
+  cat("Semi-Parametric Bootstrapping to get standard error estimates of rho...","\n")
+  rho_bs_sp <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                 iter       = 1000,
+                                                                 PF         = pf_mark,
+                                                                 PM         = pm_mark,
+                                                                 rho        = rho,
+                                                                 parametric = T)
+  # Collect Results
+  mean_bstrp_rho_sp         <- mean(rho_bs_sp)
+  names(mean_bstrp_rho_sp)  <- "Est_Btstrp"
+  se_bstrp_rho_sp           <- sd(rho_bs_sp)
+  names(se_bstrp_rho_sp)    <- "SE"
+  quantiles_rho_sp         <- quantile(rho_bs_sp, c(0.025, 0.25, 0.5, 0.75, 0.975))
+  status_sp                <- 1
+  names(status_sp)         <- "Parametric"
+  summ_rho_sp              <- c(rho, mean_bstrp_rho_sp, se_bstrp_rho_sp, quantiles_rho_sp, status_sp)
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
-  cat("Estimating recapture correlation rho...","\n")
-  gamma <- compute_survival_correlation(ps_data = ps_data,
-                                        PFM     = compute_jbin_cjs(prob.f = pf_mark,
-                                                                   prob.m = pm_mark,
-                                                                   corr   = rho)$prob.mf,
-                                        PhiF    = phif_mark,
-                                        PhiM    = phim_mark)
-  names(gamma) <- "Est"
+  cat("Estimating survival correlation gamma...","\n")
   
-  # Bootstrap To Estimate SE 
-  cat("Bootstrapping to get standard error estimates of gamma...","\n")
-  gamma_bs <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
-                                                               iter                  = 10000,
-                                                               recapture_correlation = rho,
-                                                               PF                    = pf_mark,
-                                                               PM                    = pm_mark,
-                                                               PhiF                  = phif_mark,
-                                                               PhiM                  = phim_mark)
+  # If estimate of rho fails (no valid observations) pass dummy values of 10
+  if(rho == 10){
+    gamma <- 10
+    gamma_bs_np <- rep(10, 1000)
+    gamma_bs_sp <- rep(10, 1000)
+  } else {
+    
+    # Estimate Gamma from observed data
+    gamma <- compute_survival_correlation(ps_data = ps_data,
+                                          PFM     = compute_jbin_cjs(prob.f = pf_mark,
+                                                                     prob.m = pm_mark,
+                                                                     corr   = rho)$prob.mf,
+                                          PhiF    = phif_mark,
+                                          PhiM    = phim_mark)
+    
+    # Non-Parametric Bootstrap To Estimate SE 
+    cat("Non-Parametric Bootstrapping to get standard error estimates of gamma...","\n")
+    gamma_bs_np <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                    iter                  = 1000,
+                                                                    rho                   = rho,
+                                                                    PF                    = pf_mark,
+                                                                    PM                    = pm_mark,
+                                                                    gamma                 = gamma,
+                                                                    PhiF                  = phif_mark,
+                                                                    PhiM                  = phim_mark,
+                                                                    parametric            = F)
+    
+    
+    # Semi-Parametric Bootstrap To Estimate SE 
+    cat("Semi-Parametric Bootstrapping to get standard error estimates of gamma...","\n")
+    gamma_bs_sp <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                    iter                  = 1000,
+                                                                    rho                   = rho,
+                                                                    PF                    = pf_mark,
+                                                                    PM                    = pm_mark,
+                                                                    gamma                 = gamma,
+                                                                    PhiF                  = phif_mark,
+                                                                    PhiM                  = phim_mark,
+                                                                    parametric            = T)
+  }
   
   # Collect Results
-  mean_bstrp_gamma      <- mean(gamma_bs)
-  names(mean_bstrp_gamma) <- "Est_Btstrp"
-  se_bstrp_gamma        <- sd(gamma_bs)
-  names(se_bstrp_gamma) <- "SE"
-  quantiles_gamma       <- quantile(gamma_bs, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  summ_gamma <- c(gamma, mean_bstrp_gamma, se_bstrp_gamma, quantiles_gamma)
+  names(gamma)               <- "Est"
+  mean_bstrp_gamma_np        <- mean(gamma_bs_np)
+  mean_bstrp_gamma_sp        <- mean(gamma_bs_sp)
+  names(mean_bstrp_gamma_np) <- "Est_Btstrp"
+  names(mean_bstrp_gamma_sp) <- "Est_Btstrp"
+  se_bstrp_gamma_np          <- sd(gamma_bs_np)
+  se_bstrp_gamma_sp          <- sd(gamma_bs_sp)
+  names(se_bstrp_gamma_np)   <- "SE"
+  names(se_bstrp_gamma_sp)   <- "SE"
+  quantiles_gamma_np         <- quantile(gamma_bs_np, c(0.025, 0.25, 0.5, 0.75, 0.975))
+  quantiles_gamma_sp         <- quantile(gamma_bs_sp, c(0.025, 0.25, 0.5, 0.75, 0.975))
+  status_gamma_np            <- 0
+  status_gamma_sp            <- 1
+  names(status_gamma_np)     <- "Parametric"
+  names(status_gamma_sp)     <- "Parametric"
+  summ_gamma_np <- c(gamma, mean_bstrp_gamma_np, se_bstrp_gamma_np, quantiles_gamma_np,status_gamma_np)
+  summ_gamma_sp <- c(gamma, mean_bstrp_gamma_sp, se_bstrp_gamma_sp, quantiles_gamma_sp,status_gamma_sp)
   #-------------------------------------------------------------------------------------------------------------
   
   # Return Results----------------------------------------------------------------------------------------------
@@ -324,29 +381,31 @@ execute_iteration  <- function(iter,
   cat("Success, returning results ...","\n")
   
   # Gather Correlation Results
-  summ_corr           <- as.data.frame(rbind(summ_rho, summ_gamma))
-  param_true          <- c(rho_true, gam_true)
-  summ_corr$Parameter <- c("rho","gamma")
-  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%")]
+  summ_corr           <- as.data.frame(rbind(summ_rho_np,summ_rho_sp, summ_gamma_np, summ_gamma_sp))
+  param_true          <- c(rho_true, rho_true, gam_true,gam_true)
+  summ_corr$Parameter <- c("rho","rho","gamma","gamma")
+  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric")]
   summ_corr           <- summ_corr %>% 
-                         left_join(true_param_df, by = "Parameter") %>% 
-                         mutate(Bias         = Truth - Est,
-                                Bias_Btstrp1 = Est_Btstrp - Truth,
-                                Bias_Btstrp2 = Est - Est_Btstrp,
-                                In95         = 1*(Truth <= `97.5%` & Truth >= `2.5%`),
-                                In50         = 1*(Truth <= `75%`  & Truth  >= `25%`),
-                                Range95      = `97.5%` - `2.5%`,
-                                Range50      = `75%` - `25%`,
-                                iter         = iter,
-                                Scenario    = scenario) 
+    left_join(true_param_df, by = "Parameter") %>% 
+    mutate(Bias         = Truth - Est,
+           Bias_Btstrp1 = Est_Btstrp - Truth,
+           Bias_Btstrp2 = Est - Est_Btstrp,
+           In95         = 1*(Truth <= `97.5%` & Truth >= `2.5%`),
+           In50         = 1*(Truth <= `75%`  & Truth  >= `25%`),
+           Range95      = `97.5%` - `2.5%`,
+           Range50      = `75%` - `25%`,
+           iter         = iter,
+           Scenario    = scenario) 
   
   rownames(summ_corr) <- NULL
   
   results <- list(random_seed = random_seed,
                   cjs_out     = cjs_out,
                   summ_corr   = summ_corr,
-                  rho_bs      = unname(rho_bs),
-                  gamma_bs    = unname(gamma_bs))
+                  rho_bs_np   = unname(rho_bs_np),
+                  rho_bs_sp   = unname(rho_bs_sp),
+                  gamma_bs_np = unname(gamma_bs_np),
+                  gamma_bs_sp = unname(gamma_bs_sp))
   
   return(results)
 }

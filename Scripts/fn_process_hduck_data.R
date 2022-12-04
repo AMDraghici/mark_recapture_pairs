@@ -974,12 +974,14 @@ impute_between_known_states <- function(apairs_f,
     if(length(partners_i) == 0) next
     
     for(t in 1:k){
+      
       # Who was individual i's last partner?
-      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      last_partner <- apairs_f[i,1:t][!is.na(apairs_f[i,1:t])]
+      last_partner <- last_partner[last_partner != (nm+1)]
       if(length(last_partner)==0){
         last_partner <- nm+1
       }
-      last_partner <- last_partner[1]
+      last_partner <- last_partner[length(last_partner)]
       
       # Who was individual i's next partner?
       # If t == k and unknown then just grab last partner
@@ -989,7 +991,8 @@ impute_between_known_states <- function(apairs_f,
           next_partner <- nm+1
         }
       } else {
-        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        next_partner <- apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])]
+        next_partner <- next_partner[next_partner != (nm+1)]
         if(length(next_partner)==0){
           next_partner <- nm+1
         }
@@ -1255,7 +1258,7 @@ build_nimble_data <- function(cap.data){
                                              k             = k)
   apairs_f <- apairs_list[["apairs_f"]]
   apairs_m <- apairs_list[["apairs_m"]]
-  
+
   # # Construct fully imputed pairs vector
   apairs_imputed_list <- populate_full_pairs_approximation(apairs_f  = apairs_f,
                                                            apairs_m  = apairs_m,
@@ -1275,6 +1278,25 @@ build_nimble_data <- function(cap.data){
                                        n       =  nm, 
                                        k       = k)
     
+  
+  
+  # Optional Assumption to include
+  # Assume that divorce only occurs upon death
+  for(i in 1:nf){
+    for(t in (first_capture_f[i]+1):k){
+      if(!is.na(apairs_f[i,t-1]) & is.na(apairs_f[i,t])){
+        if(apairs_f[i,t-1] == (nm+1)) next
+        if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+          apairs_f[i,t] <- apairs_f[i,t-1]
+          apairs_m[apairs_f[i,t],t-1] <- i
+          apairs_m[apairs_f[i,t],t] <- i
+        }
+      }
+    }
+  }
+
+
+  
   # Store results in list 
   nimble_data <- list(nf               = nf, 
                       nm               = nm,

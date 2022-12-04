@@ -486,89 +486,88 @@ compute_partnerships <- function(sex, pairs, mating_f, mating_m, time, repartner
         pairs[i,j,time-1] * male_taken[j] * repartner[i,time]
     }
   }
-  
-  
+
   females_mating <- sum(mating_f[1:nf,time])
   males_mating <- sum(mating_m[1:nm,time])
-  osr <- females_mating/max(1, males_mating) 
-  
+  osr <- females_mating/max(1, males_mating)
+
   if(osr <= 1){ # Pick by female
-    
+
     for(i in 1:nf){
       # Probability of partnerships forming for j -> 1:n
-      # If repartner = 1 then a pair reforms 
+      # If repartner = 1 then a pair reforms
       probi <- prob_mate[i,]
-      
+
       # Any pairs that have formed cannot form again
       if(i == 2){
         probi <- probi*c((1-pairs[1,1:nm,time]),1) #Remove pair j=1 from the prob (colsum only works on matrices)
       } else if(i > 2){
         probi <- probi*c((1-colSums(pairs[1:(i-1),1:nm,time])),1) #remove all pre-formed pairs
       }
-      
-      if(sum(probi[1:nm])==0){ 
+
+      if(sum(probi[1:nm])==0){
         probi[nm+1] <- 1
       } else {
         probi[nm+1] <- 0
       }
-      
+
       if(any(probi < 0)) browser()
-      
+
       # If repartnering just set to previous partner
       if(repartner[i,time] ==1){
         pairs[i,,time] <- 0
         pairs[i,which(pairs[i,,time-1]==1),time] <- 1
       } else {
         # Draw partnership
-        pairs[i,,time] <- t(rmultinom(1,1,probi)) # assign a partner 
+        pairs[i,,time] <- t(rmultinom(1,1,probi)) # assign a partner
       }
-      
+
     }
-    
+
     # Assign unmated males to singles row
     pairs[nf+1,,time] <- c(1-colSums(pairs[1:nf,1:nm,time]),1)
-    
+
   } else {
     for(j in 1:nm){
       # Probability of partnerships forming for j -> 1:n
-      # If repartner = 1 then a pair reforms 
+      # If repartner = 1 then a pair reforms
       probj <- prob_mate[,j]
-      
+
       # Any pairs that have formed cannot form again
       if(j == 2){
         probj <- probj*c((1-pairs[1:nf,1,time]),1) #Remove pair j=1 from the prob (colsum only works on matrices)
       } else if(j > 2){
         probj <- probj*c((1-rowSums(pairs[1:nf,1:(j-1),time])),1) #remove all pre-formed pairs
       }
-      
-      if(sum(probj[1:nf])==0){ 
+
+      if(sum(probj[1:nf])==0){
         probj[nf+1] <- 1
       } else {
         probj[nf+1] <- 0
       }
-      
+
       if(any(probj < 0)) browser()
-      
+
       previous_partner <- which(pairs[,j,time-1] == 1)
-      
+
       if(previous_partner != (nf+1)){
         if(repartner[previous_partner,time] == 1){
           pairs[,j,time] <- 0
           pairs[previous_partner,j,time] <- 1
         } else {
           # Draw partnership
-          pairs[,j,time] <- t(rmultinom(1,1,probj)) # assign a partner 
+          pairs[,j,time] <- t(rmultinom(1,1,probj)) # assign a partner
         }
       } else {
         # Draw partnership
-        pairs[,j,time] <- t(rmultinom(1,1,probj)) # assign a partner 
+        pairs[,j,time] <- t(rmultinom(1,1,probj)) # assign a partner
       }
     }
-    
+
     # Assign unmated males to singles row
     pairs[,nm+1,time] <- c(1-rowSums(pairs[1:nf,1:nm,time]),1)
   }
-  
+
   # Return updated pairs matrix
   return(pairs)
 }
@@ -1025,10 +1024,8 @@ compute_hidden_pairs <- function(pairs_f,
         
         # Otherwise just leave as NA
       }
-      
     }
   }
-  
   
   # Special Arepartner Logic ------------------------------------------------------------------------------------------
   # Dummy states 
@@ -1039,14 +1036,11 @@ compute_hidden_pairs <- function(pairs_f,
   apairs[,,1] <- 0 
   arepartner[,1] <- 0 
   
-  
-  # Filter Down to Pairs that were observed 
-  possible_partners <- lapply(1:nf, function(i) unique(c(nm+1, apairs_f[i, 1:k][!is.na(apairs_f[i,1:k])])))
-  
   # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
   for(i in 1:nf){
     
-    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+    partners_i <- apairs_f[i,1:k][!is.na(apairs_f[i,1:k])]
+    partners_i <- partners_i[partners_i != (nm+1)]
     first_partner <- partners_i[1]
     
     # If no pairs observed make no possible combos
@@ -1054,7 +1048,8 @@ compute_hidden_pairs <- function(pairs_f,
     
     for(t in 1:k){
       # Who was individual i's last partner?
-      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+      last_partner <- apairs_f[i,1:t][!is.na(apairs_f[i,1:t])]
+      last_partner <- last_partner[last_partner != (nm+1)]
       if(length(last_partner)==0){
         last_partner <- nm+1
       }
@@ -1063,12 +1058,13 @@ compute_hidden_pairs <- function(pairs_f,
       # Who was individual i's next partner?
       # If t == k and unknown then just grab last partner
       if(t == k){
-        next_partner <-  unique(apairs_f[i,k][!is.na(apairs_f[i,k])])
+        next_partner <-  apairs_f[i,k][!is.na(apairs_f[i,k])]
         if(length(next_partner) == 0){
           next_partner <- nm+1
         }
       } else {
-        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+        next_partner <-  apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])] 
+        next_partner <- next_partner[next_partner != (nm+1)]
         if(length(next_partner)==0){
           next_partner <- nm+1
         }
@@ -1086,17 +1082,12 @@ compute_hidden_pairs <- function(pairs_f,
       if(is.na(apairs_f[i,t])){
         
         if(next_partner == last_partner & next_partner != nm+1){
-          potential_partners_i <- c(next_partner)
           apairs_f[i,t] <- next_partner
           apairs_m[next_partner,t] <- i
-        } else{
-          potential_partners_i <- c(nm+1, last_partner, next_partner)
-        }
-        
+        } 
       }
     }
   }
-  
   
   # -----------------------------------------------------------------------------------------------------------------------------------------------------------
   
@@ -1112,160 +1103,160 @@ compute_hidden_pairs <- function(pairs_f,
   return(pairs_list)
 }
 
-
-# Populate imputed pairs object based on set of assumptions 
-populate_full_pairs_approximation <- function(apairs_f,
-                                              apairs_m,
-                                              amating_f,
-                                              amating_m,
-                                              nf,
-                                              nm,
-                                              k){
-  for(i in 1:nf){
-    
-    partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
-    num_partners_i <- length(partners_i)
-    
-    first_partner <- partners_i[1]
-    
-    # If no pairs observed make no possible combos
-    if(num_partners_i == 0){
-      apairs_f[i,1:k] <- (nm+1)
-      amating_f[i,1:k] <- 0
-      next
-    }
-    
-    for(t in 1:k){
-      
-      last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
-      if(length(last_partner)==0){
-        last_partner <- first_partner
-      } 
-      last_partner <- last_partner[length(last_partner)]
-      
-      if(t == k){
-        next_partner <- last_partner
-      } else {
-        next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
-        if(length(next_partner)==0){
-          next_partner <- last_partner
-        } 
-        next_partner <- next_partner[1]
-        
-      }
-      
-      if(is.na(apairs_f[i,t])){
-        
-        if(t == 1){
-          
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == first_partner)|first_partner==(nm+1)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              next 
-            }
-          }
-          
-          apairs_f[i,t] <- first_partner
-          apairs_m[first_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[first_partner,t] <- 1
-          
-          next
-        }
-        
-        if(next_partner == last_partner){
-          
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)|(last_partner==(nm+1))){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              next
-            } 
-          }
-          apairs_f[i,t] <- last_partner
-          apairs_m[last_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[last_partner,t] <- 1
-          next
-        }
-        
-        if(last_partner == (nm+1)){
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              next
-            } 
-          }
-          apairs_f[i,t] <- next_partner
-          apairs_m[next_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[next_partner,t] <- 1
-          next
-        }
-        
-        if(next_partner == (nm+1)){
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              next
-            } 
-          }
-          apairs_f[i,t] <- last_partner
-          apairs_m[last_partner,t] <- i
-          amating_f[i,t] <- 1
-          amating_m[last_partner,t] <- 1
-          next
-          
-        }
-        
-        if(next_partner != last_partner){
-          if(!all(is.na(apairs_f[1:nf,t]))){
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
-              apairs_f[i,t] <- (nm+1)
-              amating_f[i,t] <- 0
-              next
-            } 
-            
-            
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != next_partner)){
-              apairs_f[i,t] <- next_partner
-              apairs_m[next_partner,t] <- i
-              amating_f[i,t] <- 1
-              amating_m[next_partner,t] <- 1
-              next
-            } 
-            
-            
-            if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
-              apairs_f[i,t] <- last_partner
-              apairs_m[last_partner,t] <- i
-              amating_f[i,t] <- 1
-              amating_m[last_partner,t] <- 1
-              next
-            } 
-          }
-          
-          amating_f[i,t] <- 0
-          apairs_f[i,t] <- nm+1
-        }
-      } else {
-        if(apairs_f[i,t] == (nm+1)){
-          amating_f[i,t] <- 0
-        } else {
-          amating_f[i,t] <- 1
-          
-        }
-        
-      }
-    }
-  }
-  
-  return(list(apairs_f_imputed = apairs_f,
-              apairs_m_imputed = apairs_m))
-}
+# 
+# # Populate imputed pairs object based on set of assumptions 
+# populate_full_pairs_approximation <- function(apairs_f,
+#                                               apairs_m,
+#                                               amating_f,
+#                                               amating_m,
+#                                               nf,
+#                                               nm,
+#                                               k){
+#   for(i in 1:nf){
+#     
+#     partners_i <- unique(apairs_f[i,][!is.na(apairs_f[i,])])
+#     num_partners_i <- length(partners_i)
+#     
+#     first_partner <- partners_i[1]
+#     
+#     # If no pairs observed make no possible combos
+#     if(num_partners_i == 0){
+#       apairs_f[i,1:k] <- (nm+1)
+#       amating_f[i,1:k] <- 0
+#       next
+#     }
+#     
+#     for(t in 1:k){
+#       
+#       last_partner <- unique(apairs_f[i,1:t][!is.na(apairs_f[i,1:t])])
+#       if(length(last_partner)==0){
+#         last_partner <- first_partner
+#       } 
+#       last_partner <- last_partner[length(last_partner)]
+#       
+#       if(t == k){
+#         next_partner <- last_partner
+#       } else {
+#         next_partner <- unique(apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])])
+#         if(length(next_partner)==0){
+#           next_partner <- last_partner
+#         } 
+#         next_partner <- next_partner[1]
+#         
+#       }
+#       
+#       if(is.na(apairs_f[i,t])){
+#         
+#         if(t == 1){
+#           
+#           if(!all(is.na(apairs_f[1:nf,t]))){
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == first_partner)|first_partner==(nm+1)){
+#               apairs_f[i,t] <- (nm+1)
+#               amating_f[i,t] <- 0
+#               next 
+#             }
+#           }
+#           
+#           apairs_f[i,t] <- first_partner
+#           apairs_m[first_partner,t] <- i
+#           amating_f[i,t] <- 1
+#           amating_m[first_partner,t] <- 1
+#           
+#           next
+#         }
+#         
+#         if(next_partner == last_partner){
+#           
+#           if(!all(is.na(apairs_f[1:nf,t]))){
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)|(last_partner==(nm+1))){
+#               apairs_f[i,t] <- (nm+1)
+#               amating_f[i,t] <- 0
+#               next
+#             } 
+#           }
+#           apairs_f[i,t] <- last_partner
+#           apairs_m[last_partner,t] <- i
+#           amating_f[i,t] <- 1
+#           amating_m[last_partner,t] <- 1
+#           next
+#         }
+#         
+#         if(last_partner == (nm+1)){
+#           if(!all(is.na(apairs_f[1:nf,t]))){
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+#               apairs_f[i,t] <- (nm+1)
+#               amating_f[i,t] <- 0
+#               next
+#             } 
+#           }
+#           apairs_f[i,t] <- next_partner
+#           apairs_m[next_partner,t] <- i
+#           amating_f[i,t] <- 1
+#           amating_m[next_partner,t] <- 1
+#           next
+#         }
+#         
+#         if(next_partner == (nm+1)){
+#           if(!all(is.na(apairs_f[1:nf,t]))){
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner)){
+#               apairs_f[i,t] <- (nm+1)
+#               amating_f[i,t] <- 0
+#               next
+#             } 
+#           }
+#           apairs_f[i,t] <- last_partner
+#           apairs_m[last_partner,t] <- i
+#           amating_f[i,t] <- 1
+#           amating_m[last_partner,t] <- 1
+#           next
+#           
+#         }
+#         
+#         if(next_partner != last_partner){
+#           if(!all(is.na(apairs_f[1:nf,t]))){
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+#               apairs_f[i,t] <- (nm+1)
+#               amating_f[i,t] <- 0
+#               next
+#             } 
+#             
+#             
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != next_partner)){
+#               apairs_f[i,t] <- next_partner
+#               apairs_m[next_partner,t] <- i
+#               amating_f[i,t] <- 1
+#               amating_m[next_partner,t] <- 1
+#               next
+#             } 
+#             
+#             
+#             if(any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] != last_partner) & any(apairs_f[1:nf,t][!is.na(apairs_f[1:nf,t])] == next_partner)){
+#               apairs_f[i,t] <- last_partner
+#               apairs_m[last_partner,t] <- i
+#               amating_f[i,t] <- 1
+#               amating_m[last_partner,t] <- 1
+#               next
+#             } 
+#           }
+#           
+#           amating_f[i,t] <- 0
+#           apairs_f[i,t] <- nm+1
+#         }
+#       } else {
+#         if(apairs_f[i,t] == (nm+1)){
+#           amating_f[i,t] <- 0
+#         } else {
+#           amating_f[i,t] <- 1
+#           
+#         }
+#         
+#       }
+#     }
+#   }
+#   
+#   return(list(apairs_f_imputed = apairs_f,
+#               apairs_m_imputed = apairs_m))
+# }
 
 simulate_recapture <- function(recap_f, 
                                recap_m, 
@@ -1531,10 +1522,26 @@ simulate_cr_data <- function(n,
   nf         <- sex_counts[1]
   nm         <- sex_counts[2]
   
+  # # Optional Assumption to include
+  # Assume that divorce only occurs upon death
+  for(i in 1:nf){
+    for(t in (first_capture_f[i]+1):k){
+      if(!is.na(apairs_f[i,t-1]) & is.na(apairs_f[i,t])){
+        if(apairs_f[i,t-1] == (nm+1)) next
+        if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+          if(pairs_f[i,t] != apairs_f[i,t-1]) browser()
+          apairs_f[i,t] <- apairs_f[i,t-1]
+          apairs_m[apairs_f[i,t],t-1] <- i
+          apairs_m[apairs_f[i,t],t] <- i
+        }
+      }
+    }
+  }
+  
   # Construct fully imputed pairs vector
-  apairs_imputed_list <- populate_full_pairs_approximation(apairs_f, apairs_m, amating_f, amating_m, nf, nm, k)
-  apairs_f_imputed <- apairs_imputed_list[["apairs_f_imputed"]]
-  apairs_m_imputed <- apairs_imputed_list[["apairs_m_imputed"]]
+  # apairs_imputed_list <- populate_full_pairs_approximation(apairs_f, apairs_m, amating_f, amating_m, nf, nm, k)
+  # apairs_f_imputed <- apairs_imputed_list[["apairs_f_imputed"]]
+  # apairs_m_imputed <- apairs_imputed_list[["apairs_m_imputed"]]
   
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
@@ -1553,14 +1560,14 @@ simulate_cr_data <- function(n,
     sf                   = sf,                         # true survival of females
     sm                   = sm,                         # true survival of males
     # Observed /Inferred states (Missing Values are possible)
-    af                  = rbind(af[1:nf,1:k]),         # Female Survival with missing values
-    am                  = rbind(am[1:nm,1:k]),         # Male Survival with missing values
+    af                  = af[1:nf,1:k],                # Female Survival with missing values
+    am                  = am[1:nm,1:k],                # Male Survival with missing values
     apairs_f            = apairs_f[1:nf, 1:k],         # Female pairs with inbetween imputing only
     apairs_m            = apairs_m[1:nm, 1:k],         # Male pairs with inbetween imputing only
-    apairs_f_imputed    = apairs_f_imputed[1:nf, 1:k], # Female pairs with full imputation
-    apairs_m_imputed    = apairs_m_imputed[1:nm, 1:k], # Male pairs with full imputation 
-    recap_f             = rbind(recap_f[1:nf,1:k]),    # Observed Recapture of Females
-    recap_m             = rbind(recap_m[1:nm,1:k])     # Observed Recapture of Males
+    # apairs_f_imputed    = apairs_f_imputed[1:nf, 1:k], # Female pairs with full imputation
+    # apairs_m_imputed    = apairs_m_imputed[1:nm, 1:k], # Male pairs with full imputation 
+    recap_f             = recap_f[1:nf,1:k],           # Observed Recapture of Females
+    recap_m             = recap_m[1:nm,1:k]            # Observed Recapture of Males
   )
   
   #Return Model object

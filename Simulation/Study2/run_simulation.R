@@ -1,7 +1,7 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <-"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-out_dir    <- src_dir %+% "/Simulation/Study2/Output/"
+out_dir    <- src_dir %+% "Simulation/Study2/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -23,6 +23,9 @@ cat("Running iteration #" %+% iter %+% "...", "\n")
 
 # Simulate Data ---------------------------------------------------------------------------------------------------
 x <- Sys.time()
+
+# Initialize Seed
+ruinf(1)
 
 # True Parameter Settings
 PM                 <- 0.7
@@ -270,5 +273,5 @@ results$summ_posterior_cjs        <- summ_posterior_cjs
 results$summ_posterior_ps_imputed <- summ_posterior_ps_imputed
 results$summ_posterior_ps_known   <- summ_posterior_ps_known
 
-saveRDS(results, out_dir %+% "results_sim2_" %+% i %+% ".rds")
+saveRDS(results, out_dir %+% "results_sim2_" %+% iter %+% ".rds")
 # ---------------------------------------------------------------------------------------------------------
