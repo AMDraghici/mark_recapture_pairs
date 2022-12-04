@@ -171,7 +171,7 @@ run_cjs_model_mark <- function(cjs_data,
                    invisible        = TRUE,
                    brief            = TRUE,
                    delete           = TRUE,
-                   # title            = title,
+                   title            = title,
                    output           = FALSE)
   
   mark_out <- mark_out$results
