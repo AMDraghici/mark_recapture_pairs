@@ -168,7 +168,8 @@ generate_bootstrap_replicates_recapture <- function(ps_data,
                                                     PF,
                                                     PM,
                                                     rho,
-                                                    parametric){
+                                                    parametric,
+                                                    use_block){
   
   # Unpack data
   nf               <- ps_data$nf
@@ -201,7 +202,7 @@ generate_bootstrap_replicates_recapture <- function(ps_data,
   
   block <- 1
   block_matrix <- matrix(0, nrow = nf, ncol = k-2)
-  
+
   # Construct Blocks
   for(i in 1:nf){
     if(!any(pairs_mask[i,1:(k-2)])) next
@@ -216,8 +217,13 @@ generate_bootstrap_replicates_recapture <- function(ps_data,
       block_matrix[i,t] <- block
       last_partner <- apairs_f[i,t+1]
     }
-    
+
     block <- block + 1
+  }
+  
+  # Block Reset
+  if(!use_block){
+    block_matrix[block_matrix != 0] <- 1:length(which(block_matrix != 0))
   }
   
   # Get viable rows (if conditions remove individual altogether no point in sampling)
@@ -254,9 +260,10 @@ compute_bootstrap_estimates_recapture_correlation <- function(ps_data,
                                                               PF,
                                                               PM,
                                                               rho,
-                                                              parametric = F){
+                                                              parametric = F,
+                                                              use_block  = F){
   
-  bootstrap_data_replicates <- generate_bootstrap_replicates_recapture(ps_data, iter, PF, PM, rho, parametric)
+  bootstrap_data_replicates <- generate_bootstrap_replicates_recapture(ps_data, iter, PF, PM, rho, parametric, use_block)
   # rho_bs <- compute_recapture_correlation_simulation(bootstrap_data_replicates, PF = rep(PF, iter), PM = rep(PM, iter))
   rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound + 1e-6
   ru               <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound - 1e-6
@@ -382,7 +389,7 @@ compute_survival_correlation_simulation <- function(ps_data_list,
 } 
 
 # Run bootstrap to get standard error estimates of survival
-generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, iter){
+generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, use_block, iter){
   
   # Unpack data
   nm              <- ps_data$nm
@@ -442,6 +449,11 @@ generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, i
     block <- block + 1
   }
   
+  # Block Reset
+  if(!use_block){
+    block_matrix[block_matrix != 0] <- 1:length(which(block_matrix != 0))
+  }
+  
   # Collection of Y/N
   outcome_vector <- unlist(lapply(1:nf, function(i) success_matrix[i, ][block_matrix[i,] != 0]))
   # Block Label for Outcomes
@@ -482,7 +494,8 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
                                                              gamma,
                                                              PhiF,
                                                              PhiM,
-                                                             parametric){
+                                                             parametric,
+                                                             use_block){
   
   
   # Joint Probabilties
@@ -490,7 +503,7 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
   PhiFM <- compute_jbin_cjs(PhiF, PhiM, gamma)$prob.mf
   
   
-  bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, PFM * PhiFM, parametric, iter)
+  bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, PFM * PhiFM, parametric, use_block, iter)
   gamma_bs <- sapply(1:iter, function(i) compute_surv_cor(bootstrap_data_replicates[i], PFM, PhiF, PhiM))
   
   # gamma_bs <- compute_survival_correlation_simulation(ps_data_list           = bootstrap_data_replicates,

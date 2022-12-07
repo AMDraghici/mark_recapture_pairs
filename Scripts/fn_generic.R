@@ -198,6 +198,18 @@ run_cjs_model_mark <- function(cjs_data,
   
 }
 
+# Compute Confidence Intervals of correlation using Fishers Method
+compute_fisher_intervals <- function(r,N, alpha){
+  fishers_z <- log((1+r)/(1-r))/2
+  interval_width <- qnorm(1 - alpha/2, 0, 1)/sqrt(N-3)
+  U <- fishers_z + interval_width
+  L <- fishers_z - interval_width
+  LB <- (exp(2 * L)- 1)/(exp(2*L) + 1)
+  UB <- (exp(2 * U)- 1)/(exp(2*U) + 1)
+  return(c(LB,UB))
+}
+
+
 # Execute one replicate of Simulation Study 
 execute_iteration  <- function(iter,
                                scenario,
@@ -282,7 +294,8 @@ execute_iteration  <- function(iter,
                                                                  PF         = pf_mark,
                                                                  PM         = pm_mark,
                                                                  rho        = rho,
-                                                                 parametric = F)
+                                                                 use_block  = FALSE,
+                                                                 parametric = FALSE)
   # Collect Results
   mean_bstrp_rho_np        <- mean(rho_bs_np)
   names(mean_bstrp_rho_np) <- "Est_Btstrp"
@@ -300,7 +313,8 @@ execute_iteration  <- function(iter,
                                                                  PF         = pf_mark,
                                                                  PM         = pm_mark,
                                                                  rho        = rho,
-                                                                 parametric = T)
+                                                                 use_block  = FALSE,
+                                                                 parametric = TRUE)
   # Collect Results
   mean_bstrp_rho_sp         <- mean(rho_bs_sp)
   names(mean_bstrp_rho_sp)  <- "Est_Btstrp"
@@ -340,7 +354,8 @@ execute_iteration  <- function(iter,
                                                                     gamma                 = gamma,
                                                                     PhiF                  = phif_mark,
                                                                     PhiM                  = phim_mark,
-                                                                    parametric            = F)
+                                                                    use_block             = FALSE,
+                                                                    parametric            = FALSE)
     
     
     # Semi-Parametric Bootstrap To Estimate SE 
@@ -353,7 +368,8 @@ execute_iteration  <- function(iter,
                                                                     gamma                 = gamma,
                                                                     PhiF                  = phif_mark,
                                                                     PhiM                  = phim_mark,
-                                                                    parametric            = T)
+                                                                    use_block             = FALSE,
+                                                                    parametric            = TRUE)
   }
   
   # Collect Results
