@@ -26,7 +26,14 @@ partial_likelihood_recapture_correlation <- function(pars,
 # Compute recapture Correlation for one data set
 compute_recapture_correlation <- function(ps_data,
                                           PF, 
-                                          PM){
+                                          PM,
+                                          model){
+  
+  # Make model type lower case
+  model <- tolower(trimws(model))
+  
+  # Check for any bad names
+  if(!model %in% (c("likelihood", "full_pearson", "partial_pearson"))) stop("Need to specify model as: likelihood, full_pearson or partial_pearson")
   
   # Unpack data
   rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound + 1e-6
@@ -68,30 +75,40 @@ compute_recapture_correlation <- function(ps_data,
   if(sum(pairs_mask * 1) == 0){
     rho <- 10
   } else {
-    # Compute rho using non-linear in-box optimization 
-    rho <- nlminb(start            = runif(1, min = rl,max = ru),
-                  objective        = partial_likelihood_recapture_correlation,
-                  PF               = PF,
-                  PM               = PM,
-                  recap_f_filter   = recap_f_filter,
-                  recap_m_filter   = recap_m_filter,
-                  lower            = rl,
-                  upper            = ru)$par
+    
+    if(model == "likelihood"){
+      # Compute rho using non-linear in-box optimization 
+      rho <- nlminb(start            = runif(1, min = rl,max = ru),
+                    objective        = partial_likelihood_recapture_correlation,
+                    PF               = PF,
+                    PM               = PM,
+                    recap_f_filter   = recap_f_filter,
+                    recap_m_filter   = recap_m_filter,
+                    lower            = rl,
+                    upper            = ru)$par
+    } else if(model == "partial_pearson"){
+      dev_f <- (recap_f_filter - PF)
+      dev_m <- (recap_m_filter - PM)
+      rho <- sum(dev_f * dev_m)/sqrt(sum(dev_f^2) * sum(dev_m^2))
+    } else if(model == "full_pearson"){
+      rho <- cor(recap_f_filter, recap_m_filter)
+      if(is.na(rho)) rho <- 10
+    }
   }
   
   return(rho)
 }
 
-# Compute recapture correlation for n replciates 
-compute_recapture_correlation_simulation <- function(ps_data_list, PF, PM){
-  
-  # Run simulation study on list of data 
-  recapture_correlations <- lapply(1:length(ps_data_list), 
-                                   function(i) compute_recapture_correlation(ps_data = ps_data_list[[i]],
-                                                                             PF      = PF[i],
-                                                                             PM      = PM[i]))
-  return(unlist(recapture_correlations))
-} 
+# # Compute recapture correlation for n replciates 
+# compute_recapture_correlation_simulation <- function(ps_data_list, PF, PM){
+#   
+#   # Run simulation study on list of data 
+#   recapture_correlations <- lapply(1:length(ps_data_list), 
+#                                    function(i) compute_recapture_correlation(ps_data = ps_data_list[[i]],
+#                                                                              PF      = PF[i],
+#                                                                              PM      = PM[i]))
+#   return(unlist(recapture_correlations))
+# } 
 
 
 # Bootstrapping for Error Estimates of One Replicate
@@ -196,13 +213,13 @@ generate_bootstrap_replicates_recapture <- function(ps_data,
   for(t in 2:(k-1)){
     pairs_seen_index_list[[t-1]] <- which(pairs_seen[1:nf,t] & pairs_seen[1:nf,t-1]  & pairs_seen[1:nf,t+1])
     pairs_mask[pairs_seen_index_list[[t-1]] ,t-1] <- (apairs_f[pairs_seen_index_list[[t-1]] ,t] == apairs_f[pairs_seen_index_list[[t-1]] ,t-1]) &
-                                                     (apairs_f[pairs_seen_index_list[[t-1]] ,t] == apairs_f[pairs_seen_index_list[[t-1]] ,t+1]) &
-                                                     (apairs_f[pairs_seen_index_list[[t-1]] ,t] != nm+1)
+      (apairs_f[pairs_seen_index_list[[t-1]] ,t] == apairs_f[pairs_seen_index_list[[t-1]] ,t+1]) &
+      (apairs_f[pairs_seen_index_list[[t-1]] ,t] != nm+1)
   }
   
   block <- 1
   block_matrix <- matrix(0, nrow = nf, ncol = k-2)
-
+  
   # Construct Blocks
   for(i in 1:nf){
     if(!any(pairs_mask[i,1:(k-2)])) next
@@ -217,7 +234,7 @@ generate_bootstrap_replicates_recapture <- function(ps_data,
       block_matrix[i,t] <- block
       last_partner <- apairs_f[i,t+1]
     }
-
+    
     block <- block + 1
   }
   
@@ -261,21 +278,44 @@ compute_bootstrap_estimates_recapture_correlation <- function(ps_data,
                                                               PM,
                                                               rho,
                                                               parametric = F,
-                                                              use_block  = F){
+                                                              use_block  = F,
+                                                              model){
   
+  # Make model type lower case
+  model <- tolower(trimws(model))
+  
+  # Check for any bad names
+  if(!model %in% (c("likelihood", "full_pearson", "partial_pearson"))) stop("Need to specify model as: likelihood, full_pearson or partial_pearson")
+  
+  # Generate Bootstrap replicates 
   bootstrap_data_replicates <- generate_bootstrap_replicates_recapture(ps_data, iter, PF, PM, rho, parametric, use_block)
-  # rho_bs <- compute_recapture_correlation_simulation(bootstrap_data_replicates, PF = rep(PF, iter), PM = rep(PM, iter))
-  rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound + 1e-6
-  ru               <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound - 1e-6
-  rho_bs <- sapply(1:iter, function(i) nlminb(start         = runif(1, min = rl,max = ru),
-                                              objective        = partial_likelihood_recapture_correlation,
-                                              PF               = PF,
-                                              PM               = PM,
-                                              recap_f_filter   = bootstrap_data_replicates[[i]]$recap_f_filter,
-                                              recap_m_filter   = bootstrap_data_replicates[[i]]$recap_m_filter,
-                                              lower            = rl,
-                                              upper            = ru)$par)
   
+  
+  
+  # Get correlation bounds
+  
+  if(model == "likelihood"){
+    rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound + 1e-6
+    ru               <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound - 1e-6
+    rho_bs           <- sapply(1:iter, function(i) nlminb(start         = runif(1, min = rl,max = ru),
+                                                          objective        = partial_likelihood_recapture_correlation,
+                                                          PF               = PF,
+                                                          PM               = PM,
+                                                          recap_f_filter   = bootstrap_data_replicates[[i]]$recap_f_filter,
+                                                          recap_m_filter   = bootstrap_data_replicates[[i]]$recap_m_filter,
+                                                          lower            = rl,
+                                                          upper            = ru)$par)
+  } else if(model == "partial_pearson"){
+    
+    rho_bs <- sapply(1:iter, function(i) sum((bootstrap_data_replicates[[i]]$recap_f_filter - PF) * (bootstrap_data_replicates[[i]]$recap_m_filter - PM))/sqrt(sum((bootstrap_data_replicates[[i]]$recap_f_filter-PF)^2) * sum((bootstrap_data_replicates[[i]]$recap_m_filter-PM)^2)))
+    
+  } else if(model == "full_pearson"){
+    # Run full pearson model
+    rho_bs <- sapply(1:iter, function(i) cor(bootstrap_data_replicates[[i]]$recap_f_filter, bootstrap_data_replicates[[i]]$recap_m_filter))
+  }
+  
+  # Drop unknowns
+  rho_bs <- rho_bs[!is.na(rho_bs)] 
   
   return(rho_bs)
 }
@@ -501,11 +541,11 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
   # Joint Probabilties
   PFM <- compute_jbin_cjs(PF, PM, rho)$prob.mf
   PhiFM <- compute_jbin_cjs(PhiF, PhiM, gamma)$prob.mf
-  
-  
   bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, PFM * PhiFM, parametric, use_block, iter)
   gamma_bs <- sapply(1:iter, function(i) compute_surv_cor(bootstrap_data_replicates[i], PFM, PhiF, PhiM))
   
+  
+  # browser()
   # gamma_bs <- compute_survival_correlation_simulation(ps_data_list           = bootstrap_data_replicates,
   #                                                  recapture_correlations = rep(rho,iter),
   #                                                  PF                     = rep(PF, iter),
