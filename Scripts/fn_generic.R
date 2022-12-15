@@ -136,23 +136,20 @@ compute_jbin_cjs <- function(prob.f,prob.m,corr){
 
 # Run CJS Model using Mark
 run_cjs_model_mark <- function(cjs_data,
-                               title = NULL){
+                               title = NULL,
+                               version = "B"){
   
+  if(is.null(title)) title <- "mark_out_" %+% version
   
-  if(is.null(title)) title <- "mark_out"
-  
-  #Choose Appropriate CJS Model Settings
+  # Define survival/recapture parameter space
   phi.grp     <- list(formula = ~sex)
   p.grp       <- list(formula = ~sex)
-  phi.name    <- c("PhiM","PhiF")
-  p.name      <- c("PM","PF")
-  param.names <- c(phi.name,p.name)
   
   #Process Mark Data (Extract Recapture/sex)
   dat.process <- cjs_data$x %>% 
     as.data.frame() %>% 
     unite("ch",sep="") %>% 
-    mutate(sex = as.factor(cjs_data$female)) %>%
+    mutate(sex = as.factor(ifelse(cjs_data$female == 1, "F", "M"))) %>%
     arrange(sex) 
   
   mark.process <- process.data(data   = dat.process,
@@ -162,11 +159,33 @@ run_cjs_model_mark <- function(cjs_data,
   #Design Data List
   mark.ddl <- make.design.data(mark.process) 
   
+  # Choose Appropriate CJS Model Settings
+  if(version == "B"){
+    model.parameters <- list(Phi = phi.grp, p   = p.grp)
+    phi.name         <- c("PhiF","PhiM")
+    p.name           <- c("PF","PM")
+    param.names      <- c(phi.name,p.name)
+  } else if(version == "S"){
+    model.parameters <- list(Phi = phi.grp)
+    phi.name         <- c("PhiF","PhiM")
+    p.name           <- c("P")
+    param.names      <- c(phi.name,p.name)
+  } else if(version == "R"){
+    model.parameters <- list(p   = p.grp)
+    phi.name         <- c("Phi")
+    p.name           <- c("PF","PM")
+  } else if(version == "N"){
+    model.parameters <- list()
+    phi.name         <- c("Phi")
+    p.name           <- c("P")
+  }
+  
+  param.names <- c(phi.name, p.name)
+  
   #Generate Estimates
-  mark_out <- mark(mark.process,
-                   mark.ddl,
-                   model.parameters =list(Phi = phi.grp,
-                                          p   = p.grp),
+  mark_out <- mark(data             = mark.process,
+                   ddl              = mark.ddl,
+                   model.parameters = model.parameters,
                    profile.int      = FALSE,
                    invisible        = TRUE,
                    brief            = TRUE,
@@ -190,7 +209,8 @@ run_cjs_model_mark <- function(cjs_data,
            "SE" = X2,
            "LB" = X3,
            "UB" = X4) %>%
-    mutate(Parameter = param.names)
+    mutate(Parameter = param.names,
+           version   = version)
   
   mark_results <- cbind(mark.stats,gof.stats)
   #Return Output
@@ -241,6 +261,21 @@ compute_btsrp_summary <- function(estimate, bstrp_replicates, parameteric, pears
 } 
 
 
+#Generate MARK CI for Probabilities
+# Arg: Prob is value btwn [0, 1]
+# Arg: Se is a standard error value
+# Arg: Alpha is a confidence level
+compute_mark_ci <- function(prob,se,alpha=0.05){
+  var.logit <- (se^2)/((prob-1)^2*prob^2)
+  se.logit <- sqrt(var.logit)
+  est.logit <- log(prob/(1-prob),base=exp(1))
+  ub.logit <- est.logit + round(qnorm(1-alpha/2),2)*se.logit
+  lb.logit <- est.logit - round(qnorm(1-alpha/2),2)*se.logit  
+  lb.real <- exp(lb.logit)/(1+exp(lb.logit))
+  ub.real <- exp(ub.logit)/(1+exp(ub.logit))
+  return(list(lb.real,ub.real))
+} 
+
 
 
 # Execute one replicate of Simulation Study 
@@ -284,19 +319,36 @@ execute_iteration  <- function(iter,
   ps_data <- sim_dat(param_list) 
   cjs_data <- format_to_cjs(ps_data)
   
+  # Compute ~true P and PHi
+  PropF <- mean(cjs_data$female)
+  PropM <- 1-PropF
+  
+  Phi <- PhiF * PropF + PhiM * PropM
+  P   <- PF * PropF + PM * PropM
+  
   # Gather True Param DF 
   ru_true            <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound
   rl_true            <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound
   gu_true            <- compute_jbin_param_cjs(PhiF,PhiM)$cor_upper_bound
   gl_true            <- compute_jbin_param_cjs(PhiF,PhiM)$cor_upper_bound
-  true_params        <- c(PF,PM,PhiF, PhiM, gam_true, gl_true, gu_true, rho_true, rl_true, ru_true)
-  param_names        <- c("PF","PM", "PhiF", "PhiM", "gamma", "gl", "gu", "rho", "rl", "ru")
+  true_params        <- c(PF,PM,PhiF, PhiM, P, Phi, gam_true, gl_true, gu_true, rho_true, rl_true, ru_true)
+  param_names        <- c("PF","PM", "PhiF", "PhiM","P", "Phi", "gamma", "gl", "gu", "rho", "rl", "ru")
   true_param_df      <- data.frame(Truth = true_params, Parameter = param_names)
   
   # Run CJS Model MARK -----------------------------------------------------------------------------------------
   cat(paste0("Iteration#:", iter , " - Computing standard CJS estimates with program MARK..."),"\n")
-  cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
-                                title    = "mark_" %+% iter %+% "_" %+% scenario %+% "_") %>% 
+  
+  cjs_list <- list()
+  versions <- c("B","S","R","N")
+  
+  for(i in 1:length(versions)){
+    cat(paste0("Iteration#:", iter , " - Computing CJS estimates for Version:", versions[i], " ..."),"\n")
+    cjs_list[[i]] <- run_cjs_model_mark(cjs_data = cjs_data,
+                                        title    = "mark_" %+% iter %+% "_" %+% scenario %+% "_" %+% versions[i] %+% "_",
+                                        version  = versions[i])  
+  }
+  
+  cjs_out <- do.call(rbind, cjs_list) %>% 
     left_join(true_param_df,
               by = "Parameter") %>% 
     mutate(Bias     = Truth - Est,
@@ -305,12 +357,11 @@ execute_iteration  <- function(iter,
            iter     = iter,
            scenario = scenario) 
   
-  
-  # Get Predicted Probs for Correlation Estimators 
-  phim_mark <- cjs_out %>% filter(Parameter == "PhiM") %>% pull(Est)
-  phif_mark <- cjs_out %>% filter(Parameter == "PhiF") %>% pull(Est)
-  pm_mark   <- cjs_out %>% filter(Parameter == "PM") %>% pull(Est)
-  pf_mark   <- cjs_out %>% filter(Parameter == "PF") %>% pull(Est)
+  # Get Predicted Probs for Correlation Estimators (using full model version)
+  phim_mark <- cjs_out %>% filter(version == "B" & Parameter == "PhiM") %>% pull(Est)
+  phif_mark <- cjs_out %>% filter(version == "B" & Parameter == "PhiF") %>% pull(Est)
+  pm_mark   <- cjs_out %>% filter(version == "B" & Parameter == "PM") %>% pull(Est)
+  pf_mark   <- cjs_out %>% filter(version == "B" & Parameter == "PF") %>% pull(Est)
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
@@ -583,7 +634,7 @@ execute_iteration  <- function(iter,
   
   # Return Results----------------------------------------------------------------------------------------------
   
-  cat("Success, returning results ...","\n")
+  cat("Formatting output ...","\n")
   
   # Gather Correlation Results
   summ_corr           <- as.data.frame(rbind(summ_rho_np,
@@ -620,18 +671,65 @@ execute_iteration  <- function(iter,
   
   rownames(summ_corr) <- NULL
   
-  # TO DO 
-  # ADD N, S, R models to CJS OUTPUT
-  # ADD CORRECT CHAT Estimates on each model 
-  # BUILD CHAT TABLE (maybe)
+  # Compute CChat Adjustment
+  summ_chat <- data.frame(Method     = c("Likelihood", "Pearson", "Psuedo-Pearson", "Truth"),
+                          CChatRho   = c(compute_proposed_chat(rho, 0), 
+                                         compute_proposed_chat(pearson_rho, 0), 
+                                         compute_proposed_chat(pearson_partial_rho, 0),
+                                         compute_proposed_chat(rho_true, 0)),
+                          CChatGamma = c(compute_proposed_chat(0, gamma), 
+                                         compute_proposed_chat(0, pearson_gamma), 
+                                         compute_proposed_chat(0, pearson_partial_gamma),
+                                         compute_proposed_chat(0, gam_true)),
+                          CChat      = c(compute_proposed_chat(rho, gamma), 
+                                         compute_proposed_chat(pearson_rho, pearson_gamma), 
+                                         compute_proposed_chat(pearson_partial_rho, pearson_partial_gamma),
+                                         compute_proposed_chat(rho_true, gam_true)),
+                          iter       = rep(iter, 4),
+                          scenario   = rep(scenario, 4))
   
-  cjs_out$PropChat1 <- rep(compute_proposed_chat(rho,                 gamma),                nrow(cjs_out))
-  cjs_out$PropChat2 <- rep(compute_proposed_chat(pearson_rho,         pearson_gamma),        nrow(cjs_out))
-  cjs_out$PropChat3 <- rep(compute_proposed_chat(pearson_partial_rho, pearson_partial_gamma),nrow(cjs_out))
+  # Add Correlation Chat Correction to Mark-Recapture Results
+  summ_cjs <- cjs_out %>% 
+    mutate(CChatAdj_Likelihood      = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(rho, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, gamma), 
+                                                    1)),
+           CChatAdj_Pearson         = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(pearson_rho, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, pearson_gamma), 
+                                                    1)),
+           CChatAdj_Partial_Pearson = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(pearson_partial_rho, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, pearson_partial_gamma), 
+                                                    1)),
+           CChatAdj_Truth           = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(rho_true, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, gam_true), 
+                                                    1)),
+           UBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[[2]],
+           LBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[[1]],
+           UBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[[2]],
+           LBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[[1]],
+           UBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[[2]],
+           LBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[[1]],
+           In95_Likelihood          = 1*(Truth <= UBAdj_Likelihood & Truth >= LBAdj_Likelihood),
+           In95_Pearson             = 1*(Truth <= UBAdj_Pearson & Truth >= LBAdj_Pearson),
+           In95_Partial_Pearson     = 1*(Truth <= UBAdj_Partial_Pearson & Truth >= LBAdj_Partial_Pearson),
+           Range95_Likelihood       = UBAdj_Likelihood - LBAdj_Likelihood,
+           Range95_Pearson          = UBAdj_Pearson - LBAdj_Pearson,
+           Range95_Partial_Pearson  = UBAdj_Partial_Pearson - LBAdj_Partial_Pearson
+    ) 
+  
+  cat("Success, returning results ...","\n")
   
   results <- list(random_seed                 = random_seed,
-                  cjs_out                     = cjs_out,
+                  summ_cjs                    = summ_cjs,
                   summ_corr                   = summ_corr,
+                  summ_chat                   = summ_chat,
                   rho_bs_np                   = unname(rho_bs_np),
                   rho_bs_sp                   = unname(rho_bs_sp),
                   rho_bs_np_pearson           = unname(rho_bs_np_pearson),
@@ -660,8 +758,6 @@ execute_simulation <- function(niter,
                                n_pop,
                                k,
                                init = NULL){
-  
-  
   # Run niter replicates 
   results_list <- lapply(1:niter, function(iter) execute_iteration(iter,
                                                                    scenario,
@@ -675,16 +771,16 @@ execute_simulation <- function(niter,
                                                                    k,
                                                                    init = NULL))
   
-  
-  
   # Construct Summaries of Probs and Correlations
   summary_corr <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_corr))
-  summary_mark <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$cjs_out))
+  summary_cjs  <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_cjs))
+  summ_chat    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_chat))
   
   # Return Results
   out <- list(results_list = results_list,
               summary_corr = summary_corr,
-              summary_mark = summary_mark)
+              summary_cjs  = summary_cjs,
+              summ_chat    = summ_chat)
   
   return(out)
   
