@@ -96,6 +96,8 @@ compute_recapture_correlation <- function(ps_data,
     }
   }
   
+  rho <- ifelse(rho >= ru, ru, ifelse(rho <= rl, rl, rho))
+  
   return(rho)
 }
 
@@ -287,13 +289,12 @@ compute_bootstrap_estimates_recapture_correlation <- function(ps_data,
   # Check for any bad names
   if(!model %in% (c("likelihood", "full_pearson", "partial_pearson"))) stop("Need to specify model as: likelihood, full_pearson or partial_pearson")
   
+  
+  
   # Generate Bootstrap replicates 
   bootstrap_data_replicates <- generate_bootstrap_replicates_recapture(ps_data, iter, PF, PM, rho, parametric, use_block)
   
-  
-  
   # Get correlation bounds
-  
   if(model == "likelihood"){
     rl               <- compute_jbin_param_cjs(PF,PM)$cor_lower_bound + 1e-6
     ru               <- compute_jbin_param_cjs(PF,PM)$cor_upper_bound - 1e-6

@@ -210,6 +210,39 @@ compute_fisher_intervals <- function(r,N, alpha){
 }
 
 
+# Proposed Chat Estimator 
+compute_proposed_chat <- function(corr1, corr2){
+  
+  chat1 <- ifelse(corr1 >= 0, 1+corr1, 1 + 0.5  * corr1)
+  chat2 <- ifelse(corr2 >= 0, 1+corr2, 1 + 0.5  * corr2)
+  
+  return(chat1 * chat2)
+}
+
+compute_btsrp_summary <- function(estimate, bstrp_replicates, parameteric, pearson){
+  # Non-Parametric conditional estimator results
+  mean_bstrp            <- mean(bstrp_replicates)
+  names(mean_bstrp)     <- "Est_Btstrp"
+  se_bstrp              <- sd(bstrp_replicates)
+  names(se_bstrp)       <- "SE"
+  quantiles_btstrp      <- quantile(bstrp_replicates, c(0.025, 0.25, 0.5, 0.75, 0.975))
+  status_param          <- parameteric
+  status_pearson        <- pearson
+  names(status_param)   <- "Parametric"
+  names(status_pearson) <- "Pearson"
+  summ_btstrp           <- c(estimate, 
+                             mean_bstrp, 
+                             se_bstrp,
+                             quantiles_btstrp,
+                             status_param, 
+                             status_pearson)
+  
+  return(summ_btstrp)
+} 
+
+
+
+
 # Execute one replicate of Simulation Study 
 execute_iteration  <- function(iter,
                                scenario,
@@ -263,7 +296,7 @@ execute_iteration  <- function(iter,
   # Run CJS Model MARK -----------------------------------------------------------------------------------------
   cat(paste0("Iteration#:", iter , " - Computing standard CJS estimates with program MARK..."),"\n")
   cjs_out <- run_cjs_model_mark(cjs_data = cjs_data,
-                                title    = "mark_" %+% iter %+% "_" %+% scenario) %>% 
+                                title    = "mark_" %+% iter %+% "_" %+% scenario %+% "_") %>% 
     left_join(true_param_df,
               by = "Parameter") %>% 
     mutate(Bias     = Truth - Est,
@@ -300,22 +333,9 @@ execute_iteration  <- function(iter,
                                                                  use_block  = FALSE,
                                                                  parametric = FALSE,
                                                                  model      = "likelihood")
+  
   # Non-Parametric conditional estimator results
-  mean_bstrp_rho_np        <- mean(rho_bs_np)
-  names(mean_bstrp_rho_np) <- "Est_Btstrp"
-  se_bstrp_rho_np          <- sd(rho_bs_np)
-  names(se_bstrp_rho_np)   <- "SE"
-  quantiles_rho_np         <- quantile(rho_bs_np, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_np                <- 0
-  pearson_status_np        <- 0
-  names(status_np)         <- "Parametric"
-  names(pearson_status_np) <- "Pearson"
-  summ_rho_np              <- c(rho, 
-                                mean_bstrp_rho_np, 
-                                se_bstrp_rho_np,
-                                quantiles_rho_np,
-                                status_np, 
-                                pearson_status_np)
+  summ_rho_np              <- compute_btsrp_summary(rho, rho_bs_np, parameteric = 0, pearson = 0)             
   
   # Parametric Bootstrap To Estimate SE 
   cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get standard error estimates of rho (likelihood)..."),"\n")
@@ -329,21 +349,7 @@ execute_iteration  <- function(iter,
                                                                  model      = "likelihood")
   
   # Semi-Parametric conditional estimator
-  mean_bstrp_rho_sp        <- mean(rho_bs_sp)
-  names(mean_bstrp_rho_sp) <- "Est_Btstrp"
-  se_bstrp_rho_sp          <- sd(rho_bs_sp)
-  names(se_bstrp_rho_sp)   <- "SE"
-  quantiles_rho_sp         <- quantile(rho_bs_sp, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_sp                <- 1
-  pearson_status_sp        <- 0
-  names(status_sp)         <- "Parametric"
-  names(pearson_status_sp) <- "Pearson"
-  summ_rho_sp              <- c(rho, 
-                                mean_bstrp_rho_sp,
-                                se_bstrp_rho_sp, 
-                                quantiles_rho_sp,
-                                status_sp,
-                                pearson_status_sp)
+  summ_rho_sp              <- compute_btsrp_summary(rho, rho_bs_sp, parameteric = 1, pearson = 0)       
   
   #-------------------------------------------------------------------------------------------------------------
   
@@ -367,21 +373,7 @@ execute_iteration  <- function(iter,
                                                                          model      = "full_pearson")
   
   # Non-Parametric conditional pearson estimator
-  mean_bstrp_rho_np_pearson        <- mean(rho_bs_np_pearson)
-  names(mean_bstrp_rho_np_pearson) <- "Est_Btstrp"
-  se_bstrp_rho_np_pearson          <- sd(rho_bs_np_pearson)
-  names(se_bstrp_rho_np_pearson)   <- "SE"
-  quantiles_rho_np_pearson         <- quantile(rho_bs_np_pearson, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_np_pearson                <- 0
-  pearson_status_pearson_np        <- 1
-  names(status_np_pearson)         <- "Parametric"
-  names(pearson_status_pearson_np) <- "Pearson"
-  summ_rho_np_pearson              <- c(pearson_rho, 
-                                        mean_bstrp_rho_np_pearson, 
-                                        se_bstrp_rho_np_pearson, 
-                                        quantiles_rho_np_pearson,
-                                        status_np_pearson, 
-                                        pearson_status_pearson_np)
+  summ_rho_np_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_np_pearson, parameteric = 0, pearson = 1)    
   
   # Parametric Bootstrap To Estimate SE 
   cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get standard error estimates of rho (pearson)..."),"\n")
@@ -394,21 +386,7 @@ execute_iteration  <- function(iter,
                                                                          parametric = TRUE,
                                                                          model      = "full_pearson")
   # Semi-Parametric conditional pearson estimator
-  mean_bstrp_rho_sp_pearson         <- mean(rho_bs_sp_pearson)
-  names(mean_bstrp_rho_sp_pearson)  <- "Est_Btstrp"
-  se_bstrp_rho_sp_pearson           <- sd(rho_bs_sp_pearson)
-  names(se_bstrp_rho_sp_pearson)    <- "SE"
-  quantiles_rho_sp_pearson         <- quantile(rho_bs_sp_pearson, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_sp_pearson                <- 1
-  pearson_status_pearson_sp        <- 1
-  names(status_sp_pearson)         <- "Parametric"
-  names(pearson_status_pearson_sp) <- "Pearson"
-  summ_rho_sp_pearson              <- c(pearson_rho, 
-                                        mean_bstrp_rho_sp_pearson,
-                                        se_bstrp_rho_sp_pearson, 
-                                        quantiles_rho_sp_pearson, 
-                                        status_sp_pearson, 
-                                        pearson_status_pearson_sp)
+  summ_rho_sp_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_sp_pearson, parameteric = 1, pearson = 1)   
   
   #-------------------------------------------------------------------------------------------------------------
   
@@ -432,21 +410,7 @@ execute_iteration  <- function(iter,
                                                                                  model      = "partial_pearson")
   
   # Non-Parametric conditional pearson estimator
-  mean_bstrp_rho_np_pearson_partial        <- mean(rho_bs_np_pearson_partial)
-  names(mean_bstrp_rho_np_pearson_partial) <- "Est_Btstrp"
-  se_bstrp_rho_np_pearson_partial          <- sd(rho_bs_np_pearson_partial)
-  names(se_bstrp_rho_np_pearson_partial)   <- "SE"
-  quantiles_rho_np_pearson_partial         <- quantile(rho_bs_np_pearson_partial, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_np_pearson_partial                <- 0
-  pearson_status_pearson_partial_np        <- 2
-  names(status_np_pearson_partial)         <- "Parametric"
-  names(pearson_status_pearson_partial_np) <- "Pearson"
-  summ_rho_np_pearson_partial              <- c(pearson_partial_rho, 
-                                                mean_bstrp_rho_np_pearson_partial,
-                                                se_bstrp_rho_np_pearson_partial,
-                                                quantiles_rho_np_pearson_partial, 
-                                                status_np_pearson_partial, 
-                                                pearson_status_pearson_partial_np)
+  summ_rho_np_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_np_pearson_partial, parameteric = 0, pearson = 2)   
   
   # Parametric Bootstrap To Estimate SE 
   cat(paste0("Iteration#:", iter , " - Semi-Parametric Bootstrapping to get standard error estimates of rho (Psuedo-Pearson)..."),"\n")
@@ -459,22 +423,7 @@ execute_iteration  <- function(iter,
                                                                                  parametric = TRUE,
                                                                                  model      = "partial_pearson")
   # Semi-Parametric conditional pearson estimator
-  mean_bstrp_rho_sp_pearson_partial         <- mean(rho_bs_sp_pearson_partial)
-  names(mean_bstrp_rho_sp_pearson_partial)  <- "Est_Btstrp"
-  se_bstrp_rho_sp_pearson_partial           <- sd(rho_bs_sp_pearson_partial)
-  names(se_bstrp_rho_sp_pearson_partial)    <- "SE"
-  quantiles_rho_sp_pearson_partial         <- quantile(rho_bs_sp_pearson_partial, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_sp_pearson_partial                <- 1
-  pearson_status_pearson_partial_sp        <- 2
-  names(status_sp_pearson_partial)         <- "Parametric"
-  names(status_sp_pearson_partial)         <- "Pearson"
-  summ_rho_sp_pearson_partial              <- c(pearson_partial_rho, 
-                                                mean_bstrp_rho_sp_pearson_partial, 
-                                                se_bstrp_rho_sp_pearson_partial, 
-                                                quantiles_rho_sp_pearson_partial, 
-                                                status_sp_pearson_partial, 
-                                                pearson_status_pearson_partial_sp)
-  
+  summ_rho_sp_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_sp_pearson_partial, parameteric = 1, pearson = 2)   
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
@@ -526,38 +475,8 @@ execute_iteration  <- function(iter,
   }
   
   # Collect Results
-  names(gamma)                   <- "Est"
-  mean_bstrp_gamma_np            <- mean(gamma_bs_np)
-  mean_bstrp_gamma_sp            <- mean(gamma_bs_sp)
-  names(mean_bstrp_gamma_np)     <- "Est_Btstrp"
-  names(mean_bstrp_gamma_sp)     <- "Est_Btstrp"
-  se_bstrp_gamma_np              <- sd(gamma_bs_np)
-  se_bstrp_gamma_sp              <- sd(gamma_bs_sp)
-  names(se_bstrp_gamma_np)       <- "SE"
-  names(se_bstrp_gamma_sp)       <- "SE"
-  quantiles_gamma_np             <- quantile(gamma_bs_np, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  quantiles_gamma_sp             <- quantile(gamma_bs_sp, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_gamma_np                <- 0
-  status_gamma_sp                <- 1
-  names(status_gamma_np)         <- "Parametric"
-  names(status_gamma_sp)         <- "Parametric"
-  pearson_status_gamma_np        <- 0
-  pearson_status_gamma_sp        <- 0
-  names(pearson_status_gamma_np) <- "Pearson"
-  names(pearson_status_gamma_sp) <- "Pearson"
-  summ_gamma_np                  <- c(gamma, 
-                                      mean_bstrp_gamma_np,
-                                      se_bstrp_gamma_np,
-                                      quantiles_gamma_np,
-                                      status_gamma_np,
-                                      pearson_status_gamma_np)
-  summ_gamma_sp                  <- c(gamma, 
-                                      mean_bstrp_gamma_sp,
-                                      se_bstrp_gamma_sp,
-                                      quantiles_gamma_sp,
-                                      status_gamma_sp,
-                                      pearson_status_gamma_sp)
-  
+  summ_gamma_np   <- compute_btsrp_summary(gamma, gamma_bs_np, parameteric = 0, pearson = 0)   
+  summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, parameteric = 1, pearson = 0)   
   #-------------------------------------------------------------------------------------------------------------
   
   # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
@@ -607,38 +526,8 @@ execute_iteration  <- function(iter,
   }
   
   # Collect Results
-  names(pearson_gamma)                       <- "Est"
-  mean_bstrp_pearson_gamma_np                <- mean(pearson_gamma_bs_np)
-  mean_bstrp_pearson_gamma_sp                <- mean(pearson_gamma_bs_sp)
-  names(mean_bstrp_pearson_gamma_np)         <- "Est_Btstrp"
-  names(mean_bstrp_pearson_gamma_sp)         <- "Est_Btstrp"
-  se_bstrp_pearson_gamma_np                  <- sd(pearson_gamma_bs_np)
-  se_bstrp_pearson_gamma_sp                  <- sd(pearson_gamma_bs_sp)
-  names(se_bstrp_pearson_gamma_np)           <- "SE"
-  names(se_bstrp_pearson_gamma_sp)           <- "SE"
-  quantiles_pearson_gamma_np                 <- quantile(pearson_gamma_bs_np, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  quantiles_pearson_gamma_sp                 <- quantile(pearson_gamma_bs_sp, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_pearson_gamma_np                    <- 0
-  status_pearson_gamma_sp                    <- 1
-  names(status_pearson_gamma_np)             <- "Parametric"
-  names(status_pearson_gamma_sp)             <- "Parametric"
-  pearson_status_pearson_gamma_np            <- 1
-  pearson_status_pearson_gamma_sp            <- 1
-  names(pearson_status_pearson_gamma_np)     <- "Pearson"
-  names(pearson_status_pearson_gamma_sp)     <- "Pearson"
-  
-  summ_pearson_gamma_np                      <- c(pearson_gamma, 
-                                                  mean_bstrp_pearson_gamma_np, 
-                                                  se_bstrp_pearson_gamma_np,
-                                                  quantiles_pearson_gamma_np,
-                                                  status_pearson_gamma_np,
-                                                  pearson_status_pearson_gamma_np)
-  summ_pearson_gamma_sp                     <- c(pearson_gamma, 
-                                                 mean_bstrp_pearson_gamma_sp,
-                                                 se_bstrp_pearson_gamma_sp,
-                                                 quantiles_pearson_gamma_sp,
-                                                 status_pearson_gamma_sp,
-                                                 pearson_status_pearson_gamma_sp)
+  summ_pearson_gamma_np   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_np, parameteric = 0, pearson = 1)   
+  summ_pearson_gamma_sp   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_sp, parameteric = 1, pearson = 1) 
   #-------------------------------------------------------------------------------------------------------------
   
   # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
@@ -688,39 +577,9 @@ execute_iteration  <- function(iter,
   }
   
   # Collect Results
-  names(pearson_partial_gamma)                       <- "Est"
-  mean_bstrp_pearson_partial_gamma_np                <- mean(pearson_partial_gamma_bs_np)
-  mean_bstrp_pearson_partial_gamma_sp                <- mean(pearson_partial_gamma_bs_sp)
-  names(mean_bstrp_pearson_partial_gamma_np)         <- "Est_Btstrp"
-  names(mean_bstrp_pearson_partial_gamma_sp)         <- "Est_Btstrp"
-  se_bstrp_pearson_partial_gamma_np                  <- sd(pearson_partial_gamma_bs_np)
-  se_bstrp_pearson_partial_gamma_sp                  <- sd(pearson_partial_gamma_bs_sp)
-  names(se_bstrp_pearson_partial_gamma_np)           <- "SE"
-  names(se_bstrp_pearson_partial_gamma_sp)           <- "SE"
-  quantiles_pearson_partial_gamma_np                 <- quantile(pearson_partial_gamma_bs_np, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  quantiles_pearson_partial_gamma_sp                 <- quantile(pearson_partial_gamma_bs_sp, c(0.025, 0.25, 0.5, 0.75, 0.975))
-  status_pearson_partial_gamma_np                    <- 0
-  status_pearson_partial_gamma_sp                    <- 1
-  names(status_pearson_partial_gamma_np)             <- "Parametric"
-  names(status_pearson_partial_gamma_sp)             <- "Parametric"
-  pearson_status_pearson_partial_gamma_np            <- 2
-  pearson_status_pearson_partial_gamma_sp            <- 2
-  names(pearson_status_pearson_partial_gamma_np)     <- "Pearson"
-  names(pearson_status_pearson_partial_gamma_sp)     <- "Pearson"
-  summ_pearson_partial_gamma_np                      <- c(pearson_partial_gamma, 
-                                                          mean_bstrp_pearson_partial_gamma_np,
-                                                          se_bstrp_pearson_partial_gamma_np, 
-                                                          quantiles_pearson_partial_gamma_np,
-                                                          status_pearson_partial_gamma_np,
-                                                          pearson_status_pearson_partial_gamma_np)
-  summ_pearson_partial_gamma_sp                      <- c(pearson_partial_gamma,
-                                                          mean_bstrp_pearson_partial_gamma_sp, 
-                                                          se_bstrp_pearson_partial_gamma_sp, 
-                                                          quantiles_pearson_partial_gamma_sp,
-                                                          status_pearson_partial_gamma_sp,
-                                                          pearson_status_pearson_partial_gamma_sp)
+  summ_pearson_partial_gamma_np   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_np, parameteric = 0, pearson = 2)   
+  summ_pearson_partial_gamma_sp   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_sp, parameteric = 1, pearson = 2) 
   #-------------------------------------------------------------------------------------------------------------
-  
   
   # Return Results----------------------------------------------------------------------------------------------
   
@@ -760,6 +619,15 @@ execute_iteration  <- function(iter,
            Scenario            = scenario) 
   
   rownames(summ_corr) <- NULL
+  
+  # TO DO 
+  # ADD N, S, R models to CJS OUTPUT
+  # ADD CORRECT CHAT Estimates on each model 
+  # BUILD CHAT TABLE (maybe)
+  
+  cjs_out$PropChat1 <- rep(compute_proposed_chat(rho,                 gamma),                nrow(cjs_out))
+  cjs_out$PropChat2 <- rep(compute_proposed_chat(pearson_rho,         pearson_gamma),        nrow(cjs_out))
+  cjs_out$PropChat3 <- rep(compute_proposed_chat(pearson_partial_rho, pearson_partial_gamma),nrow(cjs_out))
   
   results <- list(random_seed                 = random_seed,
                   cjs_out                     = cjs_out,
