@@ -210,7 +210,7 @@ run_cjs_model_mark <- function(cjs_data,
            "LB" = X3,
            "UB" = X4) %>%
     mutate(Parameter = param.names,
-           version   = version)
+           Version   = version)
   
   mark_results <- cbind(mark.stats,gof.stats)
   #Return Output
@@ -276,7 +276,71 @@ compute_mark_ci <- function(prob,se,alpha=0.05){
   return(list(lb.real,ub.real))
 } 
 
-
+# Compute Likelihood Ratio Test and Quasi-Likelihood Ratio Tests (F-test)
+compute_lrt_summ <- function(summ_cjs,
+                             iter,
+                             scenario){
+  
+  # Get nll values by model parameterization and cchat corrections
+  ll_data <- summ_cjs %>% 
+    group_by(Version) %>% 
+    summarize(ll                    = first(`-2lnl`),
+              df                    = first(npar),
+              CChat_Likelihood      = prod(unique(CChatAdj_Likelihood)),
+              CChat_Pearson         = prod(unique(CChatAdj_Pearson)),
+              CChat_Partial_Pearson = prod(unique(CChatAdj_Partial_Pearson)))
+  
+  # Compute lrt for TEST1 
+  null                   <- c("S","R","N","N","N")
+  alt                    <- c("B","B","B","R","S")
+  n_tests                <- length(null) 
+  lrt_stat               <- rep(0,n_tests)
+  lrt_df                 <- rep(0,n_tests)
+  lrt_pval               <- rep(0,n_tests)
+  F_stat_likelihood      <- rep(0,n_tests)
+  F_pval_likelihood      <- rep(0,n_tests)
+  F_stat_pearson         <- rep(0,n_tests)
+  F_pval_pearson         <- rep(0,n_tests)
+  F_stat_partial_pearson <- rep(0,n_tests)
+  F_pval_partial_pearson <- rep(0,n_tests)
+  
+  
+  for(i in 1:n_tests){
+    # Grab relevant statistics for test i
+    null_temp <- ll_data[ll_data$Version == null[i],]
+    alt_temp  <- ll_data[ll_data$Version == alt[i],]
+    lrt_delta <- (null_temp$ll - alt_temp$ll)
+    # COmpute standard LRT 
+    lrt_df[i]   <- ((alt_temp$df - null_temp$df))
+    lrt_stat[i] <- lrt_delta/lrt_df[i]
+    lrt_pval[i] <- pchisq(lrt_stat[i],df=lrt_df[i],lower.tail=FALSE)
+    # Compute F-Test using CChat_Likelihood
+    F_stat_likelihood[i] <- lrt_delta/(null_temp$CChat_Likelihood * lrt_df[i])  
+    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_delta,df2 = alt_temp$df,lower.tail=FALSE)
+    # Compute F-Test using CChat_Pearson
+    F_stat_pearson[i] <- lrt_delta/(null_temp$CChat_Pearson * lrt_df[i])  
+    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_delta,df2 = alt_temp$df,lower.tail=FALSE)
+    # Compute F-Test using CChat_Partial_Pearson
+    F_stat_partial_pearson[i] <- lrt_delta/(null_temp$CChat_Partial_Pearson * lrt_df[i])  
+    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_delta,df2 = alt_temp$df,lower.tail=FALSE)
+  }
+  
+  summ_lrt <- data.frame(null,
+                         alt,
+                         lrt_stat,
+                         lrt_df,
+                         lrt_pval,
+                         F_stat_likelihood,
+                         F_pval_likelihood,
+                         F_stat_pearson,
+                         F_pval_pearson,
+                         F_stat_partial_pearson,
+                         F_pval_partial_pearson,
+                         iter,
+                         scenario)
+  
+  return(summ_lrt)
+}
 
 # Execute one replicate of Simulation Study 
 execute_iteration  <- function(iter,
@@ -358,10 +422,10 @@ execute_iteration  <- function(iter,
            scenario = scenario) 
   
   # Get Predicted Probs for Correlation Estimators (using full model version)
-  phim_mark <- cjs_out %>% filter(version == "B" & Parameter == "PhiM") %>% pull(Est)
-  phif_mark <- cjs_out %>% filter(version == "B" & Parameter == "PhiF") %>% pull(Est)
-  pm_mark   <- cjs_out %>% filter(version == "B" & Parameter == "PM") %>% pull(Est)
-  pf_mark   <- cjs_out %>% filter(version == "B" & Parameter == "PF") %>% pull(Est)
+  phim_mark <- cjs_out %>% filter(Version == "B" & Parameter == "PhiM") %>% pull(Est)
+  phif_mark <- cjs_out %>% filter(Version == "B" & Parameter == "PhiF") %>% pull(Est)
+  pm_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PM") %>% pull(Est)
+  pf_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PF") %>% pull(Est)
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
@@ -724,12 +788,19 @@ execute_iteration  <- function(iter,
            Range95_Partial_Pearson  = UBAdj_Partial_Pearson - LBAdj_Partial_Pearson
     ) 
   
+  
+  summ_lrt <- compute_lrt_summ(summ_cjs,
+                               iter,
+                               scenario)
+  
+  
   cat("Success, returning results ...","\n")
   
   results <- list(random_seed                 = random_seed,
                   summ_cjs                    = summ_cjs,
                   summ_corr                   = summ_corr,
                   summ_chat                   = summ_chat,
+                  summ_lrt                    = summ_lrt,
                   rho_bs_np                   = unname(rho_bs_np),
                   rho_bs_sp                   = unname(rho_bs_sp),
                   rho_bs_np_pearson           = unname(rho_bs_np_pearson),
@@ -775,12 +846,14 @@ execute_simulation <- function(niter,
   summary_corr <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_corr))
   summary_cjs  <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_cjs))
   summ_chat    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_chat))
+  summ_lrt    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_lrt))
   
   # Return Results
   out <- list(results_list = results_list,
               summary_corr = summary_corr,
               summary_cjs  = summary_cjs,
-              summ_chat    = summ_chat)
+              summ_chat    = summ_chat,
+              summ_lrt     = summ_lrt)
   
   return(out)
   
