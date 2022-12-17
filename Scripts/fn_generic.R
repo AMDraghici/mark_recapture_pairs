@@ -58,19 +58,6 @@ inv.logit <- function(x){
   return(out)
 }
 
-
-# Numerically Stable Version
-softmax <- function(par){
-  n.par <- length(par)
-  par1  <- sort(par, decreasing = TRUE)
-  Lk    <- par1[1]
-  for (k in 1:(n.par-1)) {
-    Lk <- max(par1[k+1], Lk) + log1p(exp(-abs(par1[k+1] - Lk))) 
-  }
-  val <- exp(par - Lk)
-  return(val)
-}
-
 ## S/R Distribution Functions -------------------------------------------------------------------------------------
 
 #Extract joint binomial parameters
@@ -155,7 +142,6 @@ run_cjs_model_mark <- function(cjs_data,
   mark.process <- process.data(data   = dat.process,
                                model  = "CJS",
                                groups = "sex")
-  
   #Design Data List
   mark.ddl <- make.design.data(mark.process) 
   
@@ -239,6 +225,7 @@ compute_proposed_chat <- function(corr1, corr2){
   return(chat1 * chat2)
 }
 
+# Summarize Bootstrap output
 compute_btsrp_summary <- function(estimate, bstrp_replicates, parameteric, pearson){
   # Non-Parametric conditional estimator results
   mean_bstrp            <- mean(bstrp_replicates)
@@ -278,6 +265,7 @@ compute_mark_ci <- function(prob,se,alpha=0.05){
 
 # Compute Likelihood Ratio Test and Quasi-Likelihood Ratio Tests (F-test)
 compute_lrt_summ <- function(summ_cjs,
+                             n_eff,
                              iter,
                              scenario){
   
@@ -286,23 +274,33 @@ compute_lrt_summ <- function(summ_cjs,
     group_by(Version) %>% 
     summarize(ll                    = first(`-2lnl`),
               df                    = first(npar),
+              dev_df                = first(deviance.df),
               CChat_Likelihood      = prod(unique(CChatAdj_Likelihood)),
               CChat_Pearson         = prod(unique(CChatAdj_Pearson)),
               CChat_Partial_Pearson = prod(unique(CChatAdj_Partial_Pearson)))
   
   # Compute lrt for TEST1 
-  null                   <- c("S","R","N","N","N")
-  alt                    <- c("B","B","B","R","S")
-  n_tests                <- length(null) 
-  lrt_stat               <- rep(0,n_tests)
-  lrt_df                 <- rep(0,n_tests)
-  lrt_pval               <- rep(0,n_tests)
-  F_stat_likelihood      <- rep(0,n_tests)
-  F_pval_likelihood      <- rep(0,n_tests)
-  F_stat_pearson         <- rep(0,n_tests)
-  F_pval_pearson         <- rep(0,n_tests)
-  F_stat_partial_pearson <- rep(0,n_tests)
-  F_pval_partial_pearson <- rep(0,n_tests)
+  test                       <- c("SB","RB","NB","NR","NS")
+  null                       <- c("S","R","N","N","N")
+  alt                        <- c("B","B","B","R","S")
+  n_tests                    <- length(null) 
+  lrt_stat                   <- rep(0,n_tests)
+  lrt_df                     <- rep(0,n_tests)
+  lrt_pval                   <- rep(0,n_tests)
+  F_stat_likelihood          <- rep(0,n_tests)
+  F_pval_likelihood          <- rep(0,n_tests)
+  F_stat_pearson             <- rep(0,n_tests)
+  F_pval_pearson             <- rep(0,n_tests)
+  F_stat_partial_pearson     <- rep(0,n_tests)
+  F_pval_partial_pearson     <- rep(0,n_tests)
+  aic_delta                  <- rep(0,n_tests)
+  aicc_delta                 <- rep(0,n_tests)
+  aic_delta_likelihood       <- rep(0,n_tests)
+  aicc_delta_likelihood      <- rep(0,n_tests)
+  aic_delta_pearson          <- rep(0,n_tests)
+  aicc_delta_pearson         <- rep(0,n_tests)
+  aic_delta_partial_pearson  <- rep(0,n_tests)
+  aicc_delta_partial_pearson <- rep(0,n_tests)
   
   
   for(i in 1:n_tests){
@@ -316,16 +314,44 @@ compute_lrt_summ <- function(summ_cjs,
     lrt_pval[i] <- pchisq(lrt_stat[i],df=lrt_df[i],lower.tail=FALSE)
     # Compute F-Test using CChat_Likelihood
     F_stat_likelihood[i] <- lrt_delta/(null_temp$CChat_Likelihood * lrt_df[i])  
-    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_delta,df2 = alt_temp$df,lower.tail=FALSE)
+    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_delta,df2 = n_eff-null_temp$df-1, lower.tail=FALSE)
     # Compute F-Test using CChat_Pearson
     F_stat_pearson[i] <- lrt_delta/(null_temp$CChat_Pearson * lrt_df[i])  
-    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_delta,df2 = alt_temp$df,lower.tail=FALSE)
+    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_delta,df2 = n_eff-null_temp$df-1,lower.tail=FALSE)
     # Compute F-Test using CChat_Partial_Pearson
     F_stat_partial_pearson[i] <- lrt_delta/(null_temp$CChat_Partial_Pearson * lrt_df[i])  
-    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_delta,df2 = alt_temp$df,lower.tail=FALSE)
+    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_delta,df2 = n_eff-null_temp$df-1,lower.tail=FALSE)
+    # AIC Delta
+    aic_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 0) -
+                    compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 0)
+    
+    aicc_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 1) -
+                     compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 1)
+    
+    # AIC Delta Likelihood
+    aic_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0) -
+                               compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0)
+    
+    aicc_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1) -
+                                compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1)
+    
+    # AIC Delta Pearson
+    aic_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Pearson,cc = 0) -
+                            compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,  n = n_eff, chat = null_temp$CChat_Pearson, cc = 0)
+    
+    aicc_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Pearson, cc = 1) -
+                             compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Pearson, cc = 1)
+    
+    # AIC Delta Partial Pearson
+    aic_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0) -
+                                    compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0)
+    
+    aicc_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1) -
+                                     compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1)
   }
   
-  summ_lrt <- data.frame(null,
+  summ_lrt <- data.frame(test,
+                         null,
                          alt,
                          lrt_stat,
                          lrt_df,
@@ -336,11 +362,53 @@ compute_lrt_summ <- function(summ_cjs,
                          F_pval_pearson,
                          F_stat_partial_pearson,
                          F_pval_partial_pearson,
+                         aic_delta,
+                         aicc_delta,
+                         aic_delta_likelihood,
+                         aicc_delta_likelihood,
+                         aic_delta_pearson,
+                         aicc_delta_pearson,
+                         aic_delta_partial_pearson,
+                         aicc_delta_partial_pearson,
                          iter,
                          scenario)
   
   return(summ_lrt)
 }
+
+# Compute AIC using MARKED program logic
+compute_aic_mark <- function(ll, k, n, chat, cc = 0){
+  aic  <- ll/chat + 2*k + cc * (2*k * (k+1))/(n-k-1)
+  return(aic)
+}
+
+# Compute AIC Summary 
+compute_aic_summ <- function(summ_cjs,
+                             n_eff,
+                             iter,
+                             scenario){
+
+  summ_aic <- summ_cjs %>%
+    group_by(Version) %>%
+    summarize(ll                     = first(`-2lnl`),
+              pars                     = first(npar),
+              dev_df                 = first(deviance.df),
+              CChat_Likelihood       = prod(unique(CChatAdj_Likelihood)),
+              CChat_Pearson          = prod(unique(CChatAdj_Pearson)),
+              CChat_Partial_Pearson  = prod(unique(CChatAdj_Partial_Pearson))) %>% 
+    ungroup() %>% 
+    mutate(AIC                       = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = rep(1,4), cc = 0),
+           AICC                      = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = rep(1,4), cc = 1),
+           AIC_chat_likelihood       = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Likelihood, cc = 0),
+           AICC_chat_likelihood      = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Likelihood, cc = 1),
+           AIC_chat_pearson          = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Pearson, cc = 0),
+           AICC_chat_pearson         = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Pearson, cc = 1),
+           AIC_chat_partial_pearson  = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Partial_Pearson, cc = 0),
+           AICC_chat_partial_pearson = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Partial_Pearson, cc = 1))
+  
+  return(summ_aic)
+}
+
 
 # Execute one replicate of Simulation Study 
 execute_iteration  <- function(iter,
@@ -380,13 +448,13 @@ execute_iteration  <- function(iter,
   random_seed <- .Random.seed
   
   # Generate One set of pair-swap data
-  ps_data <- sim_dat(param_list) 
+  ps_data  <- sim_dat(param_list) 
   cjs_data <- format_to_cjs(ps_data)
+  n_eff    <- sum(colSums(cjs_data$x[,1:(cjs_data$k-1)]))
   
   # Compute ~true P and PHi
   PropF <- mean(cjs_data$female)
   PropM <- 1-PropF
-  
   Phi <- PhiF * PropF + PhiM * PropM
   P   <- PF * PropF + PM * PropM
   
@@ -432,10 +500,13 @@ execute_iteration  <- function(iter,
   
   # 1. Likelihood Approach -------------------------------------------------------------------------------------
   cat(paste0("Iteration#:", iter ," - Estimating recapture correlation, rho, using likelihood approach..."),"\n")
-  rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                       PF      = pf_mark,
-                                       PM      = pm_mark,
-                                       model   = "likelihood")
+  rho_list <- compute_recapture_correlation(ps_data = ps_data, 
+                                            PF      = pf_mark,
+                                            PM      = pm_mark,
+                                            model   = "likelihood")
+  
+  rho        <- rho_list$rho
+  n_eff_rho  <- rho_list$n_eff_rho
   names(rho) <- "Est"
   
   # Non-Parametric Bootstrap To Estimate SE 
@@ -473,7 +544,7 @@ execute_iteration  <- function(iter,
   pearson_rho <- compute_recapture_correlation(ps_data = ps_data, 
                                                PF      = pf_mark,
                                                PM      = pm_mark,
-                                               model   = "full_pearson")
+                                               model   = "full_pearson")$rho
   names(pearson_rho) <- "Est"
   
   # Non-Parametric Bootstrap To Estimate SE 
@@ -510,7 +581,7 @@ execute_iteration  <- function(iter,
   pearson_partial_rho <- compute_recapture_correlation(ps_data = ps_data, 
                                                        PF      = pf_mark,
                                                        PM      = pm_mark,
-                                                       model   = "partial_pearson")
+                                                       model   = "partial_pearson")$rho
   names(pearson_partial_rho) <- "Est"
   
   # Non-Parametric Bootstrap To Estimate SE 
@@ -554,12 +625,16 @@ execute_iteration  <- function(iter,
   } else {
     
     # Estimate Gamma from observed data
-    gamma <- compute_survival_correlation(ps_data = ps_data,
-                                          PFM     = compute_jbin_cjs(prob.f = pf_mark,
-                                                                     prob.m = pm_mark,
-                                                                     corr   = rho)$prob.mf,
-                                          PhiF    = phif_mark,
-                                          PhiM    = phim_mark)
+    gamma_list <- compute_survival_correlation(ps_data = ps_data,
+                                               PFM     = compute_jbin_cjs(prob.f = pf_mark,
+                                                                          prob.m = pm_mark,
+                                                                          corr   = rho)$prob.mf,
+                                               PhiF    = phif_mark,
+                                               PhiM    = phim_mark)
+    
+    # Get Gamma and Effective Sample Size
+    gamma       <- gamma_list$gamma
+    n_eff_gamma <- gamma_list$n_eff_gamma 
     
     # Non-Parametric Bootstrap To Estimate SE 
     cat(paste0("Iteration#:", iter ," - Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-likelihood..."),"\n")
@@ -590,6 +665,7 @@ execute_iteration  <- function(iter,
   }
   
   # Collect Results
+  names(gamma) <- "Est"
   summ_gamma_np   <- compute_btsrp_summary(gamma, gamma_bs_np, parameteric = 0, pearson = 0)   
   summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, parameteric = 1, pearson = 0)   
   #-------------------------------------------------------------------------------------------------------------
@@ -610,7 +686,7 @@ execute_iteration  <- function(iter,
                                                                              prob.m = pm_mark,
                                                                              corr   = pearson_rho)$prob.mf,
                                                   PhiF    = phif_mark,
-                                                  PhiM    = phim_mark)
+                                                  PhiM    = phim_mark)$gamma
     
     # Non-Parametric Bootstrap To Estimate SE 
     cat(paste0("Iteration#:", iter , " - Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-pearson..."),"\n")
@@ -641,6 +717,7 @@ execute_iteration  <- function(iter,
   }
   
   # Collect Results
+  names(pearson_gamma) <- "Est"
   summ_pearson_gamma_np   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_np, parameteric = 0, pearson = 1)   
   summ_pearson_gamma_sp   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_sp, parameteric = 1, pearson = 1) 
   #-------------------------------------------------------------------------------------------------------------
@@ -661,7 +738,7 @@ execute_iteration  <- function(iter,
                                                                                      prob.m = pm_mark,
                                                                                      corr   = pearson_partial_rho)$prob.mf,
                                                           PhiF    = phif_mark,
-                                                          PhiM    = phim_mark)
+                                                          PhiM    = phim_mark)$gamma
     
     # Non-Parametric Bootstrap To Estimate SE 
     cat(paste0("Iteration#:", iter , " - Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-psuedo-pearson..."),"\n")
@@ -692,6 +769,7 @@ execute_iteration  <- function(iter,
   }
   
   # Collect Results
+  names(pearson_partial_gamma) <- "Est"
   summ_pearson_partial_gamma_np   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_np, parameteric = 0, pearson = 2)   
   summ_pearson_partial_gamma_sp   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_sp, parameteric = 1, pearson = 2) 
   #-------------------------------------------------------------------------------------------------------------
@@ -788,19 +866,37 @@ execute_iteration  <- function(iter,
            Range95_Partial_Pearson  = UBAdj_Partial_Pearson - LBAdj_Partial_Pearson
     ) 
   
+  # Produce Likelihood Ratio Tests
+  summ_lrt <- compute_lrt_summ(summ_cjs = summ_cjs,
+                               n_eff    = n_eff,
+                               iter     = iter,
+                               scenario = scenario)
   
-  summ_lrt <- compute_lrt_summ(summ_cjs,
-                               iter,
-                               scenario)
   
+  # Produce AICC comparisons
+  summ_aic <- compute_aic_summ(summ_cjs = summ_cjs,
+                               n_eff    = n_eff,
+                               iter     = iter,
+                               scenario = scenario)
+  
+  # Summarize Sample Sizes
+  summ_n <- data.frame(n_eff                       = n_eff,
+                       n_eff_rho                   = n_eff_rho,
+                       n_eff_gamma                 = n_eff_gamma,
+                       iter                        = iter,
+                       scenario                    = scenario)
   
   cat("Success, returning results ...","\n")
   
   results <- list(random_seed                 = random_seed,
+                  ps_data                     = ps_data,
+                  cjs_data                    = cjs_data,
+                  summ_n                      = summ_n,
                   summ_cjs                    = summ_cjs,
                   summ_corr                   = summ_corr,
                   summ_chat                   = summ_chat,
                   summ_lrt                    = summ_lrt,
+                  summ_aic                    = summ_aic,
                   rho_bs_np                   = unname(rho_bs_np),
                   rho_bs_sp                   = unname(rho_bs_sp),
                   rho_bs_np_pearson           = unname(rho_bs_np_pearson),
@@ -846,14 +942,18 @@ execute_simulation <- function(niter,
   summary_corr <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_corr))
   summary_cjs  <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_cjs))
   summ_chat    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_chat))
-  summ_lrt    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_lrt))
+  summ_lrt     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_lrt))
+  summ_aic     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_aic))
+  summ_n        <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_n))
   
   # Return Results
   out <- list(results_list = results_list,
               summary_corr = summary_corr,
               summary_cjs  = summary_cjs,
               summ_chat    = summ_chat,
-              summ_lrt     = summ_lrt)
+              summ_lrt     = summ_lrt,
+              summ_aic     = summ_aic,
+              summ_n       = summ_n)
   
   return(out)
   
@@ -861,22 +961,22 @@ execute_simulation <- function(niter,
 
 # Get Scenario Grid for correlation estimator simulation study
 get_scenarios <- function(){
-  n <- c(150, 350)
-  k <- c(15,  30)
-  PF <- c(0.45, 0.75)
-  PM <- c(0.45, 0.75)
-  PhiF <- c(0.8)
-  PhiM <- c(0.8)
-  rho <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
-  gamma <-  sort(unique(c(0,seq(-0.1, 0.9, by = 0.25))))
+  n     <- c(150, 250)
+  k     <- c(15,  25)
+  PF    <- c(0.45, 0.75)
+  PM    <- c(0.45, 0.75)
+  PhiF  <- c(0.8)
+  PhiM  <- c(0.8)
+  rho   <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
+  gamma <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
   
-  scenario_grid          <- expand.grid(n_obs    = n,
-                                        k        = k,
-                                        rho_true = rho,
-                                        gam_true = gamma, 
-                                        PhiF     = PhiF,
-                                        PhiM     = PhiM,
-                                        PF       = PF)
+  scenario_grid  <- expand.grid(n_obs    = n,
+                                k        = k,
+                                rho_true = rho,
+                                gam_true = gamma, 
+                                PhiF     = PhiF,
+                                PhiM     = PhiM,
+                                PF       = PF)
   
   scenario_grid$PM       <- scenario_grid$PF
   scenario_grid$scenario <- 1:nrow(scenario_grid)

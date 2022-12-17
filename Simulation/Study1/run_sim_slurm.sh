@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --array=1-288
-#SBATCH --time=10:00:00
+#SBATCH --time=23:00:00
 #SBATCH --mem=3G
 #SBATCH --error=Logs/rep_%A_%a_long.log
 #SBATCH --output=Logs/rep_%A_%a_long.log
