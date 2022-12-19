@@ -1,7 +1,7 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-out_dir    <- src_dir %+% "Simulation/Study1/Output/"
+out_dir    <- src_dir %+% "Simulation/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
