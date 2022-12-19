@@ -217,12 +217,20 @@ compute_fisher_intervals <- function(r,N, alpha){
 
 
 # Proposed Chat Estimator 
-compute_proposed_chat <- function(corr1, corr2){
+compute_proposed_chat <- function(corr1,
+                                  corr2, 
+                                  linear = F){
   
-  chat1 <- ifelse(corr1 >= 0, 1+corr1, 1 + 0.5  * corr1)
-  chat2 <- ifelse(corr2 >= 0, 1+corr2, 1 + 0.5  * corr2)
+  if(linear){
+    cchat1 <- ifelse(corr1 >= 0, 1+corr1, 1 + 0.5  * corr1)
+    cchat2 <- ifelse(corr2 >= 0, 1+corr2, 1 + 0.5  * corr2)
+    cchat <- cchat1 * cchat2
+  } else {
+    cchat <- 2^(corr1 + corr2)
+  }
+ 
   
-  return(chat1 * chat2)
+  return(cchat)
 }
 
 # Summarize Bootstrap output
@@ -253,14 +261,14 @@ compute_btsrp_summary <- function(estimate, bstrp_replicates, parameteric, pears
 # Arg: Se is a standard error value
 # Arg: Alpha is a confidence level
 compute_mark_ci <- function(prob,se,alpha=0.05){
-  var.logit <- (se^2)/((prob-1)^2*prob^2)
-  se.logit <- sqrt(var.logit)
-  est.logit <- log(prob/(1-prob),base=exp(1))
-  ub.logit <- est.logit + round(qnorm(1-alpha/2),2)*se.logit
-  lb.logit <- est.logit - round(qnorm(1-alpha/2),2)*se.logit  
-  lb.real <- exp(lb.logit)/(1+exp(lb.logit))
-  ub.real <- exp(ub.logit)/(1+exp(ub.logit))
-  return(list(lb.real,ub.real))
+  var.logit <- (se^2)/((prob-1)^2*prob^2)                    # Var Delta Method
+  se.logit <- sqrt(var.logit)                                # SD transform
+  est.logit <- logit(prob)                                   # Logit
+  ub.logit <- est.logit + round(qnorm(1-alpha/2),2)*se.logit # CLT UB
+  lb.logit <- est.logit - round(qnorm(1-alpha/2),2)*se.logit # CLT LB
+  lb.real <- exp(lb.logit)/(1+exp(lb.logit))                 # Backtransform LB
+  ub.real <- exp(ub.logit)/(1+exp(ub.logit))                 # Backtransform UB
+  return(list(lb = lb.real,ub = ub.real))                    # Return interval
 } 
 
 # Compute Likelihood Ratio Test and Quasi-Likelihood Ratio Tests (F-test)
@@ -314,40 +322,40 @@ compute_lrt_summ <- function(summ_cjs,
     lrt_pval[i] <- pchisq(lrt_stat[i],df=lrt_df[i],lower.tail=FALSE)
     # Compute F-Test using CChat_Likelihood
     F_stat_likelihood[i] <- lrt_delta/(null_temp$CChat_Likelihood * lrt_df[i])  
-    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_delta,df2 = n_eff-null_temp$df-1, lower.tail=FALSE)
+    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_df[i] ,df2 = n_eff-(2 + null_temp$df)  - 1, lower.tail=FALSE)
     # Compute F-Test using CChat_Pearson
     F_stat_pearson[i] <- lrt_delta/(null_temp$CChat_Pearson * lrt_df[i])  
-    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_delta,df2 = n_eff-null_temp$df-1,lower.tail=FALSE)
+    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_df[i] ,df2 = n_eff-(2 + null_temp$df)  - 1,lower.tail=FALSE)
     # Compute F-Test using CChat_Partial_Pearson
     F_stat_partial_pearson[i] <- lrt_delta/(null_temp$CChat_Partial_Pearson * lrt_df[i])  
-    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_delta,df2 = n_eff-null_temp$df-1,lower.tail=FALSE)
+    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_df[i],df2 = n_eff-(2+null_temp$df) - 1,lower.tail=FALSE)
     # AIC Delta
     aic_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 0) -
-                    compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 0)
+      compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 0)
     
     aicc_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 1) -
-                     compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 1)
+      compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 1)
     
     # AIC Delta Likelihood
     aic_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0) -
-                               compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0)
+      compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0)
     
     aicc_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1) -
-                                compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1)
+      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1)
     
     # AIC Delta Pearson
     aic_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Pearson,cc = 0) -
-                            compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,  n = n_eff, chat = null_temp$CChat_Pearson, cc = 0)
+      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,  n = n_eff, chat = null_temp$CChat_Pearson, cc = 0)
     
     aicc_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Pearson, cc = 1) -
-                             compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Pearson, cc = 1)
+      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Pearson, cc = 1)
     
     # AIC Delta Partial Pearson
     aic_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0) -
-                                    compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0)
+      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0)
     
     aicc_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1) -
-                                     compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1)
+      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1)
   }
   
   summ_lrt <- data.frame(test,
@@ -387,24 +395,26 @@ compute_aic_summ <- function(summ_cjs,
                              n_eff,
                              iter,
                              scenario){
-
+  
   summ_aic <- summ_cjs %>%
     group_by(Version) %>%
     summarize(ll                     = first(`-2lnl`),
-              pars                     = first(npar),
+              pars                   = first(npar),
               dev_df                 = first(deviance.df),
               CChat_Likelihood       = prod(unique(CChatAdj_Likelihood)),
               CChat_Pearson          = prod(unique(CChatAdj_Pearson)),
               CChat_Partial_Pearson  = prod(unique(CChatAdj_Partial_Pearson))) %>% 
     ungroup() %>% 
-    mutate(AIC                       = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = rep(1,4), cc = 0),
-           AICC                      = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = rep(1,4), cc = 1),
-           AIC_chat_likelihood       = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Likelihood, cc = 0),
-           AICC_chat_likelihood      = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Likelihood, cc = 1),
-           AIC_chat_pearson          = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Pearson, cc = 0),
-           AICC_chat_pearson         = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Pearson, cc = 1),
+    mutate(AIC                       = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = rep(1,4),              cc = 0),
+           AICC                      = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = rep(1,4),              cc = 1),
+           AIC_chat_likelihood       = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Likelihood,      cc = 0),
+           AICC_chat_likelihood      = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Likelihood,      cc = 1),
+           AIC_chat_pearson          = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Pearson,         cc = 0),
+           AICC_chat_pearson         = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Pearson,         cc = 1),
            AIC_chat_partial_pearson  = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Partial_Pearson, cc = 0),
-           AICC_chat_partial_pearson = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Partial_Pearson, cc = 1))
+           AICC_chat_partial_pearson = compute_aic_mark(ll = ll, k = pars, n = n_eff, chat = CChat_Partial_Pearson, cc = 1),
+           iter                      = iter,
+           scenario                  = scenario)
   
   return(summ_aic)
 }
@@ -421,27 +431,33 @@ execute_iteration  <- function(iter,
                                rho_true,
                                n_pop,
                                k,
-                               init = NULL){
+                               init          = NULL,
+                               Betas         = list(beta0 = 1000, 
+                                                    beta1 = 1000),
+                               Delta         = 1,
+                               PropF         = 0.5,
+                               imputed_pairs = TRUE,
+                               small_out     = TRUE){
   
   # Simulate Data ------------------------------------------------------------------------------------------------
   cat(paste0("Iteration#:", iter , " - Generating pair-swap mark-recapture data..."),"\n")
   # Parameter Grid 
   param_list <- list(
-    n            = n_pop,              # Number of Animals
-    k            = k,                  # Occasions
-    prop.female  = 0.5,                # Proportion of simulated individuals to be female
-    delta        = rep(1, k),          # Probability that mating is attempted
-    phi.f        = rep(PhiF, k),       # Marginal Prob of Female Survival
-    phi.m        = rep(PhiM, k),       # Marginal Prob of Male Survival
-    gam          = rep(gam_true, k),   # Correlation in Survival Prob of Mates
-    p.f          = rep(PF, k),         # Marginal Prob of Female Recapture
-    p.m          = rep(PM, k),         # Marginal Prob of Male Recapture
-    rho          = rep(rho_true, k),   # Correlation in male survival rates
-    betas        = list(beta0 = 1000, 
-                        beta1 = 1000), # logit pair reform params, beta1 is history coef, assume always repartner
-    rand_init    = F,                  # Randomize Initial Entry (just leave as F)
-    init         = init,               # Initial Entry into population for individual n
-    show_unmated = T                   # Include unmated observations in attempt to mate step 
+    n             = n_pop,              # Number of Animals
+    k             = k,                  # Occasions
+    prop.female   = PropF,              # Proportion of simulated individuals to be female
+    delta         = rep(Delta, k),      # Probability that mating is attempted
+    phi.f         = rep(PhiF, k),       # Marginal Prob of Female Survival
+    phi.m         = rep(PhiM, k),       # Marginal Prob of Male Survival
+    gam           = rep(gam_true, k),   # Correlation in Survival Prob of Mates
+    p.f           = rep(PF, k),         # Marginal Prob of Female Recapture
+    p.m           = rep(PM, k),         # Marginal Prob of Male Recapture
+    rho           = rep(rho_true, k),   # Correlation in male survival rates
+    betas         = Betas,              # logit pair reform params, beta1 is history coef, assume always repartner
+    rand_init     = F,                  # Randomize Initial Entry (just leave as F)
+    init          = init,               # Initial Entry into population for individual n
+    show_unmated  = T,                  # Include unmated observations in attempt to mate step,
+    imputed_pairs = imputed_pairs       # Impute between observed partnerships 
   )
   
   # Store Seed information to be able to reproduce datasets if needed
@@ -450,6 +466,8 @@ execute_iteration  <- function(iter,
   # Generate One set of pair-swap data
   ps_data  <- sim_dat(param_list) 
   cjs_data <- format_to_cjs(ps_data)
+  
+  # Effective Sample Size CJS Model
   n_eff    <- sum(colSums(cjs_data$x[,1:(cjs_data$k-1)]))
   
   # Compute ~true P and PHi
@@ -476,7 +494,7 @@ execute_iteration  <- function(iter,
   for(i in 1:length(versions)){
     cat(paste0("Iteration#:", iter , " - Computing CJS estimates for Version:", versions[i], " ..."),"\n")
     cjs_list[[i]] <- run_cjs_model_mark(cjs_data = cjs_data,
-                                        title    = "mark_" %+% iter %+% "_" %+% scenario %+% "_" %+% versions[i] %+% "_",
+                                        title    = "mark_" %+% scenario %+% "_" %+% iter %+% "_" %+% versions[i] %+% "_",
                                         version  = versions[i])  
   }
   
@@ -809,7 +827,7 @@ execute_iteration  <- function(iter,
            Cover095            = 1*(0 <= `97.5%` & 0 >= `2.5%`),    
            Cover050            = 1*(0 <= `75%`   & 0 >= `25%`),    
            iter                = iter,
-           Scenario            = scenario) 
+           scenario            = scenario) 
   
   rownames(summ_corr) <- NULL
   
@@ -852,12 +870,12 @@ execute_iteration  <- function(iter,
                                              ifelse(Parameter == "Phi",
                                                     compute_proposed_chat(0, gam_true), 
                                                     1)),
-           UBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[[2]],
-           LBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[[1]],
-           UBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[[2]],
-           LBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[[1]],
-           UBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[[2]],
-           LBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[[1]],
+           UBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[["ub"]],
+           LBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[["lb"]],
+           UBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[["ub"]],
+           LBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[["lb"]],
+           UBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[["ub"]],
+           LBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[["lb"]],
            In95_Likelihood          = 1*(Truth <= UBAdj_Likelihood & Truth >= LBAdj_Likelihood),
            In95_Pearson             = 1*(Truth <= UBAdj_Pearson & Truth >= LBAdj_Pearson),
            In95_Partial_Pearson     = 1*(Truth <= UBAdj_Partial_Pearson & Truth >= LBAdj_Partial_Pearson),
@@ -888,27 +906,38 @@ execute_iteration  <- function(iter,
   
   cat("Success, returning results ...","\n")
   
-  results <- list(random_seed                 = random_seed,
-                  ps_data                     = ps_data,
-                  cjs_data                    = cjs_data,
-                  summ_n                      = summ_n,
-                  summ_cjs                    = summ_cjs,
-                  summ_corr                   = summ_corr,
-                  summ_chat                   = summ_chat,
-                  summ_lrt                    = summ_lrt,
-                  summ_aic                    = summ_aic,
-                  rho_bs_np                   = unname(rho_bs_np),
-                  rho_bs_sp                   = unname(rho_bs_sp),
-                  rho_bs_np_pearson           = unname(rho_bs_np_pearson),
-                  rho_bs_sp_pearson           = unname(rho_bs_sp_pearson),
-                  rho_bs_np_pearson_partial   = unname(rho_bs_np_pearson_partial),
-                  rho_bs_sp_pearson_partial   = unname(rho_bs_sp_pearson_partial),
-                  gamma_bs_np                 = unname(gamma_bs_np),
-                  gamma_bs_sp                 = unname(gamma_bs_sp),
-                  pearson_gamma_bs_np         = unname(pearson_gamma_bs_np),
-                  pearson_gamma_bs_sp         = unname(pearson_gamma_bs_sp),
-                  pearson_partial_gamma_bs_np = unname(pearson_partial_gamma_bs_np),
-                  pearson_partial_gamma_bs_sp = unname(pearson_partial_gamma_bs_sp))
+  if(small_out){
+    results <- list(random_seed                 = random_seed,
+                    summ_n                      = summ_n,
+                    summ_cjs                    = summ_cjs,
+                    summ_corr                   = summ_corr,
+                    summ_chat                   = summ_chat,
+                    summ_lrt                    = summ_lrt,
+                    summ_aic                    = summ_aic)
+  } else {
+    results <- list(random_seed                 = random_seed,
+                    ps_data                     = ps_data,
+                    cjs_data                    = cjs_data,
+                    summ_n                      = summ_n,
+                    summ_cjs                    = summ_cjs,
+                    summ_corr                   = summ_corr,
+                    summ_chat                   = summ_chat,
+                    summ_lrt                    = summ_lrt,
+                    summ_aic                    = summ_aic,
+                    rho_bs_np                   = unname(rho_bs_np),
+                    rho_bs_sp                   = unname(rho_bs_sp),
+                    rho_bs_np_pearson           = unname(rho_bs_np_pearson),
+                    rho_bs_sp_pearson           = unname(rho_bs_sp_pearson),
+                    rho_bs_np_pearson_partial   = unname(rho_bs_np_pearson_partial),
+                    rho_bs_sp_pearson_partial   = unname(rho_bs_sp_pearson_partial),
+                    gamma_bs_np                 = unname(gamma_bs_np),
+                    gamma_bs_sp                 = unname(gamma_bs_sp),
+                    pearson_gamma_bs_np         = unname(pearson_gamma_bs_np),
+                    pearson_gamma_bs_sp         = unname(pearson_gamma_bs_sp),
+                    pearson_partial_gamma_bs_np = unname(pearson_partial_gamma_bs_np),
+                    pearson_partial_gamma_bs_sp = unname(pearson_partial_gamma_bs_sp))
+  }
+  
   
   return(results)
 }
@@ -924,19 +953,30 @@ execute_simulation <- function(niter,
                                rho_true,
                                n_pop,
                                k,
-                               init = NULL){
+                               Betas         = list(beta0 = 1000, 
+                                                    beta1 = 1000),
+                               Delta         = 1,
+                               PropF         = 0.5,
+                               init          = NULL,
+                               imputed_pairs = TRUE,
+                               small_out     = TRUE){
   # Run niter replicates 
-  results_list <- lapply(1:niter, function(iter) execute_iteration(iter,
-                                                                   scenario,
-                                                                   PM,
-                                                                   PF,
-                                                                   PhiF,
-                                                                   PhiM,
-                                                                   gam_true,
-                                                                   rho_true,
-                                                                   n_pop,
-                                                                   k,
-                                                                   init = NULL))
+  results_list <- lapply(1:niter, function(iter) execute_iteration(iter          = iter,
+                                                                   scenario      = scenario,
+                                                                   PM            = PM,
+                                                                   PF            = PF,
+                                                                   PhiF          = PhiF,
+                                                                   PhiM          = PhiM,
+                                                                   gam_true      = gam_true,
+                                                                   rho_true      = rho_true,
+                                                                   n_pop         = n_pop,
+                                                                   k             = k,
+                                                                   Betas         = Betas,
+                                                                   Delta         = Delta,
+                                                                   PropF         = PropF,
+                                                                   init          = init,
+                                                                   imputed_pairs = imputed_pairs,
+                                                                   small_out     = small_out))
   
   # Construct Summaries of Probs and Correlations
   summary_corr <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_corr))
@@ -944,16 +984,30 @@ execute_simulation <- function(niter,
   summ_chat    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_chat))
   summ_lrt     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_lrt))
   summ_aic     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_aic))
-  summ_n        <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_n))
+  summ_n       <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_n))
+  random_seeds <- lapply(1:niter, function(iter) results_list[[iter]]$random_seed)
   
   # Return Results
-  out <- list(results_list = results_list,
-              summary_corr = summary_corr,
-              summary_cjs  = summary_cjs,
-              summ_chat    = summ_chat,
-              summ_lrt     = summ_lrt,
-              summ_aic     = summ_aic,
-              summ_n       = summ_n)
+  if(small_out){
+    # Only summaries and random.seeds
+    out <- list(summary_corr = summary_corr,
+                summary_cjs  = summary_cjs,
+                summ_chat    = summ_chat,
+                summ_lrt     = summ_lrt,
+                summ_aic     = summ_aic,
+                summ_n       = summ_n,
+                random_seeds = random_seeds)
+  } else {
+    # Summaries, data, bootstrap estimates
+    out <- list(results_list = results_list,
+                summary_corr = summary_corr,
+                summary_cjs  = summary_cjs,
+                summ_chat    = summ_chat,
+                summ_lrt     = summ_lrt,
+                summ_aic     = summ_aic,
+                summ_n       = summ_n)
+  }
+  
   
   return(out)
   
@@ -961,6 +1015,8 @@ execute_simulation <- function(niter,
 
 # Get Scenario Grid for correlation estimator simulation study
 get_scenarios <- function(){
+  
+  # General Scenarios
   n     <- c(150, 250)
   k     <- c(15,  25)
   PF    <- c(0.45, 0.75)
@@ -970,15 +1026,64 @@ get_scenarios <- function(){
   rho   <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
   gamma <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
   
-  scenario_grid  <- expand.grid(n_obs    = n,
-                                k        = k,
-                                rho_true = rho,
-                                gam_true = gamma, 
-                                PhiF     = PhiF,
-                                PhiM     = PhiM,
-                                PF       = PF)
+  scenario_grid_base  <- expand.grid(n_obs    = n,
+                                     k        = k,
+                                     rho_true = rho,
+                                     gam_true = gamma, 
+                                     PhiF     = PhiF,
+                                     PhiM     = PhiM,
+                                     PF       = PF)
   
-  scenario_grid$PM       <- scenario_grid$PF
+  scenario_grid_base$PM            <- scenario_grid_base$PF
+  scenario_grid_base$Beta0         <- 1e3
+  scenario_grid_base$Beta1         <- 1e3
+  scenario_grid_base$Delta         <- 1
+  scenario_grid_base$imputed_pairs <- TRUE
+  
+  # Testing Hypothesis with Alternative
+  
+  phi_param <- compute_jbin_param_cjs(0.7,0.8)
+  p_param   <-compute_jbin_param_cjs(0.7,0.75)
+  
+  gl <- phi_param$cor_lower_bound
+  gu <- phi_param$cor_upper_bound
+  rl <- p_param$cor_lower_bound
+  ru <- p_param$cor_upper_bound
+  
+  rho2   <- sort(unique(c(0, seq(rl + 0.01, ru - 0.01, by = 0.25))))
+  gamma2 <- sort(unique(c(0, seq(gl + 0.01, gu - 0.01, by = 0.25))))
+  
+  scenario_grid_alternative <- expand.grid(n_obs         = 250,
+                                           k             = 25,
+                                           rho_true      = rho2,
+                                           gam_true      = gamma2, 
+                                           PhiF          = 0.7,
+                                           PhiM          = 0.8,
+                                           PF            = 0.70,
+                                           PM            = 0.75,
+                                           Beta0         = 1e3,
+                                           Beta1         = 1e3,
+                                           Delta         = 1,
+                                           imputed_pairs = TRUE)
+  
+  # Testing Imputed Mates Off
+  scenario_imputed_off <- expand.grid(n_obs         = 250,
+                                      k             = 25,
+                                      rho_true      = rho,
+                                      gam_true      = gamma, 
+                                      PhiF          = 0.8,
+                                      PhiM          = 0.8,
+                                      PF            = 0.75,
+                                      PM            = 0.75,
+                                      Beta0         = 0.25,
+                                      Beta1         = 0,
+                                      Delta         = 1,
+                                      imputed_pairs = FALSE)
+  
+  
+  
+  scenario_grid          <- rbind(scenario_grid_base, scenario_grid_alternative, scenario_imputed_off)
+  scenario_grid$PropF    <- 0.5
   scenario_grid$scenario <- 1:nrow(scenario_grid)
   return(scenario_grid)
 }

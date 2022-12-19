@@ -771,6 +771,8 @@ compute_hidden_pairs <- function(pairs_f,
                                  recap_m, 
                                  recruit_f,
                                  recruit_m,
+                                 af,
+                                 am,
                                  first_capture_f,
                                  first_capture_m,
                                  k,
@@ -778,7 +780,8 @@ compute_hidden_pairs <- function(pairs_f,
                                  repartner, 
                                  mating_f,
                                  mating_m, 
-                                 show_unmated = F){
+                                 show_unmated  = T,
+                                 imputed_pairs = T){
   
   # Number of females and males 
   nf <- length(sex[sex == "F"]) 
@@ -1037,54 +1040,70 @@ compute_hidden_pairs <- function(pairs_f,
   arepartner[,1] <- 0 
   
   # Apply Interval Filter (can only be with next/previous/single)-----------------------------------------------------------------------------------------------
-  for(i in 1:nf){
-    
-    partners_i <- apairs_f[i,1:k][!is.na(apairs_f[i,1:k])]
-    partners_i <- partners_i[partners_i != (nm+1)]
-    first_partner <- partners_i[1]
-    
-    # If no pairs observed make no possible combos
-    if(length(partners_i) == 0) next
-    
-    for(t in 1:k){
-      # Who was individual i's last partner?
-      last_partner <- apairs_f[i,1:t][!is.na(apairs_f[i,1:t])]
-      last_partner <- last_partner[last_partner != (nm+1)]
-      if(length(last_partner)==0){
-        last_partner <- nm+1
-      }
-      last_partner <- last_partner[length(last_partner)]
+  if(imputed_pairs){
+    for(i in 1:nf){
+      partners_i <- apairs_f[i,1:k][!is.na(apairs_f[i,1:k])]
+      partners_i <- partners_i[partners_i != (nm+1)]
+      first_partner <- partners_i[1]
       
-      # Who was individual i's next partner?
-      # If t == k and unknown then just grab last partner
-      if(t == k){
-        next_partner <-  apairs_f[i,k][!is.na(apairs_f[i,k])]
-        if(length(next_partner) == 0){
-          next_partner <- nm+1
-        }
-      } else {
-        next_partner <-  apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])] 
-        next_partner <- next_partner[next_partner != (nm+1)]
-        if(length(next_partner)==0){
-          next_partner <- nm+1
-        }
-        next_partner <- next_partner[1]
-      }
+      # If no pairs observed make no possible combos
+      if(length(partners_i) == 0) next
       
-      # If observed unmated set to unmated
-      if(!is.na(amating_f[i,t])){
-        if(amating_f[i,t] == 0){
-          apairs_f[i,t] <- (nm+1)
-          next
+      for(t in 1:k){
+        # Who was individual i's last partner?
+        last_partner <- apairs_f[i,1:t][!is.na(apairs_f[i,1:t])]
+        last_partner <- last_partner[last_partner != (nm+1)]
+        if(length(last_partner)==0){
+          last_partner <- nm+1
         }
-      }
-      
-      if(is.na(apairs_f[i,t])){
+        last_partner <- last_partner[length(last_partner)]
         
-        if(next_partner == last_partner & next_partner != nm+1){
-          apairs_f[i,t] <- next_partner
-          apairs_m[next_partner,t] <- i
-        } 
+        # Who was individual i's next partner?
+        # If t == k and unknown then just grab last partner
+        if(t == k){
+          next_partner <-  apairs_f[i,k][!is.na(apairs_f[i,k])]
+          if(length(next_partner) == 0){
+            next_partner <- nm+1
+          }
+        } else {
+          next_partner <-  apairs_f[i,(t+1):k][!is.na(apairs_f[i,(t+1):k])] 
+          next_partner <- next_partner[next_partner != (nm+1)]
+          if(length(next_partner)==0){
+            next_partner <- nm+1
+          }
+          next_partner <- next_partner[1]
+        }
+        
+        # If observed unmated set to unmated
+        if(!is.na(amating_f[i,t])){
+          if(amating_f[i,t] == 0){
+            apairs_f[i,t] <- (nm+1)
+            next
+          }
+        }
+        
+        if(is.na(apairs_f[i,t])){
+          
+          if(next_partner == last_partner & next_partner != nm+1){
+            apairs_f[i,t] <- next_partner
+            apairs_m[next_partner,t] <- i
+          } 
+        }
+      }
+    }
+    
+    # Assume that divorce only occurs upon death
+    for(i in 1:nf){
+      for(t in (first_capture_f[i]+1):k){
+        if(!is.na(apairs_f[i,t-1]) & is.na(apairs_f[i,t])){
+          if(apairs_f[i,t-1] == (nm+1)) next
+          if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
+            if(pairs_f[i,t] != apairs_f[i,t-1]) browser()
+            apairs_f[i,t] <- apairs_f[i,t-1]
+            apairs_m[apairs_f[i,t],t-1] <- i
+            apairs_m[apairs_f[i,t],t] <- i
+          }
+        }
       }
     }
   }
@@ -1183,7 +1202,7 @@ simulate_cr_data <- function(n,
                              rand_init = T,
                              init = NULL,
                              show_unmated,
-                             data_aug){
+                             imputed_pairs){
   
   # Make sure the number of individuals simulated is even
   if(!n %% 2 == 0){
@@ -1193,7 +1212,7 @@ simulate_cr_data <- function(n,
     }
   }
   
-  # Generate SKeleton Data Structures
+  # Generate Skeleton Data Structures
   sex             <- construct_sexes(n = n, prop.female = prop.female)
   initial_entry   <- construct_init_entry(n = n, k = k, random = rand_init, init = init) 
   first_capture_f <- initial_entry[sex == "F"]
@@ -1347,6 +1366,8 @@ simulate_cr_data <- function(n,
                                       recap_m            = recap_m,
                                       recruit_f          = recruit_f,
                                       recruit_m          = recruit_m,
+                                      af                 = af,
+                                      am                 = am,
                                       first_capture_f    = first_capture_f,
                                       first_capture_m    = first_capture_m,
                                       k                  = k,
@@ -1354,7 +1375,8 @@ simulate_cr_data <- function(n,
                                       repartner          = repartner,
                                       mating_m           = mating_m,
                                       mating_f           = mating_f,
-                                      show_unmated       = show_unmated)
+                                      show_unmated       = show_unmated,
+                                      imputed_pairs      = imputed_pairs)
   
   apairs              <- apairs_list[["apairs"]]
   amating_f           <- apairs_list[["amating_f"]]
@@ -1367,23 +1389,7 @@ simulate_cr_data <- function(n,
   sex_counts <- table(sex)
   nf         <- sex_counts[1]
   nm         <- sex_counts[2]
-  
-  # # Optional Assumption to include
-  # Assume that divorce only occurs upon death
-  for(i in 1:nf){
-    for(t in (first_capture_f[i]+1):k){
-      if(!is.na(apairs_f[i,t-1]) & is.na(apairs_f[i,t])){
-        if(apairs_f[i,t-1] == (nm+1)) next
-        if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-          if(pairs_f[i,t] != apairs_f[i,t-1]) browser()
-          apairs_f[i,t] <- apairs_f[i,t-1]
-          apairs_m[apairs_f[i,t],t-1] <- i
-          apairs_m[apairs_f[i,t],t] <- i
-        }
-      }
-    }
-  }
-  
+
   # Return JAGS/NIBMLE (and true) Data
   model_data <- list(
     # Known data 

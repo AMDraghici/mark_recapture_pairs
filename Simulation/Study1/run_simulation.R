@@ -30,17 +30,23 @@ x <- Sys.time()
 runif(1)
 
 # Run Simulation
-results <- execute_simulation(niter      = 1e3,
-                              scenario   = scenario_grid[scenario,"scenario"],
-                              PM         = scenario_grid[scenario,"PM"],
-                              PF         = scenario_grid[scenario,"PF"],
-                              PhiF       = scenario_grid[scenario,"PhiF"],
-                              PhiM       = scenario_grid[scenario,"PhiM"],
-                              gam_true   = scenario_grid[scenario,"gam_true"],
-                              rho_true   = scenario_grid[scenario,"rho_true"],
-                              n_pop      = scenario_grid[scenario,"n_obs"],
-                              k          = scenario_grid[scenario,"k"],
-                              init       = NULL)
+results <- execute_simulation(niter         = 1e3,
+                              scenario      = scenario_grid[scenario,"scenario"],
+                              PM            = scenario_grid[scenario,"PM"],
+                              PF            = scenario_grid[scenario,"PF"],
+                              PhiF          = scenario_grid[scenario,"PhiF"],
+                              PhiM          = scenario_grid[scenario,"PhiM"],
+                              gam_true      = scenario_grid[scenario,"gam_true"],
+                              rho_true      = scenario_grid[scenario,"rho_true"],
+                              n_pop         = scenario_grid[scenario,"n_obs"],
+                              k             = scenario_grid[scenario,"k"],
+                              Betas         = list(beta0 = scenario_grid[scenario,"Beta0"], 
+                                                   beta1 = scenario_grid[scenario,"Beta1"]),
+                              Delta         = scenario_grid[scenario,"Delta"],
+                              PropF         = scenario_grid[scenario,"PropF"],
+                              imputed_pairs = scenario_grid[scenario,"imputed_pairs"],
+                              init          = NULL,
+                              small_out     = TRUE)
 
 y <- Sys.time()
 difftime(y,x,units = "mins")
