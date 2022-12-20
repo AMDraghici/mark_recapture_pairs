@@ -308,6 +308,8 @@ compute_bootstrap_estimates_recapture_correlation <- function(ps_data,
   # Drop unknowns
   rho_bs[is.na(rho_bs)] <- 10
   
+  if(rho == 10) rho_bs <- rep(10, iter)
+  
   return(rho_bs)
 }
 

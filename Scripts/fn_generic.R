@@ -257,7 +257,7 @@ run_cjs_model_mark <- function(cjs_data,
   mark_results <- cbind(mark.stats,gof.stats) %>% 
     mutate(Deviance_chat = deviance/deviance.df, 
            Pearson_chat  = chat_list[["Pearson_chat"]],
-           Flecther_chat = chat_list[["Fletcher_chat"]])
+           Fletcher_chat = chat_list[["Fletcher_chat"]])
   #Return Output
   return(mark_results)
   
@@ -381,13 +381,13 @@ compute_lrt_summ <- function(summ_cjs,
     lrt_pval[i] <- pchisq(lrt_stat[i],df=lrt_df[i],lower.tail=FALSE)
     # Compute F-Test using CChat_Likelihood
     F_stat_likelihood[i] <- lrt_delta/(null_temp$CChat_Likelihood * lrt_df[i])  
-    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_df[i] ,df2 = n_eff-(2 + null_temp$df)  - 1, lower.tail=FALSE)
+    F_pval_likelihood[i] <- pf(F_stat_likelihood[i],df1 = lrt_df[i] ,df2 = alt_temp$df, lower.tail=FALSE)
     # Compute F-Test using CChat_Pearson
     F_stat_pearson[i] <- lrt_delta/(null_temp$CChat_Pearson * lrt_df[i])  
-    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_df[i] ,df2 = n_eff-(2 + null_temp$df)  - 1,lower.tail=FALSE)
+    F_pval_pearson[i] <- pf(F_stat_pearson[i],df1 = lrt_df[i] ,df2 = alt_temp$df,lower.tail=FALSE)
     # Compute F-Test using CChat_Partial_Pearson
     F_stat_partial_pearson[i] <- lrt_delta/(null_temp$CChat_Partial_Pearson * lrt_df[i])  
-    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_df[i],df2 = n_eff-(2+null_temp$df) - 1,lower.tail=FALSE)
+    F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_df[i],df2 = alt_temp$df,lower.tail=FALSE)
     # AIC Delta
     aic_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 0) -
       compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 0)
@@ -1267,6 +1267,106 @@ get_scenarios <- function(){
                                            Delta         = 1,
                                            imputed_pairs = TRUE)
   
+  # Hduck: Test1
+  phi_param <- compute_jbin_param_cjs(0.67,0.74)
+  p_param   <-compute_jbin_param_cjs(0.48,0.21)
+  
+  gl <- phi_param$cor_lower_bound
+  gu <- phi_param$cor_upper_bound
+  rl <- p_param$cor_lower_bound
+  ru <- p_param$cor_upper_bound
+  
+  rho3   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
+  gamma3 <- sort(unique(c(0, gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
+  
+  scenario_grid_hduck1 <- expand.grid(n_obs         = 250,
+                                      k             = 25,
+                                      rho_true      = rho3,
+                                      gam_true      = gamma3, 
+                                      PhiF          = 0.67,
+                                      PhiM          = 0.74,
+                                      PF            = 0.48,
+                                      PM            = 0.21,
+                                      Beta0         = 1e3,
+                                      Beta1         = 1e3,
+                                      Delta         = 1,
+                                      imputed_pairs = TRUE)
+  
+  # Hduck: Test2
+  phi_param <- compute_jbin_param_cjs(0.67,0.74)
+  p_param   <-compute_jbin_param_cjs(0.33,0.33)
+  
+  gl <- phi_param$cor_lower_bound
+  gu <- phi_param$cor_upper_bound
+  rl <- p_param$cor_lower_bound
+  ru <- p_param$cor_upper_bound
+  
+  rho4   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
+  gamma4 <- sort(unique(c(0,gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
+  
+  scenario_grid_hduck2 <- expand.grid(n_obs         = 250,
+                                      k             = 25,
+                                      rho_true      = rho4,
+                                      gam_true      = gamma4, 
+                                      PhiF          = 0.67,
+                                      PhiM          = 0.74,
+                                      PF            = 0.33,
+                                      PM            = 0.33,
+                                      Beta0         = 1e3,
+                                      Beta1         = 1e3,
+                                      Delta         = 1,
+                                      imputed_pairs = TRUE)
+  
+  # Hduck: Test3
+  phi_param <- compute_jbin_param_cjs(0.7,0.7)
+  p_param   <-compute_jbin_param_cjs(0.48, 0.21)
+  
+  gl <- phi_param$cor_lower_bound
+  gu <- phi_param$cor_upper_bound
+  rl <- p_param$cor_lower_bound
+  ru <- p_param$cor_upper_bound
+  
+  rho5   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
+  gamma5 <- sort(unique(c(0, gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
+  
+  scenario_grid_hduck3 <- expand.grid(n_obs         = 250,
+                                      k             = 25,
+                                      rho_true      = rho5,
+                                      gam_true      = gamma5, 
+                                      PhiF          = 0.7,
+                                      PhiM          = 0.7,
+                                      PF            = 0.48,
+                                      PM            = 0.21,
+                                      Beta0         = 1e3,
+                                      Beta1         = 1e3,
+                                      Delta         = 1,
+                                      imputed_pairs = TRUE)
+  
+  # Hduck: Test4
+  phi_param <- compute_jbin_param_cjs(0.7,0.7)
+  p_param   <-compute_jbin_param_cjs(0.33,0.33)
+  
+  gl <- phi_param$cor_lower_bound
+  gu <- phi_param$cor_upper_bound
+  rl <- p_param$cor_lower_bound
+  ru <- p_param$cor_upper_bound
+  
+  rho6   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
+  gamma6 <- sort(unique(c(0, gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
+  
+  scenario_grid_hduck4 <- expand.grid(n_obs         = 250,
+                                      k             = 25,
+                                      rho_true      = rho6,
+                                      gam_true      = gamma6, 
+                                      PhiF          = 0.7,
+                                      PhiM          = 0.7,
+                                      PF            = 0.33,
+                                      PM            = 0.33,
+                                      Beta0         = 1e3,
+                                      Beta1         = 1e3,
+                                      Delta         = 1,
+                                      imputed_pairs = TRUE)
+  
   # Testing Imputed Mates Off
   scenario_imputed_off <- expand.grid(n_obs         = 250,
                                       k             = 25,
@@ -1283,7 +1383,13 @@ get_scenarios <- function(){
   
   
   
-  scenario_grid          <- rbind(scenario_grid_base, scenario_grid_alternative, scenario_imputed_off)
+  scenario_grid          <- rbind(scenario_grid_base, 
+                                  scenario_grid_hduck1,
+                                  scenario_grid_hduck2,
+                                  scenario_grid_hduck3,
+                                  scenario_grid_hduck4,
+                                  scenario_grid_alternative,
+                                  scenario_imputed_off)
   scenario_grid$PropF    <- 0.5
   scenario_grid$scenario <- 1:nrow(scenario_grid)
   return(scenario_grid)
@@ -1293,62 +1399,4 @@ get_scenarios <- function(){
 # Compact ifelse for NA
 convert_na <- function(x,y=0){
   ifelse(is.na(x), y, x)
-}
-
-# Get Summary Statistics from CODA MCMC object
-gather_posterior_summary <- function(fit, nchains){
-  
-  # Summarize Results
-  summ <- summary(fit)
-  # nchains <- length(fit)
-  
-  if(nchains > 1){
-    niter   <- nrow(fit[[1]])
-  } else {
-    niter <- nrow(fit)
-  }
-  
-  # Put results into dataframe
-  summ_stats <- as.data.frame(summ$statistics) %>%
-    tibble::rownames_to_column(var = "Parameter")
-  summ_quant <- as.data.frame(summ$quantiles)  %>% 
-    tibble::rownames_to_column(var = "Parameter")
-  
-  if(nchains > 1){
-    rhat <- gelman.diag(fit,multivariate = FALSE) 
-    rhat_df <- rhat$psrf %>% 
-      as.data.frame() %>%
-      tibble::rownames_to_column(var = "Parameter") %>% 
-      rename("rhat" = "Point est.", 
-             rhat_upper = "Upper C.I.")
-  }
-  
-  effective_vector <- effectiveSize(fit) 
-  effective_df <- data.frame(Parameter = names(effective_vector),
-                             n_eff = unname(effective_vector)) %>% 
-    mutate(normalized_n_eff = n_eff/(nchains * niter))
-  
-  summ_stats <- as.data.frame(summ$statistics) %>%
-    tibble::rownames_to_column(var = "Parameter")
-  
-  summ_quant <- as.data.frame(summ$quantiles)  %>%
-    tibble::rownames_to_column(var = "Parameter")
-  
-  post_stats <- suppressWarnings(inner_join(summ_stats, 
-                                            summ_quant, 
-                                            by = "Parameter") %>% 
-                                   mutate(unique_pars      = as.factor(gsub(Parameter, pattern = "\\[.*]", replacement = "")),
-                                          par_index        = convert_na(as.double(sub("^.*\\[(.*?)\\]","\\1",Parameter)))) %>% 
-                                   inner_join(effective_df, by = "Parameter") %>%
-                                   mutate(mcse_n_eff = SD/sqrt(n_eff)) %>% 
-                                   rename(mcse = "Naive SE",
-                                          mcse_ts = "Time-series SE"))
-  
-  if(nchains > 1){
-    post_stats <- post_stats %>% 
-      inner_join(rhat_df, by = "Parameter")
-  }
-  
-  # Return Results
-  return(post_stats)
 }
