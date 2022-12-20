@@ -133,15 +133,26 @@ run_cjs_model_mark <- function(cjs_data,
   p.grp       <- list(formula = ~sex)
   
   #Process Mark Data (Extract Recapture/sex)
-  dat.process <- cjs_data$x %>% 
-    as.data.frame() %>% 
-    unite("ch",sep="") %>% 
-    mutate(sex = as.factor(ifelse(cjs_data$female == 1, "F", "M"))) %>%
-    arrange(sex) 
+  # Add sex grouping for B,R,S only
+  if(version == "N"){
+    dat.process <- cjs_data$x %>% 
+      as.data.frame() %>% 
+      unite("ch",sep="") 
+    
+    mark.process <- process.data(data   = dat.process,
+                                 model  = "CJS")
+  } else {
+    dat.process <- cjs_data$x %>% 
+      as.data.frame() %>% 
+      unite("ch",sep="") %>% 
+      mutate(sex = as.factor(ifelse(cjs_data$female == 1, "F", "M"))) %>%
+      arrange(sex)
+    
+    mark.process <- process.data(data   = dat.process,
+                                 model  = "CJS",
+                                 groups = "sex")
+  }
   
-  mark.process <- process.data(data   = dat.process,
-                               model  = "CJS",
-                               groups = "sex")
   #Design Data List
   mark.ddl <- make.design.data(mark.process) 
   
@@ -166,6 +177,7 @@ run_cjs_model_mark <- function(cjs_data,
     p.name           <- c("P")
   }
   
+  # Add names
   param.names <- c(phi.name, p.name)
   
   #Generate Estimates
@@ -198,7 +210,54 @@ run_cjs_model_mark <- function(cjs_data,
     mutate(Parameter = param.names,
            Version   = version)
   
-  mark_results <- cbind(mark.stats,gof.stats)
+  # Add Pearson and Flecthers Chat
+  if(version == "B"){
+    PhiF      <- mark.stats %>% filter(Parameter == "PhiF") %>% pull(Est)
+    PhiM      <- mark.stats %>% filter(Parameter == "PhiM") %>% pull(Est)
+    PM        <- mark.stats %>% filter(Parameter == "PM") %>% pull(Est)
+    PF        <- mark.stats %>% filter(Parameter == "PF") %>% pull(Est)
+    chat_list <- compute_chat_mark(cjs_data = cjs_data,
+                                   PhiF     = PhiF,
+                                   PhiM     = PhiM,
+                                   PF       = PF,
+                                   PM       = PM,
+                                   ungroup = F)
+    
+  } else if(version == "S"){
+    PhiF      <- mark.stats %>% filter(Parameter == "PhiF") %>% pull(Est)
+    PhiM      <- mark.stats %>% filter(Parameter == "PhiM") %>% pull(Est)
+    PM        <- PF   <- mark.stats %>% filter(Parameter == "P") %>% pull(Est)
+    chat_list <- compute_chat_mark(cjs_data = cjs_data,
+                                   PhiF     = PhiF,
+                                   PhiM     = PhiM,
+                                   PF       = PF,
+                                   PM       = PM,
+                                   ungroup  = F)
+  } else if(version == "R"){
+    PhiF      <- PhiM <- mark.stats %>% filter(Parameter == "Phi") %>% pull(Est)
+    PM        <- mark.stats %>% filter(Parameter == "PM") %>% pull(Est)
+    PF        <- mark.stats %>% filter(Parameter == "PF") %>% pull(Est)
+    chat_list <- compute_chat_mark(cjs_data = cjs_data,
+                                   PhiF     = PhiF,
+                                   PhiM     = PhiM,
+                                   PF       = PF,
+                                   PM       = PM,
+                                   ungroup  = F)
+  } else if(version == "N"){
+    PhiF <- PhiM <- mark.stats %>% filter(Parameter == "Phi") %>% pull(Est)
+    PM   <- PF   <- mark.stats %>% filter(Parameter == "P") %>% pull(Est)
+    chat_list    <- compute_chat_mark(cjs_data = cjs_data,
+                                      PhiF     = PhiF,
+                                      PhiM     = PhiM,
+                                      PF       = PF,
+                                      PM       = PM,
+                                      ungroup = T)
+  }
+  
+  mark_results <- cbind(mark.stats,gof.stats) %>% 
+    mutate(Deviance_chat = deviance/deviance.df, 
+           Pearson_chat  = chat_list[["Pearson_chat"]],
+           Flecther_chat = chat_list[["Fletcher_chat"]])
   #Return Output
   return(mark_results)
   
@@ -228,7 +287,7 @@ compute_proposed_chat <- function(corr1,
   } else {
     cchat <- 2^(corr1 + corr2)
   }
- 
+  
   
   return(cchat)
 }
@@ -419,6 +478,148 @@ compute_aic_summ <- function(summ_cjs,
   return(summ_aic)
 }
 
+# Compute chi_t value for last observation prob in encounter history of CJS
+compute_chi_t <- function(phi,p,k,K){
+  ifelse(k==K, 1, (1-phi) + phi * (1-p) * compute_chi_t(phi,p, k+1, K))
+}
+
+# Helper Function Converts string of numbers to vector numeric format
+convert_history_numeric <- function(hist){
+  as.integer(unlist(strsplit(hist, "")))
+}
+
+# Compute encounter history probability 
+encounter_history_prob <- function(hist, phi, p){
+  alive <- which(hist == 1)
+  et    <- dplyr::first(alive)
+  ek    <- dplyr::last(alive)
+  K     <- length(hist)
+  
+  occasions <- (ek-et)
+  
+  seen <- 1 *(ek > et) * sum(hist[(et+1):ek])
+  prob <- (phi ^ occasions) * (p ^ seen) * ((1-p) ^ (occasions - seen)) *  compute_chi_t(phi, p, ek, K)
+  
+  return(prob)
+}
+
+# Convert CJS data from application/sim into History table
+prep_encounter_history_df <- function(cjs_data){
+  hist_data <- cjs_data$x %>% 
+    as.data.frame() %>% 
+    unite("ch",sep="") %>% 
+    mutate(sex = as.factor(ifelse(cjs_data$female == 1, "F", "M"))) %>%
+    arrange(sex) 
+  
+  temp_tbl <- hist_data[,1:2] %>% table
+  histories <- rownames(temp_tbl)
+  Oi_F <- unname(temp_tbl[,1])
+  Oi_M <- unname(temp_tbl[,2])
+  hist_data <- data.frame(History = histories,
+                          Oi_F = Oi_F,
+                          Oi_M = Oi_M,
+                          Oi   = Oi_F + Oi_M) 
+  
+  
+  cohort <- sapply(1:nrow(hist_data), function(x) first(which(convert_history_numeric(hist_data$History[x]) == 1)))
+  hist_data$cohort <- cohort
+  return(hist_data)
+}
+
+# Get C-hat estimator by using Pearson's or Flecther's methods
+compute_chat_mark <- function(cjs_data, 
+                              PhiF, 
+                              PhiM, 
+                              PF, 
+                              PM,
+                              ungroup = F){
+  
+  # Get encounter history df 
+  hist_data <- prep_encounter_history_df(cjs_data)
+  
+  # Add history probs
+  hist_data$prob_f <- sapply(1:nrow(hist_data), 
+                             function(x) 
+                               encounter_history_prob(convert_history_numeric(hist_data[x,1]), PhiF, PF))
+  hist_data$prob_m <- sapply(1:nrow(hist_data), 
+                             function(x) 
+                               encounter_history_prob(convert_history_numeric(hist_data[x,1]), PhiM, PM))
+  
+  
+  # Encounter Histories
+  K <- cjs_data$k
+  
+  # Count of Observations in each Cohort
+  N_cohort_df <- hist_data %>%
+                 group_by(cohort) %>% 
+                 summarize(Nf               = sum(Oi_F,na.rm = T),
+                           Nm               = sum(Oi_M,na.rm = T),
+                           N                = sum(Oi,na.rm=T),
+                           f_correction     = Nf - Nf * sum(prob_f),
+                           m_correction     = Nm - Nm * sum(prob_m),
+                           ungrp_correction = N - N *sum(prob_f))
+  
+  
+  # Get Expected Cell Counts and Terms for Sums 
+  hist_data <- hist_data %>%
+    inner_join(N_cohort_df, by = "cohort") %>% 
+    mutate(Ei_F          = Nf * prob_f,
+           Ei_M          = Nm * prob_m,
+           Ei            = N * prob_f,
+           pearson_i_f   = ifelse(Nf == 0, 0, (Oi_F - Ei_F)^2/(Ei_F)),
+           pearson_i_m   = ifelse(Nm == 0, 0, (Oi_M - Ei_M)^2/(Ei_M)),
+           pearson_i     = (Oi - Ei)^2/Ei,
+           Obs_Ratio_i_f = Oi_F/Ei_F,
+           Obs_Ratio_i_m = Oi_M/Ei_M,
+           Obs_Ratio_i   = Oi/Ei) 
+  
+  # Gather Pearsons Chi-Sq and sum(Oi/Ei)
+  pearson_statistics <- hist_data %>% 
+    group_by(cohort) %>% 
+    summarize(pearson         = sum(pearson_i_m) + sum(pearson_i_f) + first(f_correction) + first(m_correction),
+              pearson_ungrp   = sum(pearson_i) + first(ungrp_correction),
+              Obs_ratio       = sum(Obs_Ratio_i_f,na.rm = T) + sum(Obs_Ratio_i_m,na.rm =T),
+              Obs_ratio_ungrp = sum(Obs_Ratio_i,na.rm = T)) 
+  
+  # Possible Outcomes
+  possible_histories_df <- hist_data %>% 
+    mutate(possible_n = 2^(K-cohort)) %>% 
+    group_by(cohort) %>% 
+    summarize(incl_f = 1 * (max(Oi_F) > 0),
+              incl_m = 1 * (max(Oi_M) > 0),
+              N_raw_i = first(possible_n)) %>% 
+    mutate(N_cohort       = N_raw_i * (incl_f + incl_m),
+           N_cohort_ungrp = N_raw_i) %>% 
+    ungroup() 
+  
+  # If Ungroup true then assume no diff between sexes (then PF=PM and PhiF = PhiM)
+  if(ungroup){
+    cat("Ungroup selected: Assuming PhiF = Phi and PF = P...", "\n")
+    pearson_chisq      <- pearson_statistics %>% pull(pearson_ungrp) %>% sum
+    obs_ratio          <- pearson_statistics %>% pull(Obs_ratio_ungrp) %>% sum
+    possible_histories <- possible_histories_df %>% pull(N_cohort_ungrp) %>% sum
+    pearson_df         <- possible_histories - K - 1
+  } else {
+    pearson_chisq      <- pearson_statistics %>% pull(pearson) %>% sum
+    obs_ratio          <- pearson_statistics %>% pull(Obs_ratio) %>% sum
+    possible_histories <- possible_histories_df %>% pull(N_cohort) %>% sum
+    pearson_df         <- possible_histories - 2*K - 1
+  }
+  
+  # Pearson's Method
+  Pearson_chat <- pearson_chisq/pearson_df
+  
+  # Fletcher's Method
+  N              <- possible_histories                  # All possible outcomes
+  n              <- length(unique(hist_data$cohort))    # Number of unique cohorts
+  s_bar          <- (obs_ratio - N)/(N-n)           # Fletcher's Term
+  Fletcher_chat  <- Pearson_chat/(1+s_bar) # Fletcher's Chat
+  
+  # Return choosen c-hat
+  return(list(Pearson_chat = Pearson_chat,
+              Fletcher_chat = Fletcher_chat))
+}
+
 
 # Execute one replicate of Simulation Study 
 execute_iteration  <- function(iter,
@@ -510,8 +711,8 @@ execute_iteration  <- function(iter,
   # Get Predicted Probs for Correlation Estimators (using full model version)
   phim_mark <- cjs_out %>% filter(Version == "B" & Parameter == "PhiM") %>% pull(Est)
   phif_mark <- cjs_out %>% filter(Version == "B" & Parameter == "PhiF") %>% pull(Est)
-  pm_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PM") %>% pull(Est)
-  pf_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PF") %>% pull(Est)
+  pm_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PM")   %>% pull(Est)
+  pf_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PF")   %>% pull(Est)
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
