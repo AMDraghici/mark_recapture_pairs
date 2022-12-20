@@ -695,7 +695,7 @@ execute_iteration  <- function(iter,
   for(i in 1:length(versions)){
     cat(paste0("Iteration#:", iter , " - Computing CJS estimates for Version:", versions[i], " ..."),"\n")
     cjs_list[[i]] <- run_cjs_model_mark(cjs_data = cjs_data,
-                                        title    = "mark_" %+% scenario %+% "_" %+% iter %+% "_" %+% versions[i] %+% "_",
+                                        title    = "mark_scenario_" %+% scenario %+% "_iter_" %+% iter %+% "_" %+% versions[i] %+% "_",
                                         version  = versions[i])  
   }
   
