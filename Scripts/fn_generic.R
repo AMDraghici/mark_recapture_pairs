@@ -478,6 +478,22 @@ compute_aic_summ <- function(summ_cjs,
   return(summ_aic)
 }
 
+compute_gam_interval <- function(ybar, 
+                                 N, 
+                                 PFM,
+                                 PhiF,
+                                 PhiM,
+                                 alpha){
+  
+  se_bern <- sqrt((ybar * (1-ybar))/N)
+  mark_int <- compute_mark_ci(ybar, se_bern, alpha)
+  U <- mark_int$ub
+  L <- mark_int$lb
+  ub <- compute_surv_cor(U, PFM, PhiF, PhiM)
+  lb <- compute_surv_cor(L, PFM, PhiF, PhiM)
+  c(lb,ub)
+}
+
 # Compute chi_t value for last observation prob in encounter history of CJS
 compute_chi_t <- function(phi,p,k,K){
   ifelse(k==K, 1, (1-phi) + phi * (1-p) * compute_chi_t(phi,p, k+1, K))
@@ -835,14 +851,12 @@ execute_iteration  <- function(iter,
   
   # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
   cat(paste0("Iteration#:", iter ," - Estimating survival correlation gamma|rho-likelihood..."),"\n")
-  
   # If estimate of rho fails (no valid observations) pass dummy values of 10
-  if(rho == 10){
+  if(is.na(rho)|rho == 10){
     gamma <- 10
     gamma_bs_np <- rep(10, 1000)
     gamma_bs_sp <- rep(10, 1000)
   } else {
-    
     # Estimate Gamma from observed data
     gamma_list <- compute_survival_correlation(ps_data = ps_data,
                                                PFM     = compute_jbin_cjs(prob.f = pf_mark,
@@ -854,6 +868,7 @@ execute_iteration  <- function(iter,
     # Get Gamma and Effective Sample Size
     gamma       <- gamma_list$gamma
     n_eff_gamma <- gamma_list$n_eff_gamma 
+    ybar        <- gamma_list$ybar
     
     # Non-Parametric Bootstrap To Estimate SE 
     cat(paste0("Iteration#:", iter ," - Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-likelihood..."),"\n")
@@ -886,7 +901,8 @@ execute_iteration  <- function(iter,
   # Collect Results
   names(gamma) <- "Est"
   summ_gamma_np   <- compute_btsrp_summary(gamma, gamma_bs_np, parameteric = 0, pearson = 0)   
-  summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, parameteric = 1, pearson = 0)   
+  summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, parameteric = 1, pearson = 0) 
+  
   #-------------------------------------------------------------------------------------------------------------
   
   # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
@@ -996,7 +1012,6 @@ execute_iteration  <- function(iter,
   # Return Results----------------------------------------------------------------------------------------------
   
   cat("Formatting output ...","\n")
-  
   # Gather Correlation Results
   summ_corr           <- as.data.frame(rbind(summ_rho_np,
                                              summ_rho_sp,
@@ -1105,6 +1120,48 @@ execute_iteration  <- function(iter,
                        iter                        = iter,
                        scenario                    = scenario)
   
+  # Compute delta method gamma intervals
+  cat("Computing gamma coverage with delta method...","\n")
+  PFM_vector <- sapply(c(rho, pearson_rho, pearson_partial_rho),
+                       function(r) compute_jbin_cjs(prob.f = pf_mark,
+                                                    prob.m = pm_mark,
+                                                    corr   = r)$prob.mf)
+  
+  gam_delta_95 <- lapply(1:3, function(i) compute_gam_interval(ybar    = ybar, 
+                                                               N       = n_eff_gamma, 
+                                                               PFM     = PFM_vector[i],
+                                                               PhiF    = phif_mark,
+                                                               PhiM    = phim_mark,
+                                                               alpha   = 0.05))
+  
+  gam_delta_50 <- lapply(1:3, function(i) compute_gam_interval(ybar    = ybar, 
+                                                               N       = n_eff_gamma, 
+                                                               PFM     = PFM_vector[i],
+                                                               PhiF    = phif_mark,
+                                                               PhiM    = phim_mark,
+                                                               alpha   = 0.5))
+                      
+  gam_delta_df <- as.data.frame(cbind(do.call(rbind, gam_delta_95),do.call(rbind, gam_delta_50)))
+  names(gam_delta_df) <- c("2.5%", "97.5%", "25%", "75%")
+  summ_gam_delta <- gam_delta_df %>% 
+    mutate(Parameter = "gamma",
+           iter      = iter,
+           scenario  = scenario,
+           N         = n_eff_gamma,
+           ybar      = ybar,
+           PFM       = PFM_vector,
+           PhiF      = PhiF,
+           PhiM      = PhiM,
+           Pearson   = 0:2,
+           Est       = c(gamma, pearson_gamma, pearson_partial_gamma),
+           Truth     = gam_true,
+           In95      = 1 * (Truth >= `2.5%` & Truth <= `97.5%`),
+           In50      = 1 * (Truth >= `25%`  & Truth <= `75%`),
+           Cover095  = 1 * (0 >= `2.5%`     & 0 <= `97.5%`),
+           Cover050  = 1 * (0 >= `25%`      & 0 <= `75%`)) %>% 
+    select(Parameter, Est, "2.5%", "25%", "75%","97.5%", 
+           N, ybar, PFM, PhiF, PhiM, Pearson, Truth, iter, scenario, In95, In50, Cover095, Cover050)
+  
   cat("Success, returning results ...","\n")
   
   if(small_out){
@@ -1114,7 +1171,8 @@ execute_iteration  <- function(iter,
                     summ_corr                   = summ_corr,
                     summ_chat                   = summ_chat,
                     summ_lrt                    = summ_lrt,
-                    summ_aic                    = summ_aic)
+                    summ_aic                    = summ_aic,
+                    summ_gam_delta              = summ_gam_delta)
   } else {
     results <- list(random_seed                 = random_seed,
                     ps_data                     = ps_data,
@@ -1125,6 +1183,7 @@ execute_iteration  <- function(iter,
                     summ_chat                   = summ_chat,
                     summ_lrt                    = summ_lrt,
                     summ_aic                    = summ_aic,
+                    summ_gam_delta              = summ_gam_delta,
                     rho_bs_np                   = unname(rho_bs_np),
                     rho_bs_sp                   = unname(rho_bs_sp),
                     rho_bs_np_pearson           = unname(rho_bs_np_pearson),
@@ -1180,24 +1239,26 @@ execute_simulation <- function(niter,
                                                                    small_out     = small_out))
   
   # Construct Summaries of Probs and Correlations
-  summary_corr <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_corr))
-  summary_cjs  <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_cjs))
-  summ_chat    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_chat))
-  summ_lrt     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_lrt))
-  summ_aic     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_aic))
-  summ_n       <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_n))
-  random_seeds <- lapply(1:niter, function(iter) results_list[[iter]]$random_seed)
+  summary_corr    <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_corr))
+  summary_cjs     <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_cjs))
+  summ_chat       <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_chat))
+  summ_lrt        <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_lrt))
+  summ_aic        <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_aic))
+  summ_n          <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_n))
+  summ_gam_delta  <- do.call(rbind, lapply(1:niter, function(iter) results_list[[iter]]$summ_gam_delta))
+  random_seeds    <- lapply(1:niter, function(iter) results_list[[iter]]$random_seed)
   
   # Return Results
   if(small_out){
     # Only summaries and random.seeds
-    out <- list(summary_corr = summary_corr,
-                summary_cjs  = summary_cjs,
-                summ_chat    = summ_chat,
-                summ_lrt     = summ_lrt,
-                summ_aic     = summ_aic,
-                summ_n       = summ_n,
-                random_seeds = random_seeds)
+    out <- list(summary_corr   = summary_corr,
+                summary_cjs    = summary_cjs,
+                summ_chat      = summ_chat,
+                summ_lrt       = summ_lrt,
+                summ_aic       = summ_aic,
+                summ_n         = summ_n,
+                summ_gam_delta = summ_gam_delta,
+                random_seeds   = random_seeds)
   } else {
     # Summaries, data, bootstrap estimates
     out <- list(results_list = results_list,
@@ -1206,7 +1267,8 @@ execute_simulation <- function(niter,
                 summ_chat    = summ_chat,
                 summ_lrt     = summ_lrt,
                 summ_aic     = summ_aic,
-                summ_n       = summ_n)
+                summ_n       = summ_n,
+                summ_gam_delta = summ_gam_delta)
   }
   
   

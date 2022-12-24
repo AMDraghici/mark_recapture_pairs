@@ -1,7 +1,7 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <- getwd() #"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-out_dir    <- src_dir %+% "/Simulation/Study1/Run5/Output/"
+out_dir    <- src_dir %+% "/Simulation/Run2/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -14,41 +14,43 @@ libs <- c("tidyverse","RMark")
 load_packages(libs, FALSE)
 # -----------------------------------------------------------------------------------------------------------------
 
+# Grab Results
 files <- list.files(out_dir)
+nruns <- length(files)
 scenario_grid <- get_scenarios()
 
-corr_list <- list()
-cjs_list <- list()
-cchat_list <- list()
-lrt_list <- list()
-aic_list <- list()
-n_list <- list()
+# Unpack Summaries
+out_list     <- lapply(1:nruns, function(i) readRDS(out_dir %+% files[i]))
+summ_corr    <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summary_corr))
+summ_cjs     <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summary_cjs))
+summ_chat    <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_chat))
+summ_lrt     <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_lrt))
+summ_aic     <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_aic))
+summ_n       <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_n))
 
-for(i in 1:length(files)){
-  print(i)
-  temp <-  readRDS(out_dir %+% files[[i]])
-  corr_list[[i]] <-temp$summary_corr
-  cjs_list[[i]] <- temp$summary_cjs
-  cchat_list[[i]] <- temp$summ_chat
-  lrt_list[[i]] <- temp$summ_lrt
-  n_list[[i]] <- temp$summ_n
-  aic_list[[i]] <- temp$summ_aic
-  gc()
-}
+# Add Scenario Settings
+summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
+summ_cjs  <-  summ_cjs %>% left_join(scenario_grid, by = c("scenario"))
+summ_lrt  <-  summ_lrt %>% left_join(scenario_grid, by = c("scenario"))
+summ_chat  <- summ_chat %>% left_join(scenario_grid, by = c("scenario"))
+summ_aic  <-  summ_aic %>% left_join(scenario_grid, by = c("scenario"))
+summ_n  <-    summ_n %>% left_join(scenario_grid, by = c("scenario"))
 
-summ_corr <- do.call(rbind, corr_list)
-summ_cjs <- do.call(rbind, cjs_list)
-summ_cchat <- do.call(rbind, cchat_list)
-summ_lrt <- do.call(rbind, lrt_list)
-summ_n <- do.call(rbind, n_list)
-summ_aic <- do.call(rbind, aic_list)
-
-summ_corr <- summ_corr %>% left_join(scenario_grid, by = c("Scenario" = "scenario"))
-summ_cjs <- summ_cjs %>% left_join(scenario_grid, by = c("scenario" = "scenario"))
-summ_lrt <- summ_lrt %>% left_join(scenario_grid, by = c("scenario" = "scenario"))
+saveRDS(summ_corr, src_dir %+% "/Output/summ_corr.rds")
+saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs.rds")
+saveRDS(summ_lrt,  src_dir %+% "/Output/summ_lrt.rds")
+saveRDS(summ_chat, src_dir %+% "/Output/summ_chat.rds")
+saveRDS(summ_aic,  src_dir %+% "/Output/summ_aic.rds")
+saveRDS(summ_n,    src_dir %+% "/Output/summ_n.rds")
 
 
-summ_corr %>% group_by(Parameter, Parametric, Pearson, Scenario, Truth) %>%
+mc_corr <- summ_corr %>% group_by(Parameter, 
+                                  Parametric, 
+                                  Pearson,
+                                  scenario, 
+                                  Truth) %>%
+  mutate(Pearson = ifelse(Pearson == 0, "MLE", ifelse(Pearson == 2, "Partial-Pearson", "Pearson")),
+         Parametric = ifelse(Parametric == 0, "Non-Parametric", "Semi-Parametric")) %>% 
   summarize(MedBias = median(Bias),
             MeanBias = mean(Bias),
             mean_est      = mean(Est),
@@ -69,33 +71,117 @@ summ_corr %>% group_by(Parameter, Parametric, Pearson, Scenario, Truth) %>%
             PhiF   = first(PhiF),
             PhiM   = first(PhiM),
             n_obs  = first(n_obs),
-            k = first(k)) %>% 
-  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75) %>% 
+            k      = first(k),
+            imputed_pairs = first(imputed_pairs))
+
+
+# Investigating Performance of hat Rho
+mc_corr %>% 
+  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = MeanBias, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
-  facet_grid(Parametric ~ Pearson)# + ylim(c(-0.05,0.05))
+  facet_grid(Pearson ~Parametric) + 
+  ylim(c(-0.03,0.03)) +
+  geom_hline(yintercept = 0, lty = 2) + 
+  labs(x = expression(rho), y = "Mean Bias", col = expression(gamma)) +
+  theme(legend.position = "bottom")
+
+mc_corr %>% 
+  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover95, x = rho, col = as.factor(gamma))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~Parametric) + 
+  ylim(c(0.75,1)) +
+  geom_hline(yintercept = 0.95, lty = 2) + 
+  labs(x = expression(rho), y = "Mean 95% Confidence Interval Coverage", col = expression(gamma)) +
+  theme(legend.position = "bottom")
 
 
+mc_corr %>% 
+  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover50, x = rho, col = as.factor(gamma))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~Parametric) + 
+  ylim(c(0,1)) +
+  geom_hline(yintercept = 0.5, lty = 2) + 
+  labs(x = expression(rho), y = "Mean 50% Confidence Interval Coverage", col = expression(gamma)) +
+  theme(legend.position = "bottom")
 
-summ_lrt %>% group_by(test, scenario) %>%
-  summarize(cover5 = mean(1 * (F_pval_partial_pearson   <= 0.05)),
-            rho = first(rho_true),
-            gamma = first(gam_true),
-            PF     = first(PF),
-            PM     = first(PM),
-            PhiF   = first(PhiF),
-            PhiM   = first(PhiM),
-            n_obs  = first(n_obs),
-            k = first(k)) %>% 
-  filter(n_obs == 250 & k == 25 & PF == 0.75) %>% 
-  ggplot() +
-  geom_boxplot(aes(x = as.factor(rho), y = cover5, col = as.factor(test)))
 
-summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>% 
+mc_corr %>% 
+  filter(Parameter == "rho" & Pearson == 2 & Parametric == 1 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover095, x = rho, col = as.factor(gamma))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(n_obs ~k) + 
+  ylim(c(0,1)) +
+  geom_hline(yintercept = c(0.05,0.95), lty = 2) + 
+  labs(x = expression(rho), y = "Average Coverage of 0 by 95% Confidence Interval", col = expression(gamma)) +
+  theme(legend.position = "bottom")
+
+
+# Investigating Performance of hat gamma
+mc_corr %>% 
+  filter(Parameter == "gamma" & n_obs == 250 & k == 25 &  PhiF == 0.8 &  PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = MedBias, x = gamma, col = as.factor(rho))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~Parametric) + 
+  ylim(c(-0.03,0.03)) +
+  geom_hline(yintercept = 0, lty = 2) + 
+  labs(x = expression(gamma), y = "Mean Bias", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+mc_corr %>% 
+  filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover95, x = gamma, col = as.factor(rho))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~Parametric) + 
+  ylim(c(0.75,1)) +
+  geom_hline(yintercept = 0.95, lty = 2) + 
+  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+
+mc_corr %>% 
+  filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover50, x = gamma, col = as.factor(rho))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~Parametric) + 
+  ylim(c(0,1)) +
+  geom_hline(yintercept = 0.5, lty = 2) + 
+  labs(x = expression(gamma), y = "Mean 50% Confidence Interval Coverage", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+
+mc_corr %>% 
+  filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover095, x = gamma, col = as.factor(rho))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~ Parametric) + 
+  ylim(c(0,1)) +
+  geom_hline(yintercept = c(0.05,0.95), lty = 2) + 
+  labs(x = expression(rho), y = "Mean Coverage of 0 by 95% Confidence Interval", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+# 
+# summ_cjs2 <- summ_cjs %>% mutate(CChatAdj_Partial_Pearson2 = 2^(log(CChatAdj_Partial_Pearson,base = 2)/2),
+#                                  UBAdj_Partial_Pearson2    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson2), alpha = 0.05)[["ub"]],
+#                                  LBAdj_Partial_Pearson2    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson2), alpha = 0.05)[["lb"]],
+#                                  In95_Partial_Pearson2     = 1*(Truth <= UBAdj_Partial_Pearson2 & Truth >= LBAdj_Partial_Pearson2))
+
+# Comparing Coverage of N model
+mc_cjs <- summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>% 
   summarize(bias = mean(Bias),
             In95 = mean(In95),
             In95_Partial_Pearson = mean(In95_Partial_Pearson),
+            In95_Partial_Pearson2 = mean(In95_Partial_Pearson2),
             rho = first(rho_true),
             gamma = first(gam_true),
             PF     = first(PF),
@@ -103,51 +189,65 @@ summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>%
             PhiF   = first(PhiF),
             PhiM   = first(PhiM),
             n_obs  = first(n_obs),
-            k = first(k)) %>% 
-  filter(n_obs == 250 & Parameter == "P" & k == 25 & PF == 0.75 & Version=="N" &  gamma == 0)  %>% 
-  ggplot() +
-  geom_line(aes(x = rho, y = In95)) +
-  geom_point(aes(x = rho, y = In95)) +
-  geom_line(aes(x = rho, y = In95_Partial_Pearson), col = "blue", lty = 2) +
-  geom_point(aes(x = rho, y = In95_Partial_Pearson), col = "blue") +
-  facet_wrap(Parameter ~ .) + ylim(c(0.85,1))
+            k = first(k),
+            imputed_pairs = first(imputed_pairs))
 
-summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>% 
-  summarize(bias = mean(Bias),
-            In95 = mean(In95),
-            In95_Partial_Pearson = mean(In95_Partial_Pearson),
-            rho = first(rho_true),
-            gamma = first(gam_true),
-            PF     = first(PF),
-            PM     = first(PM),
-            PhiF   = first(PhiF),
-            PhiM   = first(PhiM),
-            n_obs  = first(n_obs),
-            k = first(k)) %>% 
-  filter(Parameter == "Phi" & k == 25 & Version=="R")  %>% 
+mc_cjs2 <- summ_cjs %>% group_by(scenario, Version) %>% 
+  summarize(chat          = mean(Deviance_chat),
+            chat_pearson  = mean(Pearson_chat),
+            chat_fletcher = mean(Fletcher_chat),
+            CChat         = mean(CChatAdj_Partial_Pearson),
+            rho           = first(rho_true),
+            gamma         = first(gam_true),
+            PF            = first(PF),
+            PM            = first(PM),
+            PhiF          = first(PhiF),
+            PhiM          = first(PhiM),
+            n_obs         = first(n_obs),
+            k             = first(k),
+            imputed_pairs = first(imputed_pairs)) %>% 
+  pivot_longer(cols = c("chat", "chat_pearson", "chat_fletcher"), 
+               names_to = "Estimator", values_to = "chat") %>% 
+  mutate(Estimator = ifelse(Estimator == "chat", "Deviance",
+                            ifelse(Estimator == "chat_pearson", "Pearson","Fletcher")))
+
+mc_cjs %>% 
+  filter(Parameter == "P" & n_obs == 250 & k == 25 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
+  ggplot() +
+  geom_line(aes(x = rho, y = In95, col = as.factor(gamma))) +
+  geom_point(aes(x = rho, y = In95, col = as.factor(gamma))) +
+  geom_line(aes(x = rho, y = In95_Partial_Pearson, col = as.factor(gamma)), lty = 2) +
+  geom_point(aes(x = rho, y = In95_Partial_Pearson, col = as.factor(gamma))) +
+  ylim(c(0.8,1)) +
+  geom_hline(yintercept = 0.95) +
+  facet_grid(. ~ Version) + 
+  labs(x = expression(rho), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+mc_cjs %>% 
+  filter(Parameter == "Phi" & n_obs == 250 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
   ggplot() +
   geom_line(aes(x = gamma, y = In95, col = as.factor(rho))) +
   geom_point(aes(x = gamma, y = In95, col = as.factor(rho))) +
   geom_line(aes(x = gamma, y = In95_Partial_Pearson, col = as.factor(rho)), lty = 2) +
   geom_point(aes(x = gamma, y = In95_Partial_Pearson, col = as.factor(rho))) +
-  facet_wrap(PF ~ n_obs) + ylim(c(0.75,1)) + geom_hline(yintercept = 0.95, col = "red")
+  ylim(c(0.8,1)) +
+  geom_hline(yintercept = 0.95) +
+  facet_grid(. ~ Version) + 
+  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
+  theme(legend.position = "bottom")
 
-summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>% 
-  summarize(bias = mean(Bias),
-            In95 = mean(In95),
-            In95_Partial_Pearson = mean(In95_Pearson),
-            rho = first(rho_true),
-            gamma = first(gam_true),
-            PF     = first(PF),
-            PM     = first(PM),
-            PhiF   = first(PhiF),
-            PhiM   = first(PhiM),
-            n_obs  = first(n_obs),
-            k = first(k)) %>% 
-  filter(Parameter == "P" & k == 25 & Version=="N")  %>% 
+mc_cjs2 %>% 
+  filter(n_obs == 250 & k == 25 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
   ggplot() +
-  geom_line(aes(x = rho, y = In95, col = as.factor(gamma))) +
-  geom_point(aes(x =rho, y = In95, col = as.factor(gamma))) +
-  geom_line(aes(x = rho, y = In95_Partial_Pearson, col = as.factor(gamma)), lty = 2) +
-  geom_point(aes(x = rho, y = In95_Partial_Pearson, col = as.factor(gamma))) +
-  facet_wrap(PF ~ n_obs) + ylim(c(0.75,1)) + geom_hline(yintercept = 0.95, col = "red")
+  geom_line(aes(x = rho, y = chat, col = as.factor(gamma))) +
+  geom_point(aes(x = rho, y = chat, col = as.factor(gamma))) +
+  geom_line(aes(x = rho, y = CChat, col = as.factor(gamma)), lty = 2) +
+  # geom_point(aes(x = rho, y = CChat, col = as.factor(gamma)), lty = 2) +
+  geom_hline(yintercept = 0.95) +
+  facet_grid(Estimator ~ Version) + 
+  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+
+

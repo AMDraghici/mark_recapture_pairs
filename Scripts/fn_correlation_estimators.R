@@ -392,7 +392,8 @@ compute_survival_correlation <- function(ps_data,
   gamma <- compute_surv_cor(n/N, PFM, PhiF, PhiM)
   
   return(list(gamma       = gamma,
-              n_eff_gamma = N))
+              n_eff_gamma = N,
+              ybar        = n/N))
 }
 
 # Run bootstrap to get standard error estimates of survival
@@ -460,7 +461,7 @@ generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, u
   if(!use_block){
     block_matrix[block_matrix != 0] <- 1:length(which(block_matrix != 0))
   }
-  
+
   # Collection of Y/N
   outcome_vector <- unlist(lapply(1:nf, function(i) success_matrix[i, ][block_matrix[i,] != 0]))
   # Block Label for Outcomes
@@ -472,7 +473,7 @@ generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, u
     for(i in 1:iter){
       # Sample blocks of outcomes based on pairs 
       block_replicate <- sample(max(block_vector), max(block_vector), replace = T)
-      outcome_replicate <- unlist(lapply(1:length(block_replicate), function(i) rbinom(n    = length(which(block_vector == block_replicate[i])), 
+      outcome_replicate <- unlist(lapply(1:length(block_replicate), function(t) rbinom(n    = length(which(block_vector == block_replicate[t])), 
                                                                                        size = 1, 
                                                                                        prob = prob_prod)))
       replicates[i] <- mean(outcome_replicate)
@@ -484,7 +485,7 @@ generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, u
       # Sample blocks of outcomes based on pairs 
       block_replicate <- sample(max(block_vector), max(block_vector), replace = T)
       # Grab outcomes from the original dataset 
-      outcome_replicate <- unlist(lapply(1:length(block_replicate), function(i) outcome_vector[which(block_vector == block_replicate[i])]))
+      outcome_replicate <- unlist(lapply(1:length(block_replicate), function(t) outcome_vector[which(block_vector == block_replicate[t])]))
       # Convert to MLE 
       replicates[i] <- mean(outcome_replicate)
     }
@@ -505,11 +506,13 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
                                                              parametric,
                                                              use_block){
   
-  
   # Joint Probabilties
   PFM <- compute_jbin_cjs(PF, PM, rho)$prob.mf
   PhiFM <- compute_jbin_cjs(PhiF, PhiM, gamma)$prob.mf
   bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, PFM * PhiFM, parametric, use_block, iter)
-  gamma_bs <- sapply(1:iter, function(i) compute_surv_cor(bootstrap_data_replicates[i], PFM, PhiF, PhiM))
+  gamma_bs <- sapply(1:iter, function(i) compute_surv_cor(x = bootstrap_data_replicates[i],
+                                                          PMF =  PFM,
+                                                          PhiF = PhiF,
+                                                          PhiM = PhiM))
   return(gamma_bs)
 }
