@@ -299,6 +299,14 @@ compute_btsrp_summary <- function(estimate,
                                   parameteric, 
                                   pearson){
   # Non-Parametric conditional estimator results
+  n                     <- length(bstrp_replicates)
+  n_null                <- length(bstrp_replicates_null)
+  bstrp_replicates      <- bstrp_replicates[bstrp_replicates != 10]
+  bstrp_replicates_null <- bstrp_replicates_null[bstrp_replicates_null != 10]
+  n_failures            <- n - length(bstrp_replicates)
+  n_failures_null       <- n_null - length(bstrp_replicates_null)
+  names(n_failures)     <- "num_failures"
+  names(n_failures_null)<- "num_failures_null"
   mean_bstrp            <- mean(bstrp_replicates)
   names(mean_bstrp)     <- "Est_Btstrp"
   se_bstrp              <- sd(bstrp_replicates)
@@ -319,7 +327,9 @@ compute_btsrp_summary <- function(estimate,
                              status_param, 
                              status_pearson,
                              pval1_0,
-                             pval2_0)
+                             pval2_0,
+                             n_failures,
+                             n_failures_null)
   
   return(summ_btstrp)
 } 
@@ -743,8 +753,6 @@ execute_iteration  <- function(iter,
   
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
   
-  browser()
-  
   # 1. Likelihood Approach -------------------------------------------------------------------------------------
   cat(paste0("Iteration#:", iter ," - Estimating recapture correlation, rho, using likelihood approach..."),"\n")
   rho_list <- compute_recapture_correlation(ps_data = ps_data, 
@@ -786,7 +794,7 @@ execute_iteration  <- function(iter,
                                                                    iter       = 1000,
                                                                    PF         = pf_mark,
                                                                    PM         = pm_mark,
-                                                                   rho        = 0,
+                                                                   rho        = ifelse(rho == 10|n_eff_rho == 0, 10,0),
                                                                    use_block  = FALSE,
                                                                    parametric = T,
                                                                    model      = "likelihood")
@@ -834,7 +842,7 @@ execute_iteration  <- function(iter,
                                                                            iter       = 1000,
                                                                            PF         = pf_mark,
                                                                            PM         = pm_mark,
-                                                                           rho        = 0,
+                                                                           rho        = ifelse(pearson_rho == 10|n_eff_rho == 0, 10,0),
                                                                            use_block  = FALSE,
                                                                            parametric = T,
                                                                            model      = "full_pearson")
@@ -881,7 +889,7 @@ execute_iteration  <- function(iter,
                                                                                    iter       = 1000,
                                                                                    PF         = pf_mark,
                                                                                    PM         = pm_mark,
-                                                                                   rho        = 0,
+                                                                                   rho        = ifelse(pearson_partial_rho == 10|n_eff_rho == 0, 10,0),
                                                                                    use_block  = FALSE,
                                                                                    parametric = T,
                                                                                    model      = "partial_pearson")
@@ -899,6 +907,9 @@ execute_iteration  <- function(iter,
     gamma <- 10
     gamma_bs_np <- rep(10, 1000)
     gamma_bs_sp <- rep(10, 1000)
+    gamma_bs_null <- rep(10, 1000)
+    n_eff_gamma <- 0
+    ybar <- NA
   } else {
     # Estimate Gamma from observed data
     gamma_list <- compute_survival_correlation(ps_data = ps_data,
@@ -947,7 +958,7 @@ execute_iteration  <- function(iter,
                                                                       rho                   = rho,
                                                                       PF                    = pf_mark,
                                                                       PM                    = pm_mark,
-                                                                      gamma                 = 0,
+                                                                      gamma                 = ifelse(gamma == 10|n_eff_gamma == 0, 10,0),
                                                                       PhiF                  = phif_mark,
                                                                       PhiM                  = phim_mark,
                                                                       use_block             = FALSE,
@@ -969,6 +980,7 @@ execute_iteration  <- function(iter,
     pearson_gamma <- 10
     pearson_gamma_bs_np <- rep(10, 1000)
     pearson_gamma_bs_sp <- rep(10, 1000)
+    gamma_bs_pearson_null <- rep(10, 1000)
   } else {
     
     # Estimate Gamma from observed data
@@ -1013,7 +1025,7 @@ execute_iteration  <- function(iter,
                                                                               rho                   = pearson_rho,
                                                                               PF                    = pf_mark,
                                                                               PM                    = pm_mark,
-                                                                              gamma                 = 0,
+                                                                              gamma                 = ifelse(pearson_gamma == 10|n_eff_gamma == 0, 10,0),
                                                                               PhiF                  = phif_mark,
                                                                               PhiM                  = phim_mark,
                                                                               use_block             = FALSE,
@@ -1034,6 +1046,7 @@ execute_iteration  <- function(iter,
     pearson_partial_gamma <- 10
     pearson_partial_gamma_bs_np <- rep(10, 1000)
     pearson_partial_gamma_bs_sp <- rep(10, 1000)
+    gamma_bs_pearson_partial_null <- rep(10, 1000)
   } else {
     
     # Estimate Gamma from observed data
@@ -1078,7 +1091,7 @@ execute_iteration  <- function(iter,
                                                                                       rho                   = pearson_partial_rho,
                                                                                       PF                    = pf_mark,
                                                                                       PM                    = pm_mark,
-                                                                                      gamma                 = 0,
+                                                                                      gamma                 = ifelse(pearson_partial_gamma == 10|n_eff_gamma == 0, 10,0),
                                                                                       PhiF                  = phif_mark,
                                                                                       PhiM                  = phim_mark,
                                                                                       use_block             = FALSE,
@@ -1092,7 +1105,6 @@ execute_iteration  <- function(iter,
   #-------------------------------------------------------------------------------------------------------------
   
   # Return Results----------------------------------------------------------------------------------------------
-  
   cat("Formatting output ...","\n")
   # Gather Correlation Results
   summ_corr           <- as.data.frame(rbind(summ_rho_np,
@@ -1110,7 +1122,10 @@ execute_iteration  <- function(iter,
   
   param_true          <- c(rep(rho_true, 6), rep(gam_true,6))
   summ_corr$Parameter <- c(rep("rho", 6), rep("gamma",6))
-  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric", "Pearson", "Pval0_1","Pval0_2")]
+  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", 
+                                      "2.5%","25%","50%","75%","97.5%", 
+                                      "Parametric", "Pearson", "Pval0_1","Pval0_2", 
+                                      "num_failures", "num_failures_null")]
   summ_corr           <- summ_corr %>% 
     left_join(true_param_df, by = "Parameter") %>% 
     mutate(Bias                = Truth - Est,
@@ -1204,10 +1219,12 @@ execute_iteration  <- function(iter,
   
   # Compute delta method gamma intervals
   cat("Computing gamma coverage with delta method...","\n")
-  PFM_vector <- sapply(c(rho, pearson_rho, pearson_partial_rho),
-                       function(r) compute_jbin_cjs(prob.f = pf_mark,
-                                                    prob.m = pm_mark,
-                                                    corr   = r)$prob.mf)
+  
+  rho_vector <- c(rho, pearson_rho, pearson_partial_rho)
+  PFM_vector <- sapply(rho_vector,
+                       function(r) ifelse(r == 10, NA, compute_jbin_cjs(prob.f = pf_mark,
+                                                                        prob.m = pm_mark,
+                                                                        corr   = r)$prob.mf))
   
   gam_delta_95 <- lapply(1:3, function(i) compute_gam_interval(ybar    = ybar, 
                                                                N       = n_eff_gamma, 
@@ -1236,6 +1253,7 @@ execute_iteration  <- function(iter,
            PhiM      = PhiM,
            Pearson   = 0:2,
            Est       = c(gamma, pearson_gamma, pearson_partial_gamma),
+           Rho_Est   = rho_vector,
            Truth     = gam_true,
            In95      = 1 * (Truth >= `2.5%` & Truth <= `97.5%`),
            In50      = 1 * (Truth >= `25%`  & Truth <= `75%`),
@@ -1362,14 +1380,14 @@ execute_simulation <- function(niter,
 get_scenarios <- function(){
   
   # General Scenarios
-  n     <- c(150, 250)
+  n     <- c(50, 150, 250)
   k     <- c(15,  25)
-  PF    <- c(0.45, 0.75)
-  PM    <- c(0.45, 0.75)
+  PF    <- c(0.2, 0.45, 0.75)
+  PM    <- c(0.2, 0.45, 0.75)
   PhiF  <- c(0.8)
   PhiM  <- c(0.8)
-  rho   <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
-  gamma <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.25))))
+  rho   <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.15))))
+  gamma <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.15))))
   
   scenario_grid_base  <- expand.grid(n_obs    = n,
                                      k        = k,
@@ -1386,22 +1404,19 @@ get_scenarios <- function(){
   scenario_grid_base$imputed_pairs <- TRUE
   
   # Testing Hypothesis with Alternative
-  
+
   phi_param <- compute_jbin_param_cjs(0.7,0.8)
   p_param   <-compute_jbin_param_cjs(0.7,0.75)
-  
+
   gl <- phi_param$cor_lower_bound
   gu <- phi_param$cor_upper_bound
   rl <- p_param$cor_lower_bound
   ru <- p_param$cor_upper_bound
-  
-  rho2   <- sort(unique(c(0, seq(rl + 0.01, ru - 0.01, by = 0.25))))
-  gamma2 <- sort(unique(c(0, seq(gl + 0.01, gu - 0.01, by = 0.25))))
-  
+
   scenario_grid_alternative <- expand.grid(n_obs         = 250,
                                            k             = 25,
-                                           rho_true      = rho2,
-                                           gam_true      = gamma2, 
+                                           rho_true      = rho[rho <= ru & rho >= rl],
+                                           gam_true      = gamma[gamma <= gu & gamma >= gl],
                                            PhiF          = 0.7,
                                            PhiM          = 0.8,
                                            PF            = 0.70,
@@ -1410,23 +1425,20 @@ get_scenarios <- function(){
                                            Beta1         = 1e3,
                                            Delta         = 1,
                                            imputed_pairs = TRUE)
-  
+
   # Hduck: Test1
   phi_param <- compute_jbin_param_cjs(0.67,0.74)
   p_param   <-compute_jbin_param_cjs(0.48,0.21)
-  
+
   gl <- phi_param$cor_lower_bound
   gu <- phi_param$cor_upper_bound
   rl <- p_param$cor_lower_bound
   ru <- p_param$cor_upper_bound
-  
-  rho3   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
-  gamma3 <- sort(unique(c(0, gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
-  
+
   scenario_grid_hduck1 <- expand.grid(n_obs         = 250,
                                       k             = 25,
-                                      rho_true      = rho3,
-                                      gam_true      = gamma3, 
+                                      rho_true      = rho[rho <= ru & rho >= rl],
+                                      gam_true      = gamma[gamma <= gu & gamma >= gl],
                                       PhiF          = 0.67,
                                       PhiM          = 0.74,
                                       PF            = 0.48,
@@ -1435,23 +1447,20 @@ get_scenarios <- function(){
                                       Beta1         = 1e3,
                                       Delta         = 1,
                                       imputed_pairs = TRUE)
-  
+
   # Hduck: Test2
   phi_param <- compute_jbin_param_cjs(0.67,0.74)
   p_param   <-compute_jbin_param_cjs(0.33,0.33)
-  
+
   gl <- phi_param$cor_lower_bound
   gu <- phi_param$cor_upper_bound
   rl <- p_param$cor_lower_bound
   ru <- p_param$cor_upper_bound
-  
-  rho4   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
-  gamma4 <- sort(unique(c(0,gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
-  
+
   scenario_grid_hduck2 <- expand.grid(n_obs         = 250,
                                       k             = 25,
-                                      rho_true      = rho4,
-                                      gam_true      = gamma4, 
+                                      rho_true      = rho[rho <= ru & rho >= rl],
+                                      gam_true      = gamma[gamma <= gu & gamma >= gl],
                                       PhiF          = 0.67,
                                       PhiM          = 0.74,
                                       PF            = 0.33,
@@ -1460,23 +1469,20 @@ get_scenarios <- function(){
                                       Beta1         = 1e3,
                                       Delta         = 1,
                                       imputed_pairs = TRUE)
-  
+
   # Hduck: Test3
   phi_param <- compute_jbin_param_cjs(0.7,0.7)
   p_param   <-compute_jbin_param_cjs(0.48, 0.21)
-  
+
   gl <- phi_param$cor_lower_bound
   gu <- phi_param$cor_upper_bound
   rl <- p_param$cor_lower_bound
   ru <- p_param$cor_upper_bound
-  
-  rho5   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
-  gamma5 <- sort(unique(c(0, gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
-  
+
   scenario_grid_hduck3 <- expand.grid(n_obs         = 250,
                                       k             = 25,
-                                      rho_true      = rho5,
-                                      gam_true      = gamma5, 
+                                      rho_true      = rho[rho <= ru & rho >= rl],
+                                      gam_true      = gamma[gamma <= gu & gamma >= gl],
                                       PhiF          = 0.7,
                                       PhiM          = 0.7,
                                       PF            = 0.48,
@@ -1485,23 +1491,20 @@ get_scenarios <- function(){
                                       Beta1         = 1e3,
                                       Delta         = 1,
                                       imputed_pairs = TRUE)
-  
+
   # Hduck: Test4
   phi_param <- compute_jbin_param_cjs(0.7,0.7)
   p_param   <-compute_jbin_param_cjs(0.33,0.33)
-  
+
   gl <- phi_param$cor_lower_bound
   gu <- phi_param$cor_upper_bound
   rl <- p_param$cor_lower_bound
   ru <- p_param$cor_upper_bound
-  
-  rho6   <- sort(unique(c(0,rl + 0.01, ru - 0.01, seq(rl + 0.01, ru - 0.01, by = 0.25))))
-  gamma6 <- sort(unique(c(0, gl + 0.01, gu - 0.01,seq(gl + 0.01, gu - 0.01, by = 0.25))))
-  
+
   scenario_grid_hduck4 <- expand.grid(n_obs         = 250,
                                       k             = 25,
-                                      rho_true      = rho6,
-                                      gam_true      = gamma6, 
+                                      rho_true      = rho[rho <= ru & rho >= rl],
+                                      gam_true      = gamma[gamma <= gu & gamma >= gl],
                                       PhiF          = 0.7,
                                       PhiM          = 0.7,
                                       PF            = 0.33,
@@ -1510,7 +1513,7 @@ get_scenarios <- function(){
                                       Beta1         = 1e3,
                                       Delta         = 1,
                                       imputed_pairs = TRUE)
-  
+
   # Testing Imputed Mates Off
   scenario_imputed_off <- expand.grid(n_obs         = 250,
                                       k             = 25,
@@ -1523,7 +1526,7 @@ get_scenarios <- function(){
                                       Beta0         = 0.25,
                                       Beta1         = 0,
                                       Delta         = 1,
-                                      imputed_pairs = FALSE)
+                                      imputed_pairs = TRUE)
   
   
   
