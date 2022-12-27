@@ -1380,10 +1380,10 @@ execute_simulation <- function(niter,
 get_scenarios <- function(){
   
   # General Scenarios
-  n     <- c(50, 150, 250)
+  n     <- c(150, 250)
   k     <- c(15,  25)
-  PF    <- c(0.2, 0.45, 0.75)
-  PM    <- c(0.2, 0.45, 0.75)
+  PF    <- c(0.45, 0.75)
+  PM    <- c(0.45, 0.75)
   PhiF  <- c(0.8)
   PhiM  <- c(0.8)
   rho   <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.15))))
