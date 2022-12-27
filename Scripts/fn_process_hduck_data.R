@@ -1190,7 +1190,7 @@ populate_full_pairs_approximation <- function(apairs_f,
 }
 
 # Prepare data for nimble
-build_nimble_data <- function(cap.data){
+format_cap_data <- function(cap.data){
   
   # Index values
   nf <- cap.data %>% select(sex, nimble_id) %>% filter(sex=="F") %>% distinct() %>% arrange(nimble_id) %>% nrow()
@@ -1298,7 +1298,7 @@ build_nimble_data <- function(cap.data){
 
   
   # Store results in list 
-  nimble_data <- list(nf               = nf, 
+  model_data  <- list(nf               = nf, 
                       nm               = nm,
                       k                = k,
                       first_capture_f  = first_capture_f,
@@ -1317,5 +1317,28 @@ build_nimble_data <- function(cap.data){
                       recap_m          = recap_m) 
   
   # Return model data
-  return(nimble_data)
+  return(model_data)
+}
+
+# Gather mark-recapture data
+prep_cap_data <- function(dat_dir){
+  cap.data <- gather_hq_data(dat_dir) %>% 
+    build_cr_df() %>% 
+    populate_missing_mate_data() %>%
+    populate_missing_mate_data() %>% 
+    add_implied_states() %>%
+    add_last_capture() %>% 
+    clean_filtered() 
+  
+  drop_id_yr_filter <- cap.data %>%
+    group_by(animal_id) %>%
+    summarize(num = sum(recapture_individual)) %>% 
+    filter(num < 1) %>%
+    pull(animal_id)
+  
+  cap.data <- cap.data %>%
+    filter(!(animal_id %in% drop_id_yr_filter)) %>%
+    assign_ids_bysex()
+  
+  return(cap.data)
 }

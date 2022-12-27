@@ -293,7 +293,11 @@ compute_proposed_chat <- function(corr1,
 }
 
 # Summarize Bootstrap output
-compute_btsrp_summary <- function(estimate, bstrp_replicates, parameteric, pearson){
+compute_btsrp_summary <- function(estimate, 
+                                  bstrp_replicates, 
+                                  bstrp_replicates_null, 
+                                  parameteric, 
+                                  pearson){
   # Non-Parametric conditional estimator results
   mean_bstrp            <- mean(bstrp_replicates)
   names(mean_bstrp)     <- "Est_Btstrp"
@@ -304,12 +308,18 @@ compute_btsrp_summary <- function(estimate, bstrp_replicates, parameteric, pears
   status_pearson        <- pearson
   names(status_param)   <- "Parametric"
   names(status_pearson) <- "Pearson"
+  pval1_0               <- mean(1 * (abs(bstrp_replicates_null-0) > estimate - 0))
+  pval2_0               <- mean(1 * (abs(bstrp_replicates - estimate) > (estimate -0)))
+  names(pval1_0)         <- "Pval0_1"
+  names(pval2_0)         <- "Pval0_2"
   summ_btstrp           <- c(estimate, 
                              mean_bstrp, 
                              se_bstrp,
                              quantiles_btstrp,
                              status_param, 
-                             status_pearson)
+                             status_pearson,
+                             pval1_0,
+                             pval2_0)
   
   return(summ_btstrp)
 } 
@@ -390,31 +400,31 @@ compute_lrt_summ <- function(summ_cjs,
     F_pval_partial_pearson[i] <- pf(F_stat_partial_pearson[i],df1 = lrt_df[i],df2 = alt_temp$df,lower.tail=FALSE)
     # AIC Delta
     aic_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 0) -
-      compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 0)
+                    compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 0)
     
     aicc_delta[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = 1, cc = 1) -
-      compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 1)
+                     compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = 1, cc = 1)
     
     # AIC Delta Likelihood
-    aic_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0) -
-      compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = null_temp$CChat_Likelihood,  cc = 0)
+    aic_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = alt_temp$CChat_Likelihood,  cc = 0) -
+                               compute_aic_mark(ll = alt_temp$ll,  k = alt_temp$df,  n = n_eff, chat = alt_temp$CChat_Likelihood,  cc = 0)
     
-    aicc_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1) -
-      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Likelihood, cc = 1)
+    aicc_delta_likelihood[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = alt_temp$CChat_Likelihood, cc = 1) -
+                                compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = alt_temp$CChat_Likelihood, cc = 1)
     
     # AIC Delta Pearson
-    aic_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Pearson,cc = 0) -
-      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,  n = n_eff, chat = null_temp$CChat_Pearson, cc = 0)
+    aic_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = alt_temp$CChat_Pearson,cc = 0) -
+                             compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,  n = n_eff, chat = alt_temp$CChat_Pearson, cc = 0)
     
-    aicc_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Pearson, cc = 1) -
-      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Pearson, cc = 1)
+    aicc_delta_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = alt_temp$CChat_Pearson, cc = 1) -
+                             compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = alt_temp$CChat_Pearson, cc = 1)
     
     # AIC Delta Partial Pearson
-    aic_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0) -
-      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson, cc = 0)
+    aic_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = alt_temp$CChat_Partial_Pearson, cc = 0) -
+                                    compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = alt_temp$CChat_Partial_Pearson, cc = 0)
     
-    aicc_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1) -
-      compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = null_temp$CChat_Partial_Pearson,  cc = 1)
+    aicc_delta_partial_pearson[i] <- compute_aic_mark(ll = null_temp$ll, k = null_temp$df, n = n_eff, chat = alt_temp$CChat_Partial_Pearson,  cc = 1) -
+                                     compute_aic_mark(ll = alt_temp$ll,  k =alt_temp$df,   n = n_eff, chat = alt_temp$CChat_Partial_Pearson,  cc = 1)
   }
   
   summ_lrt <- data.frame(test,
@@ -567,13 +577,13 @@ compute_chat_mark <- function(cjs_data,
   
   # Count of Observations in each Cohort
   N_cohort_df <- hist_data %>%
-                 group_by(cohort) %>% 
-                 summarize(Nf               = sum(Oi_F,na.rm = T),
-                           Nm               = sum(Oi_M,na.rm = T),
-                           N                = sum(Oi,na.rm=T),
-                           f_correction     = Nf - Nf * sum(prob_f),
-                           m_correction     = Nm - Nm * sum(prob_m),
-                           ungrp_correction = N - N *sum(prob_f))
+    group_by(cohort) %>% 
+    summarize(Nf               = sum(Oi_F,na.rm = T),
+              Nm               = sum(Oi_M,na.rm = T),
+              N                = sum(Oi,na.rm=T),
+              f_correction     = Nf - Nf * sum(prob_f),
+              m_correction     = Nm - Nm * sum(prob_m),
+              ungrp_correction = N - N *sum(prob_f))
   
   
   # Get Expected Cell Counts and Terms for Sums 
@@ -733,6 +743,8 @@ execute_iteration  <- function(iter,
   
   # Compute Recapture Correlation Estimate----------------------------------------------------------------------
   
+  browser()
+  
   # 1. Likelihood Approach -------------------------------------------------------------------------------------
   cat(paste0("Iteration#:", iter ," - Estimating recapture correlation, rho, using likelihood approach..."),"\n")
   rho_list <- compute_recapture_correlation(ps_data = ps_data, 
@@ -755,8 +767,7 @@ execute_iteration  <- function(iter,
                                                                  parametric = FALSE,
                                                                  model      = "likelihood")
   
-  # Non-Parametric conditional estimator results
-  summ_rho_np              <- compute_btsrp_summary(rho, rho_bs_np, parameteric = 0, pearson = 0)             
+  
   
   # Parametric Bootstrap To Estimate SE 
   cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get standard error estimates of rho (likelihood)..."),"\n")
@@ -769,9 +780,21 @@ execute_iteration  <- function(iter,
                                                                  parametric = TRUE,
                                                                  model      = "likelihood")
   
-  # Semi-Parametric conditional estimator
-  summ_rho_sp              <- compute_btsrp_summary(rho, rho_bs_sp, parameteric = 1, pearson = 0)       
   
+  # Run under null hypothesis 
+  rho_bs_null <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                   iter       = 1000,
+                                                                   PF         = pf_mark,
+                                                                   PM         = pm_mark,
+                                                                   rho        = 0,
+                                                                   use_block  = FALSE,
+                                                                   parametric = T,
+                                                                   model      = "likelihood")
+  
+  
+  # Gather results
+  summ_rho_sp              <- compute_btsrp_summary(rho, rho_bs_sp, rho_bs_null, parameteric = 1, pearson = 0)       
+  summ_rho_np              <- compute_btsrp_summary(rho, rho_bs_np, rho_bs_null, parameteric = 0, pearson = 0)   
   #-------------------------------------------------------------------------------------------------------------
   
   # 2. Pearson Full Approach -----------------------------------------------------------------------------------
@@ -794,7 +817,6 @@ execute_iteration  <- function(iter,
                                                                          model      = "full_pearson")
   
   # Non-Parametric conditional pearson estimator
-  summ_rho_np_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_np_pearson, parameteric = 0, pearson = 1)    
   
   # Parametric Bootstrap To Estimate SE 
   cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get standard error estimates of rho (pearson)..."),"\n")
@@ -806,8 +828,20 @@ execute_iteration  <- function(iter,
                                                                          use_block  = FALSE,
                                                                          parametric = TRUE,
                                                                          model      = "full_pearson")
+  
+  # Run under null hypothesis 
+  rho_bs_pearson_null <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                           iter       = 1000,
+                                                                           PF         = pf_mark,
+                                                                           PM         = pm_mark,
+                                                                           rho        = 0,
+                                                                           use_block  = FALSE,
+                                                                           parametric = T,
+                                                                           model      = "full_pearson")
+  
   # Semi-Parametric conditional pearson estimator
-  summ_rho_sp_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_sp_pearson, parameteric = 1, pearson = 1)   
+  summ_rho_np_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_np_pearson, rho_bs_pearson_null, parameteric = 0, pearson = 1)    
+  summ_rho_sp_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_sp_pearson, rho_bs_pearson_null, parameteric = 1, pearson = 1)   
   
   #-------------------------------------------------------------------------------------------------------------
   
@@ -830,8 +864,6 @@ execute_iteration  <- function(iter,
                                                                                  parametric = FALSE,
                                                                                  model      = "partial_pearson")
   
-  # Non-Parametric conditional pearson estimator
-  summ_rho_np_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_np_pearson_partial, parameteric = 0, pearson = 2)   
   
   # Parametric Bootstrap To Estimate SE 
   cat(paste0("Iteration#:", iter , " - Semi-Parametric Bootstrapping to get standard error estimates of rho (Psuedo-Pearson)..."),"\n")
@@ -843,8 +875,19 @@ execute_iteration  <- function(iter,
                                                                                  use_block  = FALSE,
                                                                                  parametric = TRUE,
                                                                                  model      = "partial_pearson")
-  # Semi-Parametric conditional pearson estimator
-  summ_rho_sp_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_sp_pearson_partial, parameteric = 1, pearson = 2)   
+  
+  # Run under null hypothesis 
+  rho_bs_partial_pearson_null <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                                   iter       = 1000,
+                                                                                   PF         = pf_mark,
+                                                                                   PM         = pm_mark,
+                                                                                   rho        = 0,
+                                                                                   use_block  = FALSE,
+                                                                                   parametric = T,
+                                                                                   model      = "partial_pearson")
+  # Gather results
+  summ_rho_np_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_np_pearson_partial, rho_bs_partial_pearson_null, parameteric = 0, pearson = 2)   
+  summ_rho_sp_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_sp_pearson_partial, rho_bs_partial_pearson_null, parameteric = 1, pearson = 2)   
   #-------------------------------------------------------------------------------------------------------------
   
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
@@ -896,12 +939,25 @@ execute_iteration  <- function(iter,
                                                                     PhiM                  = phim_mark,
                                                                     use_block             = FALSE,
                                                                     parametric            = TRUE)
+    
+    # Semi-Parametric Bootstrap To Estimate NULL Hypothesis 
+    cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get H0: gam = 0 of gamma|rho-likelihood..."),"\n")
+    gamma_bs_null <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                      iter                  = 1000,
+                                                                      rho                   = rho,
+                                                                      PF                    = pf_mark,
+                                                                      PM                    = pm_mark,
+                                                                      gamma                 = 0,
+                                                                      PhiF                  = phif_mark,
+                                                                      PhiM                  = phim_mark,
+                                                                      use_block             = FALSE,
+                                                                      parametric            = TRUE)
   }
   
   # Collect Results
   names(gamma) <- "Est"
-  summ_gamma_np   <- compute_btsrp_summary(gamma, gamma_bs_np, parameteric = 0, pearson = 0)   
-  summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, parameteric = 1, pearson = 0) 
+  summ_gamma_np   <- compute_btsrp_summary(gamma, gamma_bs_np, gamma_bs_null, parameteric = 0, pearson = 0)   
+  summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, gamma_bs_null, parameteric = 1, pearson = 0) 
   
   #-------------------------------------------------------------------------------------------------------------
   
@@ -949,12 +1005,25 @@ execute_iteration  <- function(iter,
                                                                             PhiM                  = phim_mark,
                                                                             use_block             = FALSE,
                                                                             parametric            = TRUE)
+    
+    # Semi-Parametric Bootstrap To Estimate NULL Hypothesis 
+    cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get H0: gam = 0 of gamma|rho-pearson..."),"\n")
+    gamma_bs_pearson_null <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                              iter                  = 1000,
+                                                                              rho                   = pearson_rho,
+                                                                              PF                    = pf_mark,
+                                                                              PM                    = pm_mark,
+                                                                              gamma                 = 0,
+                                                                              PhiF                  = phif_mark,
+                                                                              PhiM                  = phim_mark,
+                                                                              use_block             = FALSE,
+                                                                              parametric            = TRUE)
   }
   
   # Collect Results
   names(pearson_gamma) <- "Est"
-  summ_pearson_gamma_np   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_np, parameteric = 0, pearson = 1)   
-  summ_pearson_gamma_sp   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_sp, parameteric = 1, pearson = 1) 
+  summ_pearson_gamma_np   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_np, gamma_bs_pearson_null, parameteric = 0, pearson = 1)   
+  summ_pearson_gamma_sp   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_sp, gamma_bs_pearson_null, parameteric = 1, pearson = 1) 
   #-------------------------------------------------------------------------------------------------------------
   
   # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
@@ -1001,12 +1070,25 @@ execute_iteration  <- function(iter,
                                                                                     PhiM                  = phim_mark,
                                                                                     use_block             = FALSE,
                                                                                     parametric            = TRUE)
+    
+    # Semi-Parametric Bootstrap To Estimate NULL Hypothesis 
+    cat(paste0("Iteration#:", iter ," - Semi-Parametric Bootstrapping to get H0: gam = 0 of gamma|rho-psuedo-pearson..."),"\n")
+    gamma_bs_pearson_partial_null <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                                      iter                  = 1000,
+                                                                                      rho                   = pearson_partial_rho,
+                                                                                      PF                    = pf_mark,
+                                                                                      PM                    = pm_mark,
+                                                                                      gamma                 = 0,
+                                                                                      PhiF                  = phif_mark,
+                                                                                      PhiM                  = phim_mark,
+                                                                                      use_block             = FALSE,
+                                                                                      parametric            = TRUE)
   }
   
   # Collect Results
   names(pearson_partial_gamma) <- "Est"
-  summ_pearson_partial_gamma_np   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_np, parameteric = 0, pearson = 2)   
-  summ_pearson_partial_gamma_sp   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_sp, parameteric = 1, pearson = 2) 
+  summ_pearson_partial_gamma_np   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_np, gamma_bs_pearson_partial_null, parameteric = 0, pearson = 2)   
+  summ_pearson_partial_gamma_sp   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_sp, gamma_bs_pearson_partial_null, parameteric = 1, pearson = 2) 
   #-------------------------------------------------------------------------------------------------------------
   
   # Return Results----------------------------------------------------------------------------------------------
@@ -1028,7 +1110,7 @@ execute_iteration  <- function(iter,
   
   param_true          <- c(rep(rho_true, 6), rep(gam_true,6))
   summ_corr$Parameter <- c(rep("rho", 6), rep("gamma",6))
-  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric", "Pearson")]
+  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric", "Pearson", "Pval0_1","Pval0_2")]
   summ_corr           <- summ_corr %>% 
     left_join(true_param_df, by = "Parameter") %>% 
     mutate(Bias                = Truth - Est,
@@ -1140,7 +1222,7 @@ execute_iteration  <- function(iter,
                                                                PhiF    = phif_mark,
                                                                PhiM    = phim_mark,
                                                                alpha   = 0.5))
-                      
+  
   gam_delta_df <- as.data.frame(cbind(do.call(rbind, gam_delta_95),do.call(rbind, gam_delta_50)))
   names(gam_delta_df) <- c("2.5%", "97.5%", "25%", "75%")
   summ_gam_delta <- gam_delta_df %>% 
@@ -1461,4 +1543,548 @@ get_scenarios <- function(){
 # Compact ifelse for NA
 convert_na <- function(x,y=0){
   ifelse(is.na(x), y, x)
+}
+
+# Execute Application to a dataset with unknown true values
+
+# Execute one replicate of Simulation Study 
+execute_application  <- function(ps_data,
+                                 small_out     = TRUE){
+  
+  # Format to CJS data
+  cjs_data <- format_to_cjs(ps_data)
+  
+  # Effective Sample Size CJS Model
+  n_eff    <- sum(colSums(cjs_data$x[,1:(cjs_data$k-1)]))
+
+  # Run CJS Model MARK -----------------------------------------------------------------------------------------
+  cat(paste0("Computing standard CJS estimates with program MARK..."),"\n")
+  
+  cjs_list <- list()
+  versions <- c("B","S","R","N")
+  
+  for(i in 1:length(versions)){
+    cat(paste0("Computing CJS estimates for Version:", versions[i], " ..."),"\n")
+    cjs_list[[i]] <- run_cjs_model_mark(cjs_data = cjs_data,
+                                        title    = "mark_" %+% versions[i] %+% "_",
+                                        version  = versions[i])  
+  }
+  
+  cjs_out <- do.call(rbind, cjs_list) %>% 
+    mutate(Range95  = UB - LB) 
+  
+  # Get Predicted Probs for Correlation Estimators (using full model version)
+  phim_mark <- cjs_out %>% filter(Version == "B" & Parameter == "PhiM") %>% pull(Est)
+  phif_mark <- cjs_out %>% filter(Version == "B" & Parameter == "PhiF") %>% pull(Est)
+  pm_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PM")   %>% pull(Est)
+  pf_mark   <- cjs_out %>% filter(Version == "B" & Parameter == "PF")   %>% pull(Est)
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # Compute Recapture Correlation Estimate----------------------------------------------------------------------
+  
+  # 1. Likelihood Approach -------------------------------------------------------------------------------------
+  cat(paste0("Estimating recapture correlation, rho, using likelihood approach..."),"\n")
+  rho_list <- compute_recapture_correlation(ps_data = ps_data, 
+                                            PF      = pf_mark,
+                                            PM      = pm_mark,
+                                            model   = "likelihood")
+  
+  rho        <- rho_list$rho
+  n_eff_rho  <- rho_list$n_eff_rho
+  names(rho) <- "Est"
+  
+  # Non-Parametric Bootstrap To Estimate SE 
+  cat(paste0("Non-Parametric Bootstrapping to get standard error estimates of rho (likelihood)..."),"\n")
+  rho_bs_np <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                 iter       = 1000,
+                                                                 PF         = pf_mark,
+                                                                 PM         = pm_mark,
+                                                                 rho        = rho,
+                                                                 use_block  = FALSE,
+                                                                 parametric = FALSE,
+                                                                 model      = "likelihood")
+  
+  
+  
+  # Parametric Bootstrap To Estimate SE 
+  cat(paste0(" Semi-Parametric Bootstrapping to get standard error estimates of rho (likelihood)..."),"\n")
+  rho_bs_sp <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                 iter       = 1000,
+                                                                 PF         = pf_mark,
+                                                                 PM         = pm_mark,
+                                                                 rho        = rho,
+                                                                 use_block  = FALSE,
+                                                                 parametric = TRUE,
+                                                                 model      = "likelihood")
+  
+  
+  # Run under null hypothesis 
+  rho_bs_null <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                   iter       = 1000,
+                                                                   PF         = pf_mark,
+                                                                   PM         = pm_mark,
+                                                                   rho        = 0,
+                                                                   use_block  = FALSE,
+                                                                   parametric = T,
+                                                                   model      = "likelihood")
+  
+  
+  # Gather results
+  summ_rho_sp              <- compute_btsrp_summary(rho, rho_bs_sp, rho_bs_null, parameteric = 1, pearson = 0)       
+  summ_rho_np              <- compute_btsrp_summary(rho, rho_bs_np, rho_bs_null, parameteric = 0, pearson = 0)   
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # 2. Pearson Full Approach -----------------------------------------------------------------------------------
+  cat(paste0("Estimating recapture correlation rho using full pearson ..."),"\n")
+  pearson_rho <- compute_recapture_correlation(ps_data = ps_data, 
+                                               PF      = pf_mark,
+                                               PM      = pm_mark,
+                                               model   = "full_pearson")$rho
+  names(pearson_rho) <- "Est"
+  
+  # Non-Parametric Bootstrap To Estimate SE 
+  cat(paste0("Non-Parametric Bootstrapping to get standard error estimates of rho (pearson) ..."),"\n")
+  rho_bs_np_pearson <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                         iter       = 1000,
+                                                                         PF         = pf_mark,
+                                                                         PM         = pm_mark,
+                                                                         rho        = pearson_rho,
+                                                                         use_block  = FALSE,
+                                                                         parametric = FALSE,
+                                                                         model      = "full_pearson")
+  
+  # Non-Parametric conditional pearson estimator
+  
+  # Parametric Bootstrap To Estimate SE 
+  cat(paste0("Semi-Parametric Bootstrapping to get standard error estimates of rho (pearson)..."),"\n")
+  rho_bs_sp_pearson <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                         iter       = 1000,
+                                                                         PF         = pf_mark,
+                                                                         PM         = pm_mark,
+                                                                         rho        = pearson_rho,
+                                                                         use_block  = FALSE,
+                                                                         parametric = TRUE,
+                                                                         model      = "full_pearson")
+  
+  # Run under null hypothesis 
+  rho_bs_pearson_null <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                           iter       = 1000,
+                                                                           PF         = pf_mark,
+                                                                           PM         = pm_mark,
+                                                                           rho        = 0,
+                                                                           use_block  = FALSE,
+                                                                           parametric = T,
+                                                                           model      = "full_pearson")
+  
+  # Semi-Parametric conditional pearson estimator
+  summ_rho_np_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_np_pearson, rho_bs_pearson_null, parameteric = 0, pearson = 1)    
+  summ_rho_sp_pearson   <- compute_btsrp_summary(pearson_rho, rho_bs_sp_pearson, rho_bs_pearson_null, parameteric = 1, pearson = 1)   
+  
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # 2. Pearson Conditional Approach ----------------------------------------------------------------------------
+  cat(paste0("Estimating recapture correlation rho using pseudo-pearson..."),"\n")
+  pearson_partial_rho <- compute_recapture_correlation(ps_data = ps_data, 
+                                                       PF      = pf_mark,
+                                                       PM      = pm_mark,
+                                                       model   = "partial_pearson")$rho
+  names(pearson_partial_rho) <- "Est"
+  
+  # Non-Parametric Bootstrap To Estimate SE 
+  cat(paste0("Non-Parametric Bootstrapping to get standard error estimates of rho (Psuedo-Pearson)..."),"\n")
+  rho_bs_np_pearson_partial <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                                 iter       = 1000,
+                                                                                 PF         = pf_mark,
+                                                                                 PM         = pm_mark,
+                                                                                 rho        = pearson_partial_rho,
+                                                                                 use_block  = FALSE,
+                                                                                 parametric = FALSE,
+                                                                                 model      = "partial_pearson")
+  
+  
+  # Parametric Bootstrap To Estimate SE 
+  cat(paste0("Semi-Parametric Bootstrapping to get standard error estimates of rho (Psuedo-Pearson)..."),"\n")
+  rho_bs_sp_pearson_partial <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                                 iter       = 1000,
+                                                                                 PF         = pf_mark,
+                                                                                 PM         = pm_mark,
+                                                                                 rho        = pearson_partial_rho,
+                                                                                 use_block  = FALSE,
+                                                                                 parametric = TRUE,
+                                                                                 model      = "partial_pearson")
+  
+  # Run under null hypothesis 
+  rho_bs_partial_pearson_null <- compute_bootstrap_estimates_recapture_correlation(ps_data    = ps_data,
+                                                                                   iter       = 1000,
+                                                                                   PF         = pf_mark,
+                                                                                   PM         = pm_mark,
+                                                                                   rho        = 0,
+                                                                                   use_block  = FALSE,
+                                                                                   parametric = T,
+                                                                                   model      = "partial_pearson")
+  # Gather results
+  summ_rho_np_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_np_pearson_partial, rho_bs_partial_pearson_null, parameteric = 0, pearson = 2)   
+  summ_rho_sp_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_sp_pearson_partial, rho_bs_partial_pearson_null, parameteric = 1, pearson = 2)   
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # Compute Survival Correlation Estimate-----------------------------------------------------------------------
+  
+  # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
+  cat(paste0("Estimating survival correlation gamma|rho-likelihood..."),"\n")
+  # If estimate of rho fails (no valid observations) pass dummy values of 10
+  if(is.na(rho)|rho == 10){
+    gamma <- 10
+    gamma_bs_np <- rep(10, 1000)
+    gamma_bs_sp <- rep(10, 1000)
+  } else {
+    # Estimate Gamma from observed data
+    gamma_list <- compute_survival_correlation(ps_data = ps_data,
+                                               PFM     = compute_jbin_cjs(prob.f = pf_mark,
+                                                                          prob.m = pm_mark,
+                                                                          corr   = rho)$prob.mf,
+                                               PhiF    = phif_mark,
+                                               PhiM    = phim_mark)
+    
+    # Get Gamma and Effective Sample Size
+    gamma       <- gamma_list$gamma
+    n_eff_gamma <- gamma_list$n_eff_gamma 
+    ybar        <- gamma_list$ybar
+    
+    # Non-Parametric Bootstrap To Estimate SE 
+    cat(paste0("Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-likelihood..."),"\n")
+    gamma_bs_np <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                    iter                  = 1000,
+                                                                    rho                   = rho,
+                                                                    PF                    = pf_mark,
+                                                                    PM                    = pm_mark,
+                                                                    gamma                 = gamma,
+                                                                    PhiF                  = phif_mark,
+                                                                    PhiM                  = phim_mark,
+                                                                    use_block             = FALSE,
+                                                                    parametric            = FALSE)
+    
+    
+    # Semi-Parametric Bootstrap To Estimate SE 
+    cat(paste0("Semi-Parametric Bootstrapping to get standard error estimates of gamma|rho-likelihood..."),"\n")
+    gamma_bs_sp <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                    iter                  = 1000,
+                                                                    rho                   = rho,
+                                                                    PF                    = pf_mark,
+                                                                    PM                    = pm_mark,
+                                                                    gamma                 = gamma,
+                                                                    PhiF                  = phif_mark,
+                                                                    PhiM                  = phim_mark,
+                                                                    use_block             = FALSE,
+                                                                    parametric            = TRUE)
+    
+    # Semi-Parametric Bootstrap To Estimate NULL Hypothesis 
+    cat(paste0("Semi-Parametric Bootstrapping to get H0: gam = 0 of gamma|rho-likelihood..."),"\n")
+    gamma_bs_null <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                      iter                  = 1000,
+                                                                      rho                   = rho,
+                                                                      PF                    = pf_mark,
+                                                                      PM                    = pm_mark,
+                                                                      gamma                 = 0,
+                                                                      PhiF                  = phif_mark,
+                                                                      PhiM                  = phim_mark,
+                                                                      use_block             = FALSE,
+                                                                      parametric            = TRUE)
+  }
+  
+  # Collect Results
+  names(gamma) <- "Est"
+  summ_gamma_np   <- compute_btsrp_summary(gamma, gamma_bs_np, gamma_bs_null, parameteric = 0, pearson = 0)   
+  summ_gamma_sp   <- compute_btsrp_summary(gamma, gamma_bs_sp, gamma_bs_null, parameteric = 1, pearson = 0) 
+  
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
+  cat(paste0("Estimating survival correlation gamma|rho-pearson..."),"\n")
+  
+  # If estimate of rho fails (no valid observations) pass dummy values of 10
+  if(is.na(pearson_rho)|pearson_rho == 10){
+    pearson_gamma <- 10
+    pearson_gamma_bs_np <- rep(10, 1000)
+    pearson_gamma_bs_sp <- rep(10, 1000)
+  } else {
+    
+    # Estimate Gamma from observed data
+    pearson_gamma <- compute_survival_correlation(ps_data = ps_data,
+                                                  PFM     = compute_jbin_cjs(prob.f = pf_mark,
+                                                                             prob.m = pm_mark,
+                                                                             corr   = pearson_rho)$prob.mf,
+                                                  PhiF    = phif_mark,
+                                                  PhiM    = phim_mark)$gamma
+    
+    # Non-Parametric Bootstrap To Estimate SE 
+    cat(paste0("Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-pearson..."),"\n")
+    pearson_gamma_bs_np <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                            iter                  = 1000,
+                                                                            rho                   = pearson_rho,
+                                                                            PF                    = pf_mark,
+                                                                            PM                    = pm_mark,
+                                                                            gamma                 = pearson_gamma,
+                                                                            PhiF                  = phif_mark,
+                                                                            PhiM                  = phim_mark,
+                                                                            use_block             = FALSE,
+                                                                            parametric            = FALSE)
+    
+    
+    # Semi-Parametric Bootstrap To Estimate SE 
+    cat(paste0("Semi-Parametric Bootstrapping to get standard error estimates of gamma|rho-pearson..."),"\n")
+    pearson_gamma_bs_sp <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                            iter                  = 1000,
+                                                                            rho                   = pearson_rho,
+                                                                            PF                    = pf_mark,
+                                                                            PM                    = pm_mark,
+                                                                            gamma                 = pearson_gamma,
+                                                                            PhiF                  = phif_mark,
+                                                                            PhiM                  = phim_mark,
+                                                                            use_block             = FALSE,
+                                                                            parametric            = TRUE)
+    
+    # Semi-Parametric Bootstrap To Estimate NULL Hypothesis 
+    cat(paste0("Semi-Parametric Bootstrapping to get H0: gam = 0 of gamma|rho-pearson..."),"\n")
+    gamma_bs_pearson_null <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                              iter                  = 1000,
+                                                                              rho                   = pearson_rho,
+                                                                              PF                    = pf_mark,
+                                                                              PM                    = pm_mark,
+                                                                              gamma                 = 0,
+                                                                              PhiF                  = phif_mark,
+                                                                              PhiM                  = phim_mark,
+                                                                              use_block             = FALSE,
+                                                                              parametric            = TRUE)
+  }
+  
+  # Collect Results
+  names(pearson_gamma) <- "Est"
+  summ_pearson_gamma_np   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_np, gamma_bs_pearson_null, parameteric = 0, pearson = 1)   
+  summ_pearson_gamma_sp   <- compute_btsrp_summary(pearson_gamma, pearson_gamma_bs_sp, gamma_bs_pearson_null, parameteric = 1, pearson = 1) 
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
+  cat(paste0("Estimating survival correlation gamma|rho-psuedo-pearson..."),"\n")
+  
+  # If estimate of rho fails (no valid observations) pass dummy values of 10
+  if(is.na(pearson_partial_rho)|pearson_partial_rho == 10){
+    pearson_partial_gamma <- 10
+    pearson_partial_gamma_bs_np <- rep(10, 1000)
+    pearson_partial_gamma_bs_sp <- rep(10, 1000)
+  } else {
+    
+    # Estimate Gamma from observed data
+    pearson_partial_gamma <- compute_survival_correlation(ps_data = ps_data,
+                                                          PFM     = compute_jbin_cjs(prob.f = pf_mark,
+                                                                                     prob.m = pm_mark,
+                                                                                     corr   = pearson_partial_rho)$prob.mf,
+                                                          PhiF    = phif_mark,
+                                                          PhiM    = phim_mark)$gamma
+    
+    # Non-Parametric Bootstrap To Estimate SE 
+    cat(paste0("Non-Parametric Bootstrapping to get standard error estimates of gamma|rho-psuedo-pearson..."),"\n")
+    pearson_partial_gamma_bs_np <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                                    iter                  = 1000,
+                                                                                    rho                   = pearson_partial_rho,
+                                                                                    PF                    = pf_mark,
+                                                                                    PM                    = pm_mark,
+                                                                                    gamma                 = pearson_partial_gamma,
+                                                                                    PhiF                  = phif_mark,
+                                                                                    PhiM                  = phim_mark,
+                                                                                    use_block             = FALSE,
+                                                                                    parametric            = FALSE)
+    
+    
+    # Semi-Parametric Bootstrap To Estimate SE 
+    cat(paste0("Semi-Parametric Bootstrapping to get standard error estimates of gamma|rho-psuedo-pearson..."),"\n")
+    pearson_partial_gamma_bs_sp <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                                    iter                  = 1000,
+                                                                                    rho                   = pearson_partial_rho,
+                                                                                    PF                    = pf_mark,
+                                                                                    PM                    = pm_mark,
+                                                                                    gamma                 = pearson_partial_gamma,
+                                                                                    PhiF                  = phif_mark,
+                                                                                    PhiM                  = phim_mark,
+                                                                                    use_block             = FALSE,
+                                                                                    parametric            = TRUE)
+    
+    # Semi-Parametric Bootstrap To Estimate NULL Hypothesis 
+    cat(paste0("Semi-Parametric Bootstrapping to get H0: gam = 0 of gamma|rho-psuedo-pearson..."),"\n")
+    gamma_bs_pearson_partial_null <- compute_bootstrap_estimates_survival_correlation(ps_data               = ps_data,
+                                                                                      iter                  = 1000,
+                                                                                      rho                   = pearson_partial_rho,
+                                                                                      PF                    = pf_mark,
+                                                                                      PM                    = pm_mark,
+                                                                                      gamma                 = 0,
+                                                                                      PhiF                  = phif_mark,
+                                                                                      PhiM                  = phim_mark,
+                                                                                      use_block             = FALSE,
+                                                                                      parametric            = TRUE)
+  }
+  
+  # Collect Results
+  names(pearson_partial_gamma) <- "Est"
+  summ_pearson_partial_gamma_np   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_np, gamma_bs_pearson_partial_null, parameteric = 0, pearson = 2)   
+  summ_pearson_partial_gamma_sp   <- compute_btsrp_summary(pearson_partial_gamma, pearson_partial_gamma_bs_sp, gamma_bs_pearson_partial_null, parameteric = 1, pearson = 2) 
+  #-------------------------------------------------------------------------------------------------------------
+  
+  # Return Results----------------------------------------------------------------------------------------------
+  
+  cat("Formatting output ...","\n")
+  # Gather Correlation Results
+  summ_corr           <- as.data.frame(rbind(summ_rho_np,
+                                             summ_rho_sp,
+                                             summ_rho_np_pearson,
+                                             summ_rho_sp_pearson, 
+                                             summ_rho_np_pearson_partial,
+                                             summ_rho_sp_pearson_partial,
+                                             summ_gamma_np, 
+                                             summ_gamma_sp,
+                                             summ_pearson_gamma_np,
+                                             summ_pearson_gamma_sp,
+                                             summ_pearson_partial_gamma_np,
+                                             summ_pearson_partial_gamma_sp))
+  
+  summ_corr$Parameter <- c(rep("rho", 6), rep("gamma",6))
+  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric", "Pearson", "Pval0_1","Pval0_2")]
+  summ_corr           <- summ_corr %>% 
+    mutate(Bias_Btstrp2_Mean   = Est   - Est_Btstrp,
+           Bias_Btstrp2_Median = Est   - `50%`,
+           Range95             = `97.5%` - `2.5%`,
+           Range50             = `75%` - `25%`,
+           Cover095            = 1*(0 <= `97.5%` & 0 >= `2.5%`),    
+           Cover050            = 1*(0 <= `75%`   & 0 >= `25%`)) 
+  
+  rownames(summ_corr) <- NULL
+  
+  # Compute CChat Adjustment
+  summ_chat <- data.frame(Method     = c("Likelihood", "Pearson", "Psuedo-Pearson"),
+                          CChatRho   = c(compute_proposed_chat(rho, 0), 
+                                         compute_proposed_chat(pearson_rho, 0), 
+                                         compute_proposed_chat(pearson_partial_rho, 0)),
+                          CChatGamma = c(compute_proposed_chat(0, gamma), 
+                                         compute_proposed_chat(0, pearson_gamma), 
+                                         compute_proposed_chat(0, pearson_partial_gamma)),
+                          CChat      = c(compute_proposed_chat(rho, gamma), 
+                                         compute_proposed_chat(pearson_rho, pearson_gamma), 
+                                         compute_proposed_chat(pearson_partial_rho, pearson_partial_gamma)))
+  
+  # Add Correlation Chat Correction to Mark-Recapture Results
+  summ_cjs <- cjs_out %>% 
+    mutate(CChatAdj_Likelihood      = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(rho, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, gamma), 
+                                                    1)),
+           CChatAdj_Pearson         = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(pearson_rho, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, pearson_gamma), 
+                                                    1)),
+           CChatAdj_Partial_Pearson = ifelse(Parameter == "P", 
+                                             compute_proposed_chat(pearson_partial_rho, 0), 
+                                             ifelse(Parameter == "Phi",
+                                                    compute_proposed_chat(0, pearson_partial_gamma), 
+                                                    1)),
+           UBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[["ub"]],
+           LBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[["lb"]],
+           UBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[["ub"]],
+           LBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[["lb"]],
+           UBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[["ub"]],
+           LBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[["lb"]],
+           Range95_Likelihood       = UBAdj_Likelihood - LBAdj_Likelihood,
+           Range95_Pearson          = UBAdj_Pearson - LBAdj_Pearson,
+           Range95_Partial_Pearson  = UBAdj_Partial_Pearson - LBAdj_Partial_Pearson
+    ) 
+  
+  # Produce Likelihood Ratio Tests
+  summ_lrt <- compute_lrt_summ(summ_cjs = summ_cjs,
+                               n_eff    = n_eff,
+                               iter     = 0,
+                               scenario = 0)
+  
+  
+  # Produce AICC comparisons
+  summ_aic <- compute_aic_summ(summ_cjs = summ_cjs,
+                               n_eff    = n_eff,
+                               iter     = 0,
+                               scenario = 0)
+  
+  # Summarize Sample Sizes
+  summ_n <- data.frame(n_eff                       = n_eff,
+                       n_eff_rho                   = n_eff_rho,
+                       n_eff_gamma                 = n_eff_gamma)
+  
+  # Compute delta method gamma intervals
+  cat("Computing gamma coverage with delta method...","\n")
+  PFM_vector <- sapply(c(rho, pearson_rho, pearson_partial_rho),
+                       function(r) compute_jbin_cjs(prob.f = pf_mark,
+                                                    prob.m = pm_mark,
+                                                    corr   = r)$prob.mf)
+  
+  gam_delta_95 <- lapply(1:3, function(i) compute_gam_interval(ybar    = ybar, 
+                                                               N       = n_eff_gamma, 
+                                                               PFM     = PFM_vector[i],
+                                                               PhiF    = phif_mark,
+                                                               PhiM    = phim_mark,
+                                                               alpha   = 0.05))
+  
+  gam_delta_50 <- lapply(1:3, function(i) compute_gam_interval(ybar    = ybar, 
+                                                               N       = n_eff_gamma, 
+                                                               PFM     = PFM_vector[i],
+                                                               PhiF    = phif_mark,
+                                                               PhiM    = phim_mark,
+                                                               alpha   = 0.5))
+  
+  gam_delta_df <- as.data.frame(cbind(do.call(rbind, gam_delta_95),do.call(rbind, gam_delta_50)))
+  names(gam_delta_df) <- c("2.5%", "97.5%", "25%", "75%")
+  summ_gam_delta <- gam_delta_df %>% 
+    mutate(Parameter = "gamma",
+           N         = n_eff_gamma,
+           ybar      = ybar,
+           PFM_Est   = PFM_vector,
+           Pearson   = 0:2,
+           Est       = c(gamma, pearson_gamma, pearson_partial_gamma),
+           Cover095  = 1 * (0 >= `2.5%`     & 0 <= `97.5%`),
+           Cover050  = 1 * (0 >= `25%`      & 0 <= `75%`)) %>% 
+    select(Parameter, Est, "2.5%", "25%", "75%","97.5%", 
+           N, ybar, PFM_Est, Pearson, Cover095, Cover050)
+  
+  cat("Success, returning results ...","\n")
+  
+  if(small_out){
+    results <- list(random_seed                 = random_seed,
+                    summ_n                      = summ_n,
+                    summ_cjs                    = summ_cjs,
+                    summ_corr                   = summ_corr,
+                    summ_chat                   = summ_chat,
+                    summ_lrt                    = summ_lrt,
+                    summ_aic                    = summ_aic,
+                    summ_gam_delta              = summ_gam_delta)
+  } else {
+    results <- list(ps_data                     = ps_data,
+                    cjs_data                    = cjs_data,
+                    summ_n                      = summ_n,
+                    summ_cjs                    = summ_cjs,
+                    summ_corr                   = summ_corr,
+                    summ_chat                   = summ_chat,
+                    summ_lrt                    = summ_lrt,
+                    summ_aic                    = summ_aic,
+                    summ_gam_delta              = summ_gam_delta,
+                    rho_bs_np                   = unname(rho_bs_np),
+                    rho_bs_sp                   = unname(rho_bs_sp),
+                    rho_bs_np_pearson           = unname(rho_bs_np_pearson),
+                    rho_bs_sp_pearson           = unname(rho_bs_sp_pearson),
+                    rho_bs_np_pearson_partial   = unname(rho_bs_np_pearson_partial),
+                    rho_bs_sp_pearson_partial   = unname(rho_bs_sp_pearson_partial),
+                    gamma_bs_np                 = unname(gamma_bs_np),
+                    gamma_bs_sp                 = unname(gamma_bs_sp),
+                    pearson_gamma_bs_np         = unname(pearson_gamma_bs_np),
+                    pearson_gamma_bs_sp         = unname(pearson_gamma_bs_sp),
+                    pearson_partial_gamma_bs_np = unname(pearson_partial_gamma_bs_np),
+                    pearson_partial_gamma_bs_sp = unname(pearson_partial_gamma_bs_sp))
+  }
+  
+  
+  return(results)
 }
