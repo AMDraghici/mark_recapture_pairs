@@ -316,8 +316,8 @@ compute_btsrp_summary <- function(estimate,
   status_pearson        <- pearson
   names(status_param)   <- "Parametric"
   names(status_pearson) <- "Pearson"
-  pval1_0               <- mean(1 * (abs(bstrp_replicates_null-0) > estimate - 0))
-  pval2_0               <- mean(1 * (abs(bstrp_replicates - estimate) > (estimate -0)))
+  pval1_0               <- mean(1 * (abs(bstrp_replicates_null-0) > abs(estimate - 0)))
+  pval2_0               <- mean(1 * (abs(bstrp_replicates - estimate) > abs(estimate -0)))
   names(pval1_0)         <- "Pval0_1"
   names(pval2_0)         <- "Pval0_2"
   summ_btstrp           <- c(estimate, 
@@ -1386,8 +1386,8 @@ get_scenarios <- function(){
   PM    <- c(0.45, 0.75)
   PhiF  <- c(0.8)
   PhiM  <- c(0.8)
-  rho   <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.15))))
-  gamma <- sort(unique(c(0, seq(-0.1, 0.9, by = 0.15))))
+  rho   <- sort(unique(c(0, 0.9, -0.1, seq(-0.1, 0.9, by = 0.15))))
+  gamma <- sort(unique(c(0, 0.9, -0.1, seq(-0.1, 0.9, by = 0.15))))
   
   scenario_grid_base  <- expand.grid(n_obs    = n,
                                      k        = k,
@@ -1517,8 +1517,8 @@ get_scenarios <- function(){
   # Testing Imputed Mates Off
   scenario_imputed_off <- expand.grid(n_obs         = 250,
                                       k             = 25,
-                                      rho_true      = rho,
-                                      gam_true      = gamma, 
+                                      rho_true      = c(-0.10,  0.00,  0.20,  0.50,  0.80,  0.90),
+                                      gam_true      = c(-0.10,  0.00,  0.20,  0.50,  0.80,  0.90), 
                                       PhiF          = 0.8,
                                       PhiM          = 0.8,
                                       PF            = 0.75,
@@ -1526,7 +1526,7 @@ get_scenarios <- function(){
                                       Beta0         = 0.25,
                                       Beta1         = 0,
                                       Delta         = 1,
-                                      imputed_pairs = TRUE)
+                                      imputed_pairs = FALSE)
   
   
   
@@ -1626,7 +1626,7 @@ execute_application  <- function(ps_data,
                                                                    iter       = 1000,
                                                                    PF         = pf_mark,
                                                                    PM         = pm_mark,
-                                                                   rho        = 0,
+                                                                   rho        = ifelse(rho == 10|n_eff_rho == 0, 10,0),
                                                                    use_block  = FALSE,
                                                                    parametric = T,
                                                                    model      = "likelihood")
@@ -1674,7 +1674,7 @@ execute_application  <- function(ps_data,
                                                                            iter       = 1000,
                                                                            PF         = pf_mark,
                                                                            PM         = pm_mark,
-                                                                           rho        = 0,
+                                                                           rho        = ifelse(pearson_rho == 10|n_eff_rho == 0, 10,0),
                                                                            use_block  = FALSE,
                                                                            parametric = T,
                                                                            model      = "full_pearson")
@@ -1721,7 +1721,7 @@ execute_application  <- function(ps_data,
                                                                                    iter       = 1000,
                                                                                    PF         = pf_mark,
                                                                                    PM         = pm_mark,
-                                                                                   rho        = 0,
+                                                                                   rho        = ifelse(pearson_partial_rho == 10|n_eff_rho == 0, 10,0),
                                                                                    use_block  = FALSE,
                                                                                    parametric = T,
                                                                                    model      = "partial_pearson")
@@ -1737,8 +1737,11 @@ execute_application  <- function(ps_data,
   # If estimate of rho fails (no valid observations) pass dummy values of 10
   if(is.na(rho)|rho == 10){
     gamma <- 10
-    gamma_bs_np <- rep(10, 1000)
-    gamma_bs_sp <- rep(10, 1000)
+    gamma_bs_np   <- rep(10, 1000)
+    gamma_bs_sp   <- rep(10, 1000)
+    gamma_bs_null <- rep(10, 1000)
+    n_eff_gamma   <- 0
+    ybar          <- NA
   } else {
     # Estimate Gamma from observed data
     gamma_list <- compute_survival_correlation(ps_data = ps_data,
@@ -1809,6 +1812,7 @@ execute_application  <- function(ps_data,
     pearson_gamma <- 10
     pearson_gamma_bs_np <- rep(10, 1000)
     pearson_gamma_bs_sp <- rep(10, 1000)
+    gamma_bs_pearson_null <- rep(10, 1000)
   } else {
     
     # Estimate Gamma from observed data
@@ -1874,6 +1878,7 @@ execute_application  <- function(ps_data,
     pearson_partial_gamma <- 10
     pearson_partial_gamma_bs_np <- rep(10, 1000)
     pearson_partial_gamma_bs_sp <- rep(10, 1000)
+    gamma_bs_pearson_partial_null <- rep(10, 1000)
   } else {
     
     # Estimate Gamma from observed data
@@ -1918,7 +1923,7 @@ execute_application  <- function(ps_data,
                                                                                       rho                   = pearson_partial_rho,
                                                                                       PF                    = pf_mark,
                                                                                       PM                    = pm_mark,
-                                                                                      gamma                 = 0,
+                                                                                      gamma                 = ifelse(pearson_partial_gamma == 10|n_eff_gamma == 0, 10,0),
                                                                                       PhiF                  = phif_mark,
                                                                                       PhiM                  = phim_mark,
                                                                                       use_block             = FALSE,
@@ -1949,7 +1954,8 @@ execute_application  <- function(ps_data,
                                              summ_pearson_partial_gamma_sp))
   
   summ_corr$Parameter <- c(rep("rho", 6), rep("gamma",6))
-  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric", "Pearson", "Pval0_1","Pval0_2")]
+  summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", "2.5%","25%","50%","75%","97.5%", "Parametric", "Pearson", "Pval0_1","Pval0_2", 
+                                      "num_failures", "num_failures_null")]
   summ_corr           <- summ_corr %>% 
     mutate(Bias_Btstrp2_Mean   = Est   - Est_Btstrp,
            Bias_Btstrp2_Median = Est   - `50%`,
@@ -2020,10 +2026,11 @@ execute_application  <- function(ps_data,
   
   # Compute delta method gamma intervals
   cat("Computing gamma coverage with delta method...","\n")
-  PFM_vector <- sapply(c(rho, pearson_rho, pearson_partial_rho),
-                       function(r) compute_jbin_cjs(prob.f = pf_mark,
-                                                    prob.m = pm_mark,
-                                                    corr   = r)$prob.mf)
+  rho_vector <- c(rho, pearson_rho, pearson_partial_rho)
+  PFM_vector <- sapply(rho_vector,
+                       function(r) ifelse(r == 10, NA, compute_jbin_cjs(prob.f = pf_mark,
+                                                                        prob.m = pm_mark,
+                                                                        corr   = r)$prob.mf))
   
   gam_delta_95 <- lapply(1:3, function(i) compute_gam_interval(ybar    = ybar, 
                                                                N       = n_eff_gamma, 
@@ -2048,6 +2055,7 @@ execute_application  <- function(ps_data,
            PFM_Est   = PFM_vector,
            Pearson   = 0:2,
            Est       = c(gamma, pearson_gamma, pearson_partial_gamma),
+           rho_Est   = rho_vector,
            Cover095  = 1 * (0 >= `2.5%`     & 0 <= `97.5%`),
            Cover050  = 1 * (0 >= `25%`      & 0 <= `75%`)) %>% 
     select(Parameter, Est, "2.5%", "25%", "75%","97.5%", 
