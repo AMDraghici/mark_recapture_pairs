@@ -796,7 +796,7 @@ execute_iteration  <- function(iter,
                                                                    PM         = pm_mark,
                                                                    rho        = ifelse(rho == 10|n_eff_rho == 0, 10,0),
                                                                    use_block  = FALSE,
-                                                                   parametric = T,
+                                                                   parametric = TRUE,
                                                                    model      = "likelihood")
   
   
@@ -844,7 +844,7 @@ execute_iteration  <- function(iter,
                                                                            PM         = pm_mark,
                                                                            rho        = ifelse(pearson_rho == 10|n_eff_rho == 0, 10,0),
                                                                            use_block  = FALSE,
-                                                                           parametric = T,
+                                                                           parametric = TRUE,
                                                                            model      = "full_pearson")
   
   # Semi-Parametric conditional pearson estimator
@@ -891,7 +891,7 @@ execute_iteration  <- function(iter,
                                                                                    PM         = pm_mark,
                                                                                    rho        = ifelse(pearson_partial_rho == 10|n_eff_rho == 0, 10,0),
                                                                                    use_block  = FALSE,
-                                                                                   parametric = T,
+                                                                                   parametric = TRUE,
                                                                                    model      = "partial_pearson")
   # Gather results
   summ_rho_np_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_np_pearson_partial, rho_bs_partial_pearson_null, parameteric = 0, pearson = 2)   
@@ -1526,7 +1526,7 @@ get_scenarios <- function(){
                                       Beta0         = 0.25,
                                       Beta1         = 0,
                                       Delta         = 1,
-                                      imputed_pairs = FALSE)
+                                      imputed_pairs = TRUE)
   
   
   
@@ -1628,7 +1628,7 @@ execute_application  <- function(ps_data,
                                                                    PM         = pm_mark,
                                                                    rho        = ifelse(rho == 10|n_eff_rho == 0, 10,0),
                                                                    use_block  = FALSE,
-                                                                   parametric = T,
+                                                                   parametric = TRUE,
                                                                    model      = "likelihood")
   
   
@@ -1676,7 +1676,7 @@ execute_application  <- function(ps_data,
                                                                            PM         = pm_mark,
                                                                            rho        = ifelse(pearson_rho == 10|n_eff_rho == 0, 10,0),
                                                                            use_block  = FALSE,
-                                                                           parametric = T,
+                                                                           parametric = TRUE,
                                                                            model      = "full_pearson")
   
   # Semi-Parametric conditional pearson estimator
@@ -1723,7 +1723,7 @@ execute_application  <- function(ps_data,
                                                                                    PM         = pm_mark,
                                                                                    rho        = ifelse(pearson_partial_rho == 10|n_eff_rho == 0, 10,0),
                                                                                    use_block  = FALSE,
-                                                                                   parametric = T,
+                                                                                   parametric = TRUE,
                                                                                    model      = "partial_pearson")
   # Gather results
   summ_rho_np_pearson_partial   <- compute_btsrp_summary(pearson_partial_rho, rho_bs_np_pearson_partial, rho_bs_partial_pearson_null, parameteric = 0, pearson = 2)   
