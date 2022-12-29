@@ -191,6 +191,7 @@ run_cjs_model_mark <- function(cjs_data,
                    prefix           = title,
                    output           = FALSE)
   
+  
   mark_out <- mark_out$results
   
   #Extract values of use
@@ -258,6 +259,9 @@ run_cjs_model_mark <- function(cjs_data,
     mutate(Deviance_chat = deviance/deviance.df, 
            Pearson_chat  = chat_list[["Pearson_chat"]],
            Fletcher_chat = chat_list[["Fletcher_chat"]])
+  
+  Sys.sleep(0.5)
+  
   #Return Output
   return(mark_results)
   

@@ -1,7 +1,7 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <- getwd() #"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-out_dir    <- src_dir %+% "/Simulation/Run2/Output/"
+out_dir    <- src_dir %+% "/Simulation/Run4/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -43,6 +43,12 @@ saveRDS(summ_chat, src_dir %+% "/Output/summ_chat.rds")
 saveRDS(summ_aic,  src_dir %+% "/Output/summ_aic.rds")
 saveRDS(summ_n,    src_dir %+% "/Output/summ_n.rds")
 
+summ_corr <- readRDS(src_dir %+% "/Output/summ_corr.rds")
+summ_cjs <- readRDS(src_dir %+% "/Output/summ_cjs.rds")
+summ_lrt <- readRDS(src_dir %+% "/Output/summ_lrt.rds")
+summ_chat <- readRDS(src_dir %+% "/Output/summ_chat.rds")
+summ_aic <- readRDS(src_dir %+% "/Output/summ_aic.rds")
+summ_n <- readRDS(src_dir %+% "/Output/summ_n.rds")
 
 mc_corr <- summ_corr %>% group_by(Parameter, 
                                   Parametric, 
@@ -72,18 +78,21 @@ mc_corr <- summ_corr %>% group_by(Parameter,
             PhiM   = first(PhiM),
             n_obs  = first(n_obs),
             k      = first(k),
+            Accept95_1 = mean(1 * (Pval0_1 > 0.05)),
+            Accept95_2 = mean(1 * (Pval0_2 > 0.05)),
             imputed_pairs = first(imputed_pairs))
+
 
 
 # Investigating Performance of hat Rho
 mc_corr %>% 
-  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = MeanBias, x = rho, col = as.factor(gamma))) +
+  filter(Parameter == "rho" & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover95, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
-  facet_grid(Pearson ~Parametric) + 
-  ylim(c(-0.03,0.03)) +
-  geom_hline(yintercept = 0, lty = 2) + 
+  facet_grid(Pearson + as.factor(n_obs) + as.factor(k) ~Parametric + as.factor(PF)) + 
+  ylim(c(0.6,1)) +
+  geom_hline(yintercept = 0.95, lty = 2) + 
   labs(x = expression(rho), y = "Mean Bias", col = expression(gamma)) +
   theme(legend.position = "bottom")
 
@@ -99,6 +108,7 @@ mc_corr %>%
   theme(legend.position = "bottom")
 
 
+
 mc_corr %>% 
   filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover50, x = rho, col = as.factor(gamma))) +
@@ -112,13 +122,13 @@ mc_corr %>%
 
 
 mc_corr %>% 
-  filter(Parameter == "rho" & Pearson == 2 & Parametric == 1 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover095, x = rho, col = as.factor(gamma))) +
+  filter(Parameter == "rho" & k == 25 & n_obs == 250 & Pearson == "Partial-Pearson" & Parametric == "Semi-Parametric" & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = 1-Cover095, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
-  facet_grid(n_obs ~k) + 
+  # facet_grid(n_obs ~k) + 
   ylim(c(0,1)) +
-  geom_hline(yintercept = c(0.05,0.95), lty = 2) + 
+  geom_hline(yintercept = c(0.05,0.8), lty = 2) + 
   labs(x = expression(rho), y = "Average Coverage of 0 by 95% Confidence Interval", col = expression(gamma)) +
   theme(legend.position = "bottom")
 
@@ -161,15 +171,26 @@ mc_corr %>%
 
 mc_corr %>% 
   filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover095, x = gamma, col = as.factor(rho))) +
+  ggplot(aes(y = 1 - Accept95_1, x = gamma, col = as.factor(rho))) +
   geom_line() + 
   geom_point() + 
   facet_grid(Pearson ~ Parametric) + 
   ylim(c(0,1)) +
-  geom_hline(yintercept = c(0.05,0.95), lty = 2) + 
+  geom_hline(yintercept = c(0.8), lty = 2) + 
   labs(x = expression(rho), y = "Mean Coverage of 0 by 95% Confidence Interval", col = expression(rho)) +
   theme(legend.position = "bottom")
 
+
+mc_corr %>% 
+  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = 1 - Accept95_2, x = rho, col = as.factor(gamma))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~ Parametric) + 
+  ylim(c(0,1)) +
+  geom_hline(yintercept = c(0.8), lty = 2) + 
+  labs(x = expression(rho), y = "Mean Coverage of 0 by 95% Confidence Interval", col = expression(rho)) +
+  theme(legend.position = "bottom")
 # 
 # summ_cjs2 <- summ_cjs %>% mutate(CChatAdj_Partial_Pearson2 = 2^(log(CChatAdj_Partial_Pearson,base = 2)/2),
 #                                  UBAdj_Partial_Pearson2    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson2), alpha = 0.05)[["ub"]],
@@ -181,7 +202,6 @@ mc_cjs <- summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>%
   summarize(bias = mean(Bias),
             In95 = mean(In95),
             In95_Partial_Pearson = mean(In95_Partial_Pearson),
-            In95_Partial_Pearson2 = mean(In95_Partial_Pearson2),
             rho = first(rho_true),
             gamma = first(gam_true),
             PF     = first(PF),
@@ -225,7 +245,7 @@ mc_cjs %>%
   theme(legend.position = "bottom")
 
 mc_cjs %>% 
-  filter(Parameter == "Phi" & n_obs == 250 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
+  filter(Parameter == "Phi" & k == 25 & n_obs == 250 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
   ggplot() +
   geom_line(aes(x = gamma, y = In95, col = as.factor(rho))) +
   geom_point(aes(x = gamma, y = In95, col = as.factor(rho))) +
@@ -251,3 +271,5 @@ mc_cjs2 %>%
 
 
 
+success <- summ_cjs$scenario %>% unique()
+scenario_grid %>% filter(!scenario %in% success) %>% pull(scenario)
