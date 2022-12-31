@@ -1098,7 +1098,7 @@ compute_hidden_pairs <- function(pairs_f,
         if(!is.na(apairs_f[i,t-1]) & is.na(apairs_f[i,t])){
           if(apairs_f[i,t-1] == (nm+1)) next
           if(!is.na(af[i,t]) & !is.na(am[apairs_f[i,t-1],t])){
-            if(pairs_f[i,t] != apairs_f[i,t-1]) browser()
+            # if(pairs_f[i,t] != apairs_f[i,t-1]) browser()
             apairs_f[i,t] <- apairs_f[i,t-1]
             apairs_m[apairs_f[i,t],t-1] <- i
             apairs_m[apairs_f[i,t],t] <- i
