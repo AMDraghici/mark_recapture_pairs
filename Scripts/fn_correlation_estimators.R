@@ -412,6 +412,67 @@ compute_survival_correlation <- function(ps_data,
               ybar        = n/N))
 }
 
+# generate_bootstrap_replicates_surv2 <- function(ps_data,
+#                                                 PFM,
+#                                                 PhiF,
+#                                                 PhiM,
+#                                                 gamma,
+#                                                 iter){
+#   
+#   
+#   # Unpack data
+#   nm              <- ps_data$nm
+#   nf              <- ps_data$nf
+#   k               <- ps_data$k
+#   first_capture_f <- ps_data$first_capture_f
+#   recap_f         <- ps_data$recap_f
+#   recap_m         <- ps_data$recap_m
+#   apairs_f        <- ps_data$apairs_f
+#   
+#   # Filter on known pairs that are not single
+#   pairs_known <- !is.na(apairs_f[1:nf,1:k])
+#   pairs_taken <- (apairs_f[1:nf,1:k] != (nm+1))
+#   pairs_taken[is.na(pairs_taken)] <- FALSE
+#   partner_grid <- pairs_known * pairs_taken
+#   trial_matrix <- matrix(0, nrow = nf, ncol = k)
+#   success_matrix <- matrix(0, nrow = nf, ncol = k)
+#   
+#   # Count Trials
+#   for(i in 1:nf){
+#     if(first_capture_f[i] == k) next
+#     for(t in first_capture_f[i]:k){
+#       if(partner_grid[i,t] == 1){
+#         if(recap_f[i,t] == 1 & recap_m[apairs_f[i,t], t] == 1){
+#           trial_matrix[i,t] <- 1
+#         }
+#       }
+#     }
+#   }
+#   
+#   # Count Success
+#   for(i in 1:nf){
+#     if(first_capture_f[i] == k) next
+#     for(t in first_capture_f[i]:(k-1)){
+#       if(trial_matrix[i,t] == 1 & trial_matrix[i,t+1] == 1){
+#         if(apairs_f[i,t] == apairs_f[i,t+1]){
+#           success_matrix[i,t] <- 1
+#         }
+#       }
+#     }
+#   }
+#   
+#   # Summarize results (dont count k as we cannot jump from there)
+#   n <- sum(success_matrix[,1:(k-1)])
+#   N <- sum(trial_matrix[,1:(k-1)])
+#   
+#   PhiFM <- compute_jbin_cjs(PhiF, PhiM, gamma)[[1]]
+#   
+#   # Get bootstraps
+#   gamma_bs <- replicate(iter, compute_surv_cor(rbinom(1, N, PhiFM * PFM)/N,PFM, PhiF, PhiM)) 
+#   return(gamma_bs)
+#   
+# }
+
 # Run bootstrap to get standard error estimates of survival
 generate_bootstrap_replicates_surv <- function(ps_data, prob_prod, parametric, use_block, iter){
   
@@ -529,8 +590,8 @@ compute_bootstrap_estimates_survival_correlation <- function(ps_data,
   # Joint Probabilties
   PFM                       <- compute_jbin_cjs(PF, PM, rho)$prob.mf
   PhiFM                     <- compute_jbin_cjs(PhiF, PhiM, gamma)$prob.mf
-  bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, PFM * PhiFM, parametric, use_block, iter)
-  gamma_bs <- sapply(1:iter, function(i) compute_surv_cor(x    = bootstrap_data_replicates[i],
+  bootstrap_data_replicates <- generate_bootstrap_replicates_surv(ps_data, PhiFM, parametric, use_block, iter)
+  gamma_bs <- sapply(1:iter, function(i) compute_surv_cor(x    = PFM * bootstrap_data_replicates[i],
                                                           PMF  =  PFM,
                                                           PhiF = PhiF,
                                                           PhiM = PhiM))
