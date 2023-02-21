@@ -1,7 +1,7 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <- getwd() #"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-out_dir    <- src_dir %+% "/Simulation/Run4/Output/"
+out_dir    <- src_dir %+% "/Simulation/Run6/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -27,6 +27,7 @@ summ_chat    <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_ch
 summ_lrt     <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_lrt))
 summ_aic     <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_aic))
 summ_n       <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_n))
+summ_gam_delta <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_gam_delta))
 
 # Add Scenario Settings
 summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
@@ -35,6 +36,8 @@ summ_lrt  <-  summ_lrt %>% left_join(scenario_grid, by = c("scenario"))
 summ_chat  <- summ_chat %>% left_join(scenario_grid, by = c("scenario"))
 summ_aic  <-  summ_aic %>% left_join(scenario_grid, by = c("scenario"))
 summ_n  <-    summ_n %>% left_join(scenario_grid, by = c("scenario"))
+summ_gam_delta <- summ_gam_delta %>% left_join(scenario_grid, by = c("scenario"))
+
 
 saveRDS(summ_corr, src_dir %+% "/Output/summ_corr.rds")
 saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs.rds")
@@ -42,6 +45,7 @@ saveRDS(summ_lrt,  src_dir %+% "/Output/summ_lrt.rds")
 saveRDS(summ_chat, src_dir %+% "/Output/summ_chat.rds")
 saveRDS(summ_aic,  src_dir %+% "/Output/summ_aic.rds")
 saveRDS(summ_n,    src_dir %+% "/Output/summ_n.rds")
+saveRDS(summ_gam_delta, src_dir %+% "/Output/summ_gam_delta.rds")
 
 summ_corr <- readRDS(src_dir %+% "/Output/summ_corr.rds")
 summ_cjs <- readRDS(src_dir %+% "/Output/summ_cjs.rds")
@@ -78,6 +82,7 @@ mc_corr <- summ_corr %>% group_by(Parameter,
             PhiM   = first(PhiM),
             n_obs  = first(n_obs),
             k      = first(k),
+            Beta0 = first(Beta0),
             Accept95_1 = mean(1 * (Pval0_1 > 0.05)),
             Accept95_2 = mean(1 * (Pval0_2 > 0.05)),
             imputed_pairs = first(imputed_pairs))
@@ -86,7 +91,7 @@ mc_corr <- summ_corr %>% group_by(Parameter,
 
 # Investigating Performance of hat Rho
 mc_corr %>% 
-  filter(Parameter == "rho" & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
+  filter(Parameter == "rho" & Beta0 > 1 & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover95, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
@@ -97,7 +102,7 @@ mc_corr %>%
   theme(legend.position = "bottom")
 
 mc_corr %>% 
-  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "rho" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover95, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
@@ -110,7 +115,7 @@ mc_corr %>%
 
 
 mc_corr %>% 
-  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "rho" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover50, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
@@ -122,7 +127,7 @@ mc_corr %>%
 
 
 mc_corr %>% 
-  filter(Parameter == "rho" & k == 25 & n_obs == 250 & Pearson == "Partial-Pearson" & Parametric == "Semi-Parametric" & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "rho" & Beta0 > 1 & k == 25 & n_obs == 250 & Pearson == "Partial-Pearson" & Parametric == "Semi-Parametric" & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = 1-Cover095, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
@@ -135,7 +140,7 @@ mc_corr %>%
 
 # Investigating Performance of hat gamma
 mc_corr %>% 
-  filter(Parameter == "gamma" & n_obs == 250 & k == 25 &  PhiF == 0.8 &  PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 &  PhiF == 0.8 &  PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = MedBias, x = gamma, col = as.factor(rho))) +
   geom_line() + 
   geom_point() + 
@@ -146,7 +151,7 @@ mc_corr %>%
   theme(legend.position = "bottom")
 
 mc_corr %>% 
-  filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover95, x = gamma, col = as.factor(rho))) +
   geom_line() + 
   geom_point() + 
@@ -157,8 +162,39 @@ mc_corr %>%
   theme(legend.position = "bottom")
 
 
+summ_gam_delta %>% 
+  group_by(Parameter, 
+           Pearson,
+           scenario, 
+           Truth)  %>% 
+  summarize(mean_est      = mean(Est),
+            median_est = median(Est),
+            sd_est    = sd(Est),
+            Cover95 = mean(In95),
+            Cover50 = mean(In50),
+            rho = first(rho_true),
+            gamma = first(gam_true),
+            PF     = first(PF),
+            PM     = first(PM),
+            PhiF   = first(PhiF.x),
+            PhiM   = first(PhiM.x),
+            n_obs  = first(n_obs),
+            k      = first(k),
+            Beta0 = first(Beta0),
+            imputed_pairs = first(imputed_pairs)) %>% 
+  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = Cover95, x = gamma, col = as.factor(rho))) +
+  geom_line() + 
+  geom_point() + 
+  facet_grid(Pearson ~.) + 
+  ylim(c(0.75,1)) +
+  geom_hline(yintercept = 0.95, lty = 2) + 
+  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
+  theme(legend.position = "bottom")
+
+
 mc_corr %>% 
-  filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "gamma"& Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover50, x = gamma, col = as.factor(rho))) +
   geom_line() + 
   geom_point() + 
@@ -170,7 +206,7 @@ mc_corr %>%
 
 
 mc_corr %>% 
-  filter(Parameter == "gamma" & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
   ggplot(aes(y = 1 - Accept95_1, x = gamma, col = as.factor(rho))) +
   geom_line() + 
   geom_point() + 
@@ -182,8 +218,8 @@ mc_corr %>%
 
 
 mc_corr %>% 
-  filter(Parameter == "rho" & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = 1 - Accept95_2, x = rho, col = as.factor(gamma))) +
+  filter(Parameter == "rho" & Beta0 < 1 & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  ggplot(aes(y = 1 - Accept95_1, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
   facet_grid(Pearson ~ Parametric) + 
@@ -209,6 +245,7 @@ mc_cjs <- summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>%
             PhiF   = first(PhiF),
             PhiM   = first(PhiM),
             n_obs  = first(n_obs),
+            Beta0         = first(Beta0),
             k = first(k),
             imputed_pairs = first(imputed_pairs))
 
@@ -225,14 +262,15 @@ mc_cjs2 <- summ_cjs %>% group_by(scenario, Version) %>%
             PhiM          = first(PhiM),
             n_obs         = first(n_obs),
             k             = first(k),
-            imputed_pairs = first(imputed_pairs)) %>% 
+            imputed_pairs = first(imputed_pairs),
+            Beta0         = first(Beta0)) %>% 
   pivot_longer(cols = c("chat", "chat_pearson", "chat_fletcher"), 
                names_to = "Estimator", values_to = "chat") %>% 
   mutate(Estimator = ifelse(Estimator == "chat", "Deviance",
                             ifelse(Estimator == "chat_pearson", "Pearson","Fletcher")))
 
 mc_cjs %>% 
-  filter(Parameter == "P" & n_obs == 250 & k == 25 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
+  filter(Parameter == "P" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
   ggplot() +
   geom_line(aes(x = rho, y = In95, col = as.factor(gamma))) +
   geom_point(aes(x = rho, y = In95, col = as.factor(gamma))) +
@@ -245,7 +283,7 @@ mc_cjs %>%
   theme(legend.position = "bottom")
 
 mc_cjs %>% 
-  filter(Parameter == "Phi" & k == 25 & n_obs == 250 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
+  filter(Parameter == "Phi" & Beta0 > 1 & k == 25 & n_obs == 250 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
   ggplot() +
   geom_line(aes(x = gamma, y = In95, col = as.factor(rho))) +
   geom_point(aes(x = gamma, y = In95, col = as.factor(rho))) +
@@ -273,3 +311,7 @@ mc_cjs2 %>%
 
 success <- summ_cjs$scenario %>% unique()
 scenario_grid %>% filter(!scenario %in% success) %>% pull(scenario)
+scenario_grid %>% filter(!scenario %in% success) %>% pull(scenario) -> x
+
+paste0(x, ",")
+
