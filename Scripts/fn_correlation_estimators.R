@@ -341,8 +341,8 @@ compute_surv_cor <- function(x, PMF, PhiF, PhiM){
   sigM <- params_cjs$sig.prob.m
   
   # Upper and Lower bounds of correlation 
-  gl <- params_cjs$cor_lower_bound
-  gu <- params_cjs$cor_upper_bound
+  gl <- params_cjs$cor_lower_bound+1e-5
+  gu <- params_cjs$cor_upper_bound-1e-5
   
   y <- ((x/PMF) - (PhiF * PhiM))/(sigF * sigM)
   

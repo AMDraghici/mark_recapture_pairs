@@ -267,6 +267,136 @@ run_cjs_model_mark <- function(cjs_data,
   
 }
 
+
+
+# Run CJS Model using Mark
+run_cjs_model_marked <- function(cjs_data,
+                                 version = "B"){
+  
+  # Define survival/recapture parameter space
+  phi.grp     <- list(formula = ~sex)
+  p.grp       <- list(formula = ~sex)
+  
+  #Process Mark Data (Extract Recapture/sex)
+  # Add sex grouping for B,R,S only
+  if(version == "N"){
+    dat.process <- cjs_data$x %>% 
+      as.data.frame() %>% 
+      unite("ch",sep="") 
+    
+    mark.process <- marked::process.data(data   = dat.process,
+                                         model  = "CJS")
+  } else {
+    dat.process <- cjs_data$x %>% 
+      as.data.frame() %>% 
+      unite("ch",sep="") %>% 
+      mutate(sex = as.factor(ifelse(cjs_data$female == 1, "F", "M"))) %>%
+      arrange(sex)
+    
+    mark.process <-  marked::process.data(data   = dat.process,
+                                          model  = "CJS",
+                                          groups = "sex")
+  }
+  
+  #Design Data List
+  mark.ddl <-  marked::make.design.data(mark.process) 
+  
+  # Choose Appropriate CJS Model Settings
+  if(version == "B"){
+    model.parameters <- list(Phi = phi.grp, p   = p.grp)
+    phi.name         <- c("PhiF","PhiM")
+    p.name           <- c("PF","PM")
+    param.names      <- c(phi.name,p.name)
+  } else if(version == "S"){
+    model.parameters <- list(Phi = phi.grp)
+    phi.name         <- c("PhiF","PhiM")
+    p.name           <- c("P")
+    param.names      <- c(phi.name,p.name)
+  } else if(version == "R"){
+    model.parameters <- list(p   = p.grp)
+    phi.name         <- c("Phi")
+    p.name           <- c("PF","PM")
+  } else if(version == "N"){
+    model.parameters <- list()
+    phi.name         <- c("Phi")
+    p.name           <- c("P")
+  }
+  
+  # Add names
+  param.names <- c(phi.name, p.name)
+  
+  #Generate Estimates
+  mark_out <-  marked::crm(data             = mark.process,
+                           ddl              = mark.ddl,
+                           model.parameters = model.parameters,
+                           hessian          = T)
+  
+  mark_out <- mark_out$results
+  
+  #Extract values of use
+  gof.stats <- data.frame("lnl"       = mark_out$neg2lnl,
+                          "npar"        = (mark_out$AIC - mark_out$neg2lnl)/2)  %>% 
+    rename(`-2lnl` = "lnl")
+  
+  mark.stats <- rbind(mark_out$reals$Phi %>%  select(estimate, se, lcl, ucl),
+                      mark_out$reals$p  %>% select(estimate, se, lcl, ucl)) %>% 
+                rename("Est" = estimate, "SE" = se, "LB" = lcl, "UB" = ucl) %>%
+                mutate(Parameter = param.names,
+                       Version   = version)
+  
+  # Add Pearson and Flecthers Chat
+  if(version == "B"){
+    PhiF      <- mark.stats %>% filter(Parameter == "PhiF") %>% pull(Est)
+    PhiM      <- mark.stats %>% filter(Parameter == "PhiM") %>% pull(Est)
+    PM        <- mark.stats %>% filter(Parameter == "PM") %>% pull(Est)
+    PF        <- mark.stats %>% filter(Parameter == "PF") %>% pull(Est)
+    chat_list <- compute_chat_mark(cjs_data = cjs_data,
+                                   PhiF     = PhiF,
+                                   PhiM     = PhiM,
+                                   PF       = PF,
+                                   PM       = PM,
+                                   ungroup = F)
+    
+  } else if(version == "S"){
+    PhiF      <- mark.stats %>% filter(Parameter == "PhiF") %>% pull(Est)
+    PhiM      <- mark.stats %>% filter(Parameter == "PhiM") %>% pull(Est)
+    PM        <- PF   <- mark.stats %>% filter(Parameter == "P") %>% pull(Est)
+    chat_list <- compute_chat_mark(cjs_data = cjs_data,
+                                   PhiF     = PhiF,
+                                   PhiM     = PhiM,
+                                   PF       = PF,
+                                   PM       = PM,
+                                   ungroup  = F)
+  } else if(version == "R"){
+    PhiF      <- PhiM <- mark.stats %>% filter(Parameter == "Phi") %>% pull(Est)
+    PM        <- mark.stats %>% filter(Parameter == "PM") %>% pull(Est)
+    PF        <- mark.stats %>% filter(Parameter == "PF") %>% pull(Est)
+    chat_list <- compute_chat_mark(cjs_data = cjs_data,
+                                   PhiF     = PhiF,
+                                   PhiM     = PhiM,
+                                   PF       = PF,
+                                   PM       = PM,
+                                   ungroup  = F)
+  } else if(version == "N"){
+    PhiF <- PhiM <- mark.stats %>% filter(Parameter == "Phi") %>% pull(Est)
+    PM   <- PF   <- mark.stats %>% filter(Parameter == "P") %>% pull(Est)
+    chat_list    <- compute_chat_mark(cjs_data = cjs_data,
+                                      PhiF     = PhiF,
+                                      PhiM     = PhiM,
+                                      PF       = PF,
+                                      PM       = PM,
+                                      ungroup = T)
+  }
+  
+  mark_results <- cbind(mark.stats,gof.stats) %>% 
+    mutate(Pearson_chat  = chat_list[["Pearson_chat"]],
+           Fletcher_chat = chat_list[["Fletcher_chat"]])
+  
+  #Return Output
+  return(mark_results)
+  
+}
+
 # Compute Confidence Intervals of correlation using Fishers Method
 compute_fisher_intervals <- function(r,N, alpha){
   fishers_z <- log((1+r)/(1-r))/2
@@ -483,7 +613,6 @@ compute_aic_summ <- function(summ_cjs,
     group_by(Version) %>%
     summarize(ll                     = first(`-2lnl`),
               pars                   = first(npar),
-              dev_df                 = first(deviance.df),
               CChat_Likelihood       = prod(unique(CChatAdj_Likelihood)),
               CChat_Pearson          = prod(unique(CChatAdj_Pearson)),
               CChat_Partial_Pearson  = prod(unique(CChatAdj_Partial_Pearson))) %>% 
@@ -789,8 +918,8 @@ execute_iteration  <- function(iter,
   
   for(i in 1:length(versions)){
     cat(paste0("Iteration#:", iter , " - Computing CJS estimates for Version:", versions[i], " ..."),"\n")
-    cjs_list[[i]] <- run_cjs_model_mark(cjs_data = cjs_data,
-                                        title    = "mark_scenario_" %+% scenario %+% "_iter_" %+% iter %+% "_" %+% versions[i] %+% "_",
+    cjs_list[[i]] <- run_cjs_model_marked(cjs_data = cjs_data,
+                                        #title    = "mark_scenario_" %+% scenario %+% "_iter_" %+% iter %+% "_" %+% versions[i] %+% "_",
                                         version  = versions[i])  
   }
   
@@ -1363,6 +1492,10 @@ execute_iteration  <- function(iter,
   
   return(results)
 }
+
+
+
+
 
 # Execute entire simulation study for correlation estimators
 execute_simulation <- function(niter,
