@@ -2,21 +2,21 @@
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
 out_dir    <- src_dir %+% "Simulation/Output/"
-source(file.path(src_dir, "Scripts", "fn_generic.R"))
-source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
+Rcpp::sourceCpp("Src/generate_pair_data.cpp")
+source(file.path(src_dir, "Scripts", "fn_generic2.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
 
 ## Options (ECHO FOR LOGS)
 options(echo = TRUE)
 
 # Load packages ---------------------------------------------------------------------------------------------------
-libs <- c("tidyverse","RMark")
+libs <- c("tidyverse","marked")
 load_packages(libs, FALSE)
 # -----------------------------------------------------------------------------------------------------------------
 
 # Read command line arguments--------------------------------------------------------------------------------------
 args <- commandArgs(trailingOnly = TRUE)
-scenario <- as.numeric(args[1])
+scenario <- as.numeric(args[1]) 
 scenario_grid <- get_scenarios()
 
 cat("Running scenario #" %+% scenario_grid[scenario,"scenario"] %+% "...", "\n")
@@ -30,22 +30,22 @@ x <- Sys.time()
 runif(1)
 
 # Run Simulation
-results <- execute_simulation(niter         = 1e3,
+results2 <- execute_simulation(niter        = 100,
+                              bstrp_iter    = 1000,
                               scenario      = scenario_grid[scenario,"scenario"],
                               PM            = scenario_grid[scenario,"PM"],
                               PF            = scenario_grid[scenario,"PF"],
                               PhiF          = scenario_grid[scenario,"PhiF"],
                               PhiM          = scenario_grid[scenario,"PhiM"],
-                              gam_true      = scenario_grid[scenario,"gam_true"],
-                              rho_true      = scenario_grid[scenario,"rho_true"],
+                              gamma         = scenario_grid[scenario,"gam_true"],
+                              rho           = scenario_grid[scenario,"rho_true"],
                               n_pop         = scenario_grid[scenario,"n_obs"],
                               k             = scenario_grid[scenario,"k"],
-                              Betas         = list(beta0 = scenario_grid[scenario,"Beta0"], 
-                                                   beta1 = scenario_grid[scenario,"Beta1"]),
+                              Betas         = c(scenario_grid[scenario,"Beta0"], scenario_grid[scenario,"Beta1"]),
                               Delta         = scenario_grid[scenario,"Delta"],
                               PropF         = scenario_grid[scenario,"PropF"],
                               imputed_pairs = scenario_grid[scenario,"imputed_pairs"],
-                              init          = NULL,
+                              tau           = c(rep(1/scenario_grid[scenario,"k"],scenario_grid[scenario,"k"]-1 ),0),
                               small_out     = TRUE)
 
 y <- Sys.time()
