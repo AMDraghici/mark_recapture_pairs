@@ -15,8 +15,8 @@ load_packages(libs, FALSE)
 # -----------------------------------------------------------------------------------------------------------------
 
 # Read command line arguments--------------------------------------------------------------------------------------
-args <- commandArgs(trailingOnly = TRUE)
-scenario <- as.numeric(args[1]) 
+args          <- commandArgs(trailingOnly = TRUE)
+scenario      <- as.numeric(args[1]) 
 scenario_grid <- get_scenarios()
 
 cat("Running scenario #" %+% scenario_grid[scenario,"scenario"] %+% "...", "\n")
@@ -30,7 +30,7 @@ x <- Sys.time()
 runif(1)
 
 # Run Simulation
-results2 <- execute_simulation(niter        = 100,
+results <- execute_simulation(niter         = 100,
                               bstrp_iter    = 1000,
                               scenario      = scenario_grid[scenario,"scenario"],
                               PM            = scenario_grid[scenario,"PM"],

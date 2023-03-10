@@ -71,7 +71,7 @@ compute_recapture_correlation <- function(ps_data,
   times <- t((2:(k-1))* t(pairs_mask))[pairs_mask]
   recap_f_filter <- recap_f[1:nf, 2:(k-1)][pairs_mask]
   recap_m_filter <- sapply(1:length(male_index), function(x) recap_m[male_index[x], times[x]])
-  
+
   # Correlation Calculations break on boundaries
   if(PF == 0|PM == 0|PF == 1|PM == 1){
     return(list(rho       = 0, 
@@ -96,6 +96,13 @@ compute_recapture_correlation <- function(ps_data,
                     lower            = rl,
                     upper            = ru)$par
     } else if(model == "partial_pearson"){
+      # 
+      # sdf <- sqrt(PF * (1-PF))
+      # sdm <- sqrt(PM * (1-PM))
+      # PFM <- sum(recap_f_filter * recap_m_filter)/length(recap_f_filter) 
+      # 
+      # rho <- (PFM - PF*PM)/(sdf * sdm)
+      # 
       dev_f <- (recap_f_filter - PF)
       dev_m <- (recap_m_filter - PM)
       rho <- sum(dev_f * dev_m)/sqrt(sum(dev_f^2) * sum(dev_m^2))
@@ -109,7 +116,10 @@ compute_recapture_correlation <- function(ps_data,
   
   # Return correlation and effective sample size
   return(list(rho       = rho, 
-              n_eff_rho = length(recap_f_filter)))
+              n_eff_rho = length(recap_f_filter),
+              recap_f   = recap_f_filter,
+              recap_m   = recap_m_filter,
+              joint_recap = 1 + 2 * recap_f_filter + recap_m_filter))
 }
 
 # Bootstrapping for Error Estimates of One Replicate
@@ -409,6 +419,7 @@ compute_survival_correlation <- function(ps_data,
   
   return(list(gamma       = gamma,
               n_eff_gamma = N,
+              n_success   = n,
               ybar        = n/N))
 }
 
