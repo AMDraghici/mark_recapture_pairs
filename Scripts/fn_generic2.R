@@ -801,11 +801,11 @@ execute_iteration  <- function(iter,
                sum(rho_list$joint_recap == 2),
                sum(rho_list$joint_recap == 3),
                sum(rho_list$joint_recap == 4))  
-  prob_rho <- as.vector(rev(unlist(compute_jbin_cjs(pf_mark, pm_mark, 0))))
-  size <- sum(obs_rho)
-  groups <- length(obs_rho)
-  numEvents <- choose(size + groups - 1, groups - 1)
-  pval0_rho2 <- EMT::ExactMultinomialTestChisquare(obs_rho,prob_rho, size, groups, numEvents)$p.value
+  # prob_rho <- as.vector(rev(unlist(compute_jbin_cjs(pf_mark, pm_mark, 0))))
+  # size <- sum(obs_rho)
+  # groups <- length(obs_rho)
+  # numEvents <- choose(size + groups - 1, groups - 1)
+  # pval0_rho2 <- 0 #@ EMT::ExactMultinomialTestChisquare(obs_rho,prob_rho, size, groups, numEvents)$p.value
   
   #-------------------------------------------------------------------------------------------------------------
   
@@ -849,11 +849,11 @@ execute_iteration  <- function(iter,
     n_eff_gamma       <- gamma_list$n_eff_gamma 
     n_success         <- gamma_list$n_success
     ybar              <- gamma_list$ybar
-    pval0_gamma2      <- binom_test_gamma(test_prob = compute_jbin_cjs(prob.f = pf_mark,
-                                                                       prob.m = pm_mark,
-                                                                       corr   = rho)$prob.mf * phif_mark * phim_mark, 
-                                          success   = n_success, 
-                                          trials    = n_eff_gamma)
+    # pval0_gamma2      <- 0 #binom_test_gamma(test_prob = compute_jbin_cjs(prob.f = pf_mark,
+                                          #                              prob.m = pm_mark,
+                                          #                              corr   = rho)$prob.mf * phif_mark * phim_mark, 
+                                          # success   = n_success, 
+                                          # trials    = n_eff_gamma)
   }
   #-------------------------------------------------------------------------------------------------------------
   
@@ -939,7 +939,7 @@ execute_iteration  <- function(iter,
   
   
   # Get Pval for H0: Rho = 0 vs Ha rho != 0 (conditional on all other parameters)
-  pval0_rho3 <- compute_full_bootstrap(iterations    = bstrp_iter,
+  pval0_rho2 <- compute_full_bootstrap(iterations    = bstrp_iter,
                                        full_result   = FALSE,
                                        PM            = pm_mark,
                                        PF            = pf_mark,
@@ -960,7 +960,7 @@ execute_iteration  <- function(iter,
   
   
   # Get Pval for H0: Rho = 0 vs Ha rho != 0 (conditional on all other parameters)
-  pval0_gamma3 <- compute_full_bootstrap(iterations      = bstrp_iter,
+  pval0_gamma2 <- compute_full_bootstrap(iterations      = bstrp_iter,
                                          full_result     = FALSE,
                                          PM              = pm_mark,
                                          PF              = pf_mark,
@@ -1029,11 +1029,11 @@ execute_iteration  <- function(iter,
   # 
   
   summ_corr           <- as.data.frame(rbind(summ_corr_lik))
-  summ_corr$Pval02    <- c(pval0_rho2, pval0_gamma2)#,0,pearson_pval0_gamma,0,pearson_partial_pval0_gamma)
-  summ_corr$Pval03    <- c(pval0_rho3, pval0_gamma3)
+  # summ_corr$Pval02    <- c(pval0_rho2, pval0_gamma2)#,0,pearson_pval0_gamma,0,pearson_partial_pval0_gamma)
+  summ_corr$Pval02    <- c(pval0_rho2, pval0_gamma2)
   summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", 
                                       "2.5%","25%","50%","75%","97.5%", 
-                                      "Rho_Estimator", "Pval0","Pval02", "Pval03","num_failures")]
+                                      "Rho_Estimator", "Pval0","Pval02","num_failures")]
   summ_corr           <- summ_corr %>% 
     left_join(true_param_df, by = "Parameter") %>% 
     mutate(Est = as.numeric(Est),
@@ -1046,7 +1046,6 @@ execute_iteration  <- function(iter,
            `97.5%` = as.numeric(`97.5%`),
            Pval0  = as.numeric(Pval0),
            Pval02  = as.numeric(Pval02),
-           Pval03  = as.numeric(Pval03),
            num_failures = as.numeric(num_failures),
            Bias                = Truth - Est,
            Bias_Btstrp1_Mean   = Truth - Est_Btstrp,
