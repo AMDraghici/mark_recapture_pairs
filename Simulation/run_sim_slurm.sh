@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --array=1-995
+#SBATCH --array=1-649
 #SBATCH --time=80:00:00
 #SBATCH --mem=5G
 #SBATCH --error=Logs/rep_%A_%a_long.log

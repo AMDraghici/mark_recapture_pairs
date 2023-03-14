@@ -79,7 +79,7 @@ compute_recapture_correlation <- function(ps_data,
   }
   
   if(sum(pairs_mask * 1) == 0){
-    rho <- 10
+    rho <- 0
     # Return correlation and effective sample size
     return(list(rho       = rho, 
                 n_eff_rho = length(recap_f_filter)))

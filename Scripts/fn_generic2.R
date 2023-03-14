@@ -831,10 +831,10 @@ execute_iteration  <- function(iter,
   cat(paste0("Iteration#:", iter ," - Estimating survival correlation gamma|rho-likelihood..."),"\n")
   # If estimate of rho fails (no valid observations) pass dummy values of 10
   if(is.na(rho)|rho == 10){
-    gamma <- 10
+    gamma <- 0
     n_eff_gamma <- 0
     ybar <- 0
-    pval0_gamma <- 10
+    pval0_gamma <- 0
   } else {
     # Estimate Gamma from observed data
     gamma_list <- compute_survival_correlation(ps_data = ps_data,
@@ -1348,8 +1348,6 @@ compute_full_bootstrap <- function(iterations,
   
 }
 
-
-
 # Summarize Bootstrap output
 compute_btsrp_summary <- function(estimate, 
                                   bstrp_replicates, 
@@ -1380,6 +1378,7 @@ compute_btsrp_summary <- function(estimate,
   return(summ_btstrp)
 } 
 
+# Strip down CRM function to produce only CJS estimates to speed up bootstrap
 crm2 <- function (data, ddl = NULL, begin.time = 1, model = "CJS", title = "", 
                   model.parameters = list(), design.parameters = list(), initial = NULL, 
                   groups = NULL, time.intervals = NULL, debug = FALSE, method = NULL, 
@@ -1462,10 +1461,6 @@ crm2 <- function (data, ddl = NULL, begin.time = 1, model = "CJS", title = "",
   return(par)
   
 }
-
-
-
-
 
 # Execute entire simulation study for correlation estimators
 execute_simulation <- function(niter,
