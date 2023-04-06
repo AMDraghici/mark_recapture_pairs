@@ -15,9 +15,9 @@ load_packages(libs, FALSE)
 dat_dir <- src_dir %+% "/Data/RE__Harlequin_duck_data/"
 cap.data <- prep_cap_data(dat_dir)
 ps_data  <- format_cap_data(cap.data)
-results <- execute_application(ps_data, bstrp_iter = 1e4, small_out = F)
+results <- execute_application(ps_data, bstrp_iter = 1e3, small_out = F)
 
 # Save Results
-saveRDS(cap.data, out_dir %+% "/hd_cap_data.rds")
-saveRDS(ps_data,  out_dir %+%  "/hd_ps_data.rds")
-saveRDS(results,  out_dir %+%  "/hd_results.rds")
+saveRDS(cap.data, out_dir %+% "/hd_cap_data2.rds")
+saveRDS(ps_data,  out_dir %+%  "/hd_ps_data2.rds")
+saveRDS(results,  out_dir %+%  "/hd_results2.rds")

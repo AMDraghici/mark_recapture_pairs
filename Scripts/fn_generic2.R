@@ -192,6 +192,7 @@ run_cjs_model_marked <- function(cjs_data,
   
   mark.stats <- rbind(mark_out$reals$Phi %>%  select(estimate, se, lcl, ucl),
                       mark_out$reals$p  %>% select(estimate, se, lcl, ucl)) %>% 
+    filter(se > 0) %>% 
     rename("Est" = estimate, "SE" = se, "LB" = lcl, "UB" = ucl) %>%
     mutate(Parameter = param.names,
            Version   = version)
@@ -1282,7 +1283,7 @@ compute_full_bootstrap <- function(iterations,
                                                              Delta = Delta,
                                                              PropF = PropF,
                                                              imputed_pairs = imputed_pairs,
-                                                             method_rh = method_rho))
+                                                             method_rho = method_rho))
     
     
     replicates <- do.call(rbind, replicates)
@@ -1307,7 +1308,7 @@ compute_full_bootstrap <- function(iterations,
                                                              Delta = Delta,
                                                              PropF = PropF,
                                                              imputed_pairs = imputed_pairs,
-                                                             method_rh = method_rho))
+                                                             method_rho = method_rho))
     
     replicates <- do.call(rbind, replicates)
     pval       <- mean(1 * (abs(replicates[,2]-0) > abs(gamma - 0)))
@@ -1330,7 +1331,7 @@ compute_full_bootstrap <- function(iterations,
                                                              Delta = Delta,
                                                              PropF = PropF,
                                                              imputed_pairs = imputed_pairs,
-                                                             method_rh = method_rho))
+                                                             method_rho = method_rho))
     
     replicates <- do.call(rbind, replicates)
     
@@ -1586,21 +1587,21 @@ execute_application  <- function(ps_data,
   
   #-------------------------------------------------------------------------------------------------------------
   
-  # 2. Pearson Full Approach -----------------------------------------------------------------------------------
-  cat(paste0("Estimating recapture correlation rho using full pearson ..."),"\n")
-  pearson_rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                               PF      = pf_mark,
-                                               PM      = pm_mark,
-                                               model   = "full_pearson")$rho
-  names(pearson_rho) <- "Est"
-  
-  # 2. Pearson Conditional Approach ----------------------------------------------------------------------------
-  cat(paste0("Estimating recapture correlation rho using pseudo-pearson..."),"\n")
-  pearson_partial_rho <- compute_recapture_correlation(ps_data = ps_data, 
-                                                       PF      = pf_mark,
-                                                       PM      = pm_mark,
-                                                       model   = "partial_pearson")$rho
-  names(pearson_partial_rho) <- "Est"
+  # # 2. Pearson Full Approach -----------------------------------------------------------------------------------
+  # cat(paste0("Estimating recapture correlation rho using full pearson ..."),"\n")
+  # pearson_rho <- compute_recapture_correlation(ps_data = ps_data, 
+  #                                              PF      = pf_mark,
+  #                                              PM      = pm_mark,
+  #                                              model   = "full_pearson")$rho
+  # names(pearson_rho) <- "Est"
+  # 
+  # # 2. Pearson Conditional Approach ----------------------------------------------------------------------------
+  # cat(paste0("Estimating recapture correlation rho using pseudo-pearson..."),"\n")
+  # pearson_partial_rho <- compute_recapture_correlation(ps_data = ps_data, 
+  #                                                      PF      = pf_mark,
+  #                                                      PM      = pm_mark,
+  #                                                      model   = "partial_pearson")$rho
+  # names(pearson_partial_rho) <- "Est"
   
   # Compute Survival Correlation Estimate-----------------------------------------------------------------------
   
@@ -1630,54 +1631,54 @@ execute_application  <- function(ps_data,
   }
   #-------------------------------------------------------------------------------------------------------------
   
-  # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
-  cat(paste0("Estimating survival correlation gamma|rho-pearson..."),"\n")
-  
-  # If estimate of rho fails (no valid observations) pass dummy values of 10
-  if(is.na(pearson_rho)|pearson_rho == 10){
-    pearson_gamma <- 10
-    pearson_gamma_bs_np <- rep(10, 1000)
-    pearson_gamma_bs_sp <- rep(10, 1000)
-    gamma_bs_pearson_null <- rep(10, 1000)
-  } else {
-    
-    # Estimate Gamma from observed data
-    pearson_gamma <- compute_survival_correlation(ps_data = ps_data,
-                                                  PFM     = compute_jbin_cjs(prob.f = pf_mark,
-                                                                             prob.m = pm_mark,
-                                                                             corr   = pearson_rho)$prob.mf,
-                                                  PhiF    = phif_mark,
-                                                  PhiM    = phim_mark)$gamma
-    
-  }
-  
-  # Collect Results
-  names(pearson_gamma) <- "Est"
-  #-------------------------------------------------------------------------------------------------------------
-  
-  # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
-  cat(paste0("Estimating survival correlation gamma|rho-psuedo-pearson..."),"\n")
-  
-  # If estimate of rho fails (no valid observations) pass dummy values of 10
-  if(is.na(pearson_partial_rho)|pearson_partial_rho == 10){
-    pearson_partial_gamma <- 10
-    pearson_partial_gamma_bs_np <- rep(10, 1000)
-    pearson_partial_gamma_bs_sp <- rep(10, 1000)
-    gamma_bs_pearson_partial_null <- rep(10, 1000)
-  } else {
-    
-    # Estimate Gamma from observed data
-    pearson_partial_gamma <- compute_survival_correlation(ps_data = ps_data,
-                                                          PFM     = compute_jbin_cjs(prob.f = pf_mark,
-                                                                                     prob.m = pm_mark,
-                                                                                     corr   = pearson_partial_rho)$prob.mf,
-                                                          PhiF    = phif_mark,
-                                                          PhiM    = phim_mark)$gamma
-    
-  }
-  
-  # Collect Results
-  names(pearson_partial_gamma) <- "Est"
+  # # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
+  # cat(paste0("Estimating survival correlation gamma|rho-pearson..."),"\n")
+  # 
+  # # If estimate of rho fails (no valid observations) pass dummy values of 10
+  # if(is.na(pearson_rho)|pearson_rho == 10){
+  #   pearson_gamma <- 10
+  #   pearson_gamma_bs_np <- rep(10, 1000)
+  #   pearson_gamma_bs_sp <- rep(10, 1000)
+  #   gamma_bs_pearson_null <- rep(10, 1000)
+  # } else {
+  #   
+  #   # Estimate Gamma from observed data
+  #   pearson_gamma <- compute_survival_correlation(ps_data = ps_data,
+  #                                                 PFM     = compute_jbin_cjs(prob.f = pf_mark,
+  #                                                                            prob.m = pm_mark,
+  #                                                                            corr   = pearson_rho)$prob.mf,
+  #                                                 PhiF    = phif_mark,
+  #                                                 PhiM    = phim_mark)$gamma
+  #   
+  # }
+  # 
+  # # Collect Results
+  # names(pearson_gamma) <- "Est"
+  # #-------------------------------------------------------------------------------------------------------------
+  # 
+  # # Conditional on Rho from Likelihood Approach ----------------------------------------------------------------
+  # cat(paste0("Estimating survival correlation gamma|rho-psuedo-pearson..."),"\n")
+  # 
+  # # If estimate of rho fails (no valid observations) pass dummy values of 10
+  # if(is.na(pearson_partial_rho)|pearson_partial_rho == 10){
+  #   pearson_partial_gamma <- 10
+  #   pearson_partial_gamma_bs_np <- rep(10, 1000)
+  #   pearson_partial_gamma_bs_sp <- rep(10, 1000)
+  #   gamma_bs_pearson_partial_null <- rep(10, 1000)
+  # } else {
+  #   
+  #   # Estimate Gamma from observed data
+  #   pearson_partial_gamma <- compute_survival_correlation(ps_data = ps_data,
+  #                                                         PFM     = compute_jbin_cjs(prob.f = pf_mark,
+  #                                                                                    prob.m = pm_mark,
+  #                                                                                    corr   = pearson_partial_rho)$prob.mf,
+  #                                                         PhiF    = phif_mark,
+  #                                                         PhiM    = phim_mark)$gamma
+  #   
+  # }
+  # 
+  # # Collect Results
+  # names(pearson_partial_gamma) <- "Est"
   #-------------------------------------------------------------------------------------------------------------
   
   # Run Bootstraps
@@ -1709,60 +1710,103 @@ execute_application  <- function(ps_data,
                                                Delta         = 1.0,
                                                PropF         = mean(cjs_data$female),
                                                imputed_pairs = TRUE,
-                                               method_rho    = "likelihood")
+                                               method_rho    = "likelihood",
+                                               test0rho      = FALSE,
+                                               test0gam      = FALSE)
   
   summ_corr_lik <- summ_corr_lik_list$results
   
-  # Run Bootstrap Estimates for Pearson Approach
-  summ_corr_fp_list <- compute_full_bootstrap(iterations    = bstrp_iter,
-                                              full_result   = !small_out,
-                                              PM            = pm_mark,
-                                              PF            = pf_mark,
-                                              PhiF          = phif_mark,
-                                              PhiM          = phim_mark, 
-                                              gamma         = pearson_gamma,
-                                              rho           = pearson_rho,
-                                              n_pop         = cjs_data$n,
-                                              k             = cjs_data$k,
-                                              tau           = tau,
-                                              Betas         = c(1000,1000),
-                                              Delta         = 1.0,
-                                              PropF         = mean(cjs_data$female),
-                                              imputed_pairs = TRUE,
-                                              method_rho    = "full_pearson")
+  # Get Pval for H0: Rho = 0 vs Ha rho != 0 (conditional on all other parameters)
+  pval0_rho2 <- compute_full_bootstrap(iterations    = bstrp_iter,
+                                       full_result   = FALSE,
+                                       PM            = pm_mark,
+                                       PF            = pf_mark,
+                                       PhiF          = phif_mark,
+                                       PhiM          = phim_mark, 
+                                       gamma         = gamma,
+                                       rho           = rho,
+                                       n_pop         = cjs_data$n,
+                                       k             = cjs_data$k,
+                                       tau           = tau,
+                                       Betas         = c(1000,1000),
+                                       Delta         = 1.0,
+                                       PropF         = mean(cjs_data$female),
+                                       imputed_pairs = TRUE,
+                                       method_rho    = "likelihood",
+                                       test0rho      = TRUE,
+                                       test0gam      = FALSE)$results$pval
   
-  summ_corr_fp <- summ_corr_fp_list$results
   
-  # Run Bootstrap Estimates for Partial-Pearson Approach
-  summ_corr_pp_list <- compute_full_bootstrap(iterations    = bstrp_iter,
-                                              full_result   = !small_out,
-                                              PM            = pm_mark,
-                                              PF            = pf_mark,
-                                              PhiF          = phif_mark,
-                                              PhiM          = phim_mark, 
-                                              gamma         = pearson_partial_gamma,
-                                              rho           = pearson_partial_rho,
-                                              n_pop         = cjs_data$n,
-                                              k             = cjs_data$k,
-                                              tau           = tau,
-                                              Betas         = c(1000,1000),
-                                              Delta         = 1.0,
-                                              PropF         = mean(cjs_data$female),
-                                              imputed_pairs = TRUE,
-                                              method_rho    = "partial_pearson")
+  # Get Pval for H0: Rho = 0 vs Ha rho != 0 (conditional on all other parameters)
+  pval0_gamma2 <- compute_full_bootstrap(iterations      = bstrp_iter,
+                                         full_result     = FALSE,
+                                         PM              = pm_mark,
+                                         PF              = pf_mark,
+                                         PhiF            = phif_mark,
+                                         PhiM            = phim_mark, 
+                                         gamma           = gamma,
+                                         rho             = rho,
+                                         n_pop           = cjs_data$n,
+                                         k               = cjs_data$k,
+                                         tau             = tau,
+                                         Betas           = c(1000,1000),
+                                         Delta           = 1.0,
+                                         PropF           = mean(cjs_data$female),
+                                         imputed_pairs   = TRUE,
+                                         method_rho      = "likelihood",
+                                         test0rho        = FALSE,
+                                         test0gam        = TRUE)$results$pval
   
-  summ_corr_pp <- summ_corr_pp_list$results
+  # # Run Bootstrap Estimates for Pearson Approach
+  # summ_corr_fp_list <- compute_full_bootstrap(iterations    = bstrp_iter,
+  #                                             full_result   = !small_out,
+  #                                             PM            = pm_mark,
+  #                                             PF            = pf_mark,
+  #                                             PhiF          = phif_mark,
+  #                                             PhiM          = phim_mark, 
+  #                                             gamma         = pearson_gamma,
+  #                                             rho           = pearson_rho,
+  #                                             n_pop         = cjs_data$n,
+  #                                             k             = cjs_data$k,
+  #                                             tau           = tau,
+  #                                             Betas         = c(1000,1000),
+  #                                             Delta         = 1.0,
+  #                                             PropF         = mean(cjs_data$female),
+  #                                             imputed_pairs = TRUE,
+  #                                             method_rho    = "full_pearson")
+  # 
+  # summ_corr_fp <- summ_corr_fp_list$results
+  # 
+  # # Run Bootstrap Estimates for Partial-Pearson Approach
+  # summ_corr_pp_list <- compute_full_bootstrap(iterations    = bstrp_iter,
+  #                                             full_result   = !small_out,
+  #                                             PM            = pm_mark,
+  #                                             PF            = pf_mark,
+  #                                             PhiF          = phif_mark,
+  #                                             PhiM          = phim_mark, 
+  #                                             gamma         = pearson_partial_gamma,
+  #                                             rho           = pearson_partial_rho,
+  #                                             n_pop         = cjs_data$n,
+  #                                             k             = cjs_data$k,
+  #                                             tau           = tau,
+  #                                             Betas         = c(1000,1000),
+  #                                             Delta         = 1.0,
+  #                                             PropF         = mean(cjs_data$female),
+  #                                             imputed_pairs = TRUE,
+  #                                             method_rho    = "partial_pearson")
+  # 
+  # summ_corr_pp <- summ_corr_pp_list$results
   
   # Return Results----------------------------------------------------------------------------------------------
   cat("Formatting output ...","\n")
   # Gather Correlation Results
-  summ_corr           <- as.data.frame(rbind(summ_corr_lik,
-                                             summ_corr_fp, 
-                                             summ_corr_pp))
-  
+  summ_corr           <- as.data.frame(rbind(summ_corr_lik))
+  # summ_corr$Pval02    <- c(pval0_rho2, pval0_gamma2)#,0,pearson_pval0_gamma,0,pearson_partial_pval0_gamma)
+  summ_corr$Pval02    <- c(pval0_rho2, pval0_gamma2)
   summ_corr           <- summ_corr[,c("Parameter","Est","Est_Btstrp","SE", 
                                       "2.5%","25%","50%","75%","97.5%", 
-                                      "Rho_Estimator", "Pval0","num_failures")]
+                                      "Rho_Estimator", "Pval0","Pval02","num_failures")]
+  
   summ_corr           <- summ_corr %>% 
     mutate(Est = as.numeric(Est),
            Est_Btstrp = as.numeric(Est_Btstrp),
@@ -1773,19 +1817,14 @@ execute_application  <- function(ps_data,
            `75%` = as.numeric(`75%`),
            `97.5%` = as.numeric(`97.5%`),
            Pval0  = as.numeric(Pval0),
+           Pval02  = as.numeric(Pval02),
            num_failures = as.numeric(num_failures)) 
   
   # Compute CChat Adjustment
-  summ_chat <- data.frame(Method     = c("Likelihood", "Pearson", "Psuedo-Pearson"),
-                          CChatRho   = c(compute_proposed_chat(rho, 0), 
-                                         compute_proposed_chat(pearson_rho, 0), 
-                                         compute_proposed_chat(pearson_partial_rho, 0)),
-                          CChatGamma = c(compute_proposed_chat(0, gamma), 
-                                         compute_proposed_chat(0, pearson_gamma), 
-                                         compute_proposed_chat(0, pearson_partial_gamma)),
-                          CChat      = c(compute_proposed_chat(rho, gamma), 
-                                         compute_proposed_chat(pearson_rho, pearson_gamma), 
-                                         compute_proposed_chat(pearson_partial_rho, pearson_partial_gamma)))
+  summ_chat <- data.frame(Method     = c("Likelihood"),
+                          CChatRho   = c(compute_proposed_chat(rho, 0)),
+                          CChatGamma = c(compute_proposed_chat(0, gamma)),
+                          CChat      = c(compute_proposed_chat(rho, gamma)))
   
   # Add Correlation Chat Correction to Mark-Recapture Results
   summ_cjs <- cjs_out %>% 
@@ -1794,26 +1833,9 @@ execute_application  <- function(ps_data,
                                              ifelse(Parameter == "Phi",
                                                     compute_proposed_chat(0, gamma), 
                                                     1)),
-           CChatAdj_Pearson         = ifelse(Parameter == "P", 
-                                             compute_proposed_chat(pearson_rho, 0), 
-                                             ifelse(Parameter == "Phi",
-                                                    compute_proposed_chat(0, pearson_gamma), 
-                                                    1)),
-           CChatAdj_Partial_Pearson = ifelse(Parameter == "P", 
-                                             compute_proposed_chat(pearson_partial_rho, 0), 
-                                             ifelse(Parameter == "Phi",
-                                                    compute_proposed_chat(0, pearson_partial_gamma), 
-                                                    1)),
            UBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[["ub"]],
            LBAdj_Likelihood         = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Likelihood), alpha = 0.05)[["lb"]],
-           UBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[["ub"]],
-           LBAdj_Pearson            = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Pearson), alpha = 0.05)[["lb"]],
-           UBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[["ub"]],
-           LBAdj_Partial_Pearson    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson), alpha = 0.05)[["lb"]],
-           Range95_Likelihood       = UBAdj_Likelihood - LBAdj_Likelihood,
-           Range95_Pearson          = UBAdj_Pearson - LBAdj_Pearson,
-           Range95_Partial_Pearson  = UBAdj_Partial_Pearson - LBAdj_Partial_Pearson
-    ) 
+           Range95_Likelihood       = UBAdj_Likelihood - LBAdj_Likelihood) 
   
   # Summarize Sample Sizes
   summ_n <- data.frame(n_eff                       = n_eff,
@@ -1845,9 +1867,7 @@ execute_application  <- function(ps_data,
                 summ_corr                   = summ_corr,
                 summ_chat                   = summ_chat,
                 summ_aic                    = summ_aic,
-                bstrp_lik_rep               = summ_corr_lik_list$replicates,
-                bstrp_fp_rep                = summ_corr_fp_list$replicates,
-                bstrp_pp_rep                = summ_corr_pp_list$replicates)
+                bstrp_lik_rep               = summ_corr_lik_list$replicates)
   }
   
   return(out)
