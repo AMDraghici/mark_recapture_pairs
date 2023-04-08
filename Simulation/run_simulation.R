@@ -5,6 +5,7 @@ out_dir    <- src_dir %+% "Simulation/Output/"
 Rcpp::sourceCpp(file.path(src_dir, "Src", "generate_pair_data.cpp"))
 source(file.path(src_dir, "Scripts", "fn_generic2.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
+scenario_mapping <- readRDS(src_dir %+% "Simulation/scenario_mapping.rds")
 
 ## Options (ECHO FOR LOGS)
 options(echo = TRUE)
@@ -16,7 +17,8 @@ load_packages(libs, FALSE)
 
 # Read command line arguments--------------------------------------------------------------------------------------
 args          <- commandArgs(trailingOnly = TRUE)
-scenario      <- as.numeric(args[1]) 
+replicate     <- as.numeric(args[1]) 
+scenario      <- scenario_mapping[replicate]
 scenario_grid <- get_scenarios()
 
 cat("Running scenario #" %+% scenario_grid[scenario,"scenario"] %+% "...", "\n")
@@ -53,5 +55,5 @@ difftime(y,x,units = "mins")
 # ----------------------------------------------------------------------------------------------------------------
 
 # Return Results -------------------------------------------------------------------------------------------------
-saveRDS(results, out_dir %+% "results_" %+% scenario %+% ".rds")
+saveRDS(results, out_dir %+% "results_" %+% replicate %+% ".rds")
 # ----------------------------------------------------------------------------------------------------------------

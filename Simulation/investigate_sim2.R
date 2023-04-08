@@ -4,6 +4,7 @@ src_dir    <- getwd() #"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapt
 out_dir1   <- src_dir %+% "/Simulation/Run9(Bug)/Output/"
 out_dir2   <- src_dir %+% "/Simulation/Run10_100/Output/"
 out_dir3   <- src_dir %+% "/Simulation/Run11_100/Output/"
+out_dir4   <- src_dir %+% "/Simulation/Run12_200/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -57,8 +58,21 @@ summ_corr3 <- summ_corr3 %>% mutate(iter = iter + 200)
 summ_cjs3 <- summ_cjs3 %>% mutate(iter = iter + 200)
 
 
-summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3)
-summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3)
+# Grab Results4
+files <- list.files(out_dir4)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+# Unpack Summaries
+out_list4     <- lapply(1:nruns, function(i) readRDS(out_dir4 %+% files[i]))
+summ_corr4    <- do.call(rbind, lapply(1:nruns, function(i) out_list4[[i]]$summary_corr))
+summ_cjs4     <- do.call(rbind, lapply(1:nruns, function(i) out_list4[[i]]$summary_cjs))
+
+summ_corr4 <- summ_corr4 %>% mutate(iter = iter + 300)
+summ_cjs4 <- summ_cjs4 %>% mutate(iter = iter + 300)
+
+summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3,summ_corr4)
+summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3,summ_cjs4)
 
 # drop_scenario <- summ_corr %>% group_by(scenario) %>% summarize(n = n()) %>% filter(n < 600) %>% pull(scenario)
 
@@ -74,8 +88,8 @@ summ_aic  <-  summ_aic %>% left_join(scenario_grid, by = c("scenario"))
 summ_n  <-    summ_n %>% left_join(scenario_grid, by = c("scenario"))
 summ_gam_delta <- summ_gam_delta %>% left_join(scenario_grid, by = c("scenario"))
 
-saveRDS(summ_corr, src_dir %+% "/Output/summ_corr3.rds")
-saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs3.rds")
+saveRDS(summ_corr, src_dir %+% "/Output/summ_corr4.rds")
+saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs4.rds")
 saveRDS(summ_lrt,  src_dir %+% "/Output/summ_lrt.rds")
 saveRDS(summ_chat, src_dir %+% "/Output/summ_chat.rds")
 saveRDS(summ_aic,  src_dir %+% "/Output/summ_aic.rds")
@@ -151,11 +165,11 @@ mc_corr %>%
 
 
 mc_corr %>% 
-  filter(Parameter == "rho" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
+  filter(Parameter == "rho" & Beta0 > 1  & Beta0 > 1 & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
   ggplot(aes(y = Cover95, x = rho, col = as.factor(gamma))) +
   geom_line() + 
   geom_point() + 
-  facet_grid(Pearson ~Parametric) + 
+  facet_grid(as.factor(n_obs) + as.factor(k) ~ as.factor(PF)) + 
   ylim(c(0.75,1)) +
   geom_hline(yintercept = 0.95, lty = 2) + 
   labs(x = expression(rho), y = "Mean 95% Confidence Interval Coverage", col = expression(gamma)) +
