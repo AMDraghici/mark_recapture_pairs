@@ -5,6 +5,7 @@ out_dir1   <- src_dir %+% "/Simulation/Run9(Bug)/Output/"
 out_dir2   <- src_dir %+% "/Simulation/Run10_100/Output/"
 out_dir3   <- src_dir %+% "/Simulation/Run11_100/Output/"
 out_dir4   <- src_dir %+% "/Simulation/Run12_200/Output/"
+out_dir5   <- src_dir %+% "/Simulation/Run13_Rest/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -27,6 +28,8 @@ out_list1     <- lapply(1:nruns, function(i) readRDS(out_dir1 %+% files[i]))
 summ_corr1    <- do.call(rbind, lapply(1:nruns, function(i) out_list1[[i]]$summary_corr))
 summ_cjs1    <- do.call(rbind, lapply(1:nruns, function(i) out_list1[[i]]$summary_cjs))
 
+summ_corr1 <- summ_corr1  %>% select(-iter) ##%>% mutate(iter = iter + 100)
+summ_cjs1 <- summ_cjs1 %>% select(-iter) # #%>% mutate(iter = iter + 100)
 
 summ_corr1 <- summ_corr1 %>% select(-Pval02) %>% rename(Pval02 = Pval03)
 
@@ -40,8 +43,8 @@ out_list2     <- lapply(1:nruns, function(i) readRDS(out_dir2 %+% files[i]))
 summ_corr2    <- do.call(rbind, lapply(1:nruns, function(i) out_list2[[i]]$summary_corr))
 summ_cjs2     <- do.call(rbind, lapply(1:nruns, function(i) out_list2[[i]]$summary_cjs))
 
-summ_corr2 <- summ_corr2 %>% mutate(iter = iter + 100)
-summ_cjs2 <- summ_cjs2 %>% mutate(iter = iter + 100)
+summ_corr2 <- summ_corr2  %>% select(-iter) ##%>% mutate(iter = iter + 100)
+summ_cjs2 <- summ_cjs2 %>% select(-iter) # #%>% mutate(iter = iter + 100)
 
 
 # Grab Results3
@@ -54,8 +57,8 @@ out_list3     <- lapply(1:nruns, function(i) readRDS(out_dir3 %+% files[i]))
 summ_corr3    <- do.call(rbind, lapply(1:nruns, function(i) out_list3[[i]]$summary_corr))
 summ_cjs3     <- do.call(rbind, lapply(1:nruns, function(i) out_list3[[i]]$summary_cjs))
 
-summ_corr3 <- summ_corr3 %>% mutate(iter = iter + 200)
-summ_cjs3 <- summ_cjs3 %>% mutate(iter = iter + 200)
+summ_corr3 <- summ_corr3  %>% select(-iter) #%>% mutate(iter = iter + 200)
+summ_cjs3 <- summ_cjs3  %>% select(-iter) #%>% mutate(iter = iter + 200)
 
 
 # Grab Results4
@@ -68,11 +71,27 @@ out_list4     <- lapply(1:nruns, function(i) readRDS(out_dir4 %+% files[i]))
 summ_corr4    <- do.call(rbind, lapply(1:nruns, function(i) out_list4[[i]]$summary_corr))
 summ_cjs4     <- do.call(rbind, lapply(1:nruns, function(i) out_list4[[i]]$summary_cjs))
 
-summ_corr4 <- summ_corr4 %>% mutate(iter = iter + 300)
-summ_cjs4 <- summ_cjs4 %>% mutate(iter = iter + 300)
+summ_corr4 <- summ_corr4  %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs4 <- summ_cjs4  %>% select(-iter) #%>% mutate(iter = iter + 300)
 
-summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3,summ_corr4)
-summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3,summ_cjs4)
+
+# Grab Results5
+files <- list.files(out_dir5)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+# Unpack Summaries
+out_list5     <- lapply(1:nruns, function(i) readRDS(out_dir5 %+% files[i]))
+summ_corr5    <- do.call(rbind, lapply(1:nruns, function(i) out_list5[[i]]$summary_corr))
+summ_cjs5     <- do.call(rbind, lapply(1:nruns, function(i) out_list5[[i]]$summary_cjs))
+
+summ_corr5 <- summ_corr5 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs5 <- summ_cjs5  %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+
+
+summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3,summ_corr4,summ_corr5)
+summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3,summ_cjs4,summ_cjs5)
 
 # drop_scenario <- summ_corr %>% group_by(scenario) %>% summarize(n = n()) %>% filter(n < 600) %>% pull(scenario)
 
@@ -82,19 +101,10 @@ summ_cjs <- summ_cjs %>% filter(!(scenario %in% drop_scenario))
 # Add Scenario Settings
 summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
 summ_cjs  <-  summ_cjs %>% left_join(scenario_grid, by = c("scenario"))
-summ_lrt  <-  summ_lrt %>% left_join(scenario_grid, by = c("scenario"))
-summ_chat  <- summ_chat %>% left_join(scenario_grid, by = c("scenario"))
-summ_aic  <-  summ_aic %>% left_join(scenario_grid, by = c("scenario"))
-summ_n  <-    summ_n %>% left_join(scenario_grid, by = c("scenario"))
-summ_gam_delta <- summ_gam_delta %>% left_join(scenario_grid, by = c("scenario"))
 
-saveRDS(summ_corr, src_dir %+% "/Output/summ_corr4.rds")
-saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs4.rds")
-saveRDS(summ_lrt,  src_dir %+% "/Output/summ_lrt.rds")
-saveRDS(summ_chat, src_dir %+% "/Output/summ_chat.rds")
-saveRDS(summ_aic,  src_dir %+% "/Output/summ_aic.rds")
-saveRDS(summ_n,    src_dir %+% "/Output/summ_n.rds")
-saveRDS(summ_gam_delta, src_dir %+% "/Output/summ_gam_delta.rds")
+
+saveRDS(summ_corr, src_dir %+% "/Output/summ_corr5.rds")
+saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs5.rds")
 
 summ_corr <- readRDS(src_dir %+% "/Output/summ_corr.rds")
 summ_cjs <- readRDS(src_dir %+% "/Output/summ_cjs.rds")
@@ -382,3 +392,25 @@ paste0(x, ",")
 which(!(1:649 %in% unique(summ_corr$scenario) )) %+% "," 
 
 4,5,6,7,12,13,14,15,22,23,24,25,31,32,50,64,65,90,107,108,118,132,133,186,187,235,236,237,238,239,240,241,242,243,298,315,316,317,384,394,395,408,409,415,416,417,418,428,429,430,431,434,444,454,455,464,465,466,467,468,488,489,490,491,496,497,498,499,503,504,505,506,512,513,514,515,516,523,524,525,526,527,533,534,535,536,537,545,546,547,548,549,553,554,555,556,557,561,562,563,564,572,592,612,624,634,642
+
+
+# Get jobs to 500
+
+rerun_table <- summ_corr %>%
+  filter(Parameter == "rho") %>%
+  group_by(scenario) %>% 
+  summarize(n = n()) %>% 
+  filter(n < 500) %>%
+  ungroup() %>%
+  mutate(reps = (500-n)/100) %>%
+  select(scenario, reps)
+
+scenario_mapping <- c()
+
+for(i in 1:nrow(rerun_table)){
+  scenario <- as.numeric(rerun_table[i,1])
+  reps <- as.numeric(rerun_table[i,2])
+  scenario_mapping <- c(scenario_mapping, rep(scenario, reps))
+}
+
+saveRDS(scenario_mapping, getwd() %+% "/Simulation/scenario_mapping.rds")
