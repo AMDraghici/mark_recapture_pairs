@@ -5,7 +5,7 @@ out_dir    <- src_dir %+% "Simulation/Output/"
 Rcpp::sourceCpp(file.path(src_dir, "Src", "generate_pair_data.cpp"))
 source(file.path(src_dir, "Scripts", "fn_generic2.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
-scenario_mapping <- 1:648#readRDS(src_dir %+% "Simulation/scenario_mapping.rds")
+scenario_mapping <- 1:1000
 
 ## Options (ECHO FOR LOGS)
 options(echo = TRUE)
@@ -19,7 +19,7 @@ load_packages(libs, FALSE)
 args          <- commandArgs(trailingOnly = TRUE)
 replicate     <- as.numeric(args[1]) 
 scenario      <- scenario_mapping[replicate]
-scenario_grid <- get_scenarios()
+scenario_grid <- get_scenarios_extended()
 
 cat("Running scenario #" %+% scenario_grid[scenario,"scenario"] %+% "...", "\n")
 cat("Settings are...","\n")
