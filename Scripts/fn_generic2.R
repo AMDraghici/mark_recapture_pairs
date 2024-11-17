@@ -684,6 +684,55 @@ get_scenarios <- function(){
   return(scenario_grid)
 }
 
+# Get Scenario Grid for correlation estimator simulation study
+get_scenarios_extended <- function(){
+  
+  # General Scenarios
+  n     <- c(150,250, 2000)
+  k     <- c(15, 25)
+  PF    <- c(0.2, 0.75)
+  PM    <- c(0.2, 0.75)
+  PhiF  <- c(0.4, 0.8)
+  PhiM  <- c(0.4, 0.8)
+  rho   <- seq(-0.9,0.9,by = 0.2)
+  gamma <- seq(-0.9,0.9,by = 0.2)
+  Delta <- c(0.5,1)
+  
+  scenario_grid_base  <- expand.grid(n_obs    = n,
+                                     k        = k,
+                                     rho_true = rho,
+                                     gam_true = gamma, 
+                                     PhiF     = PhiF,
+                                     PhiM     = PhiM,
+                                     PF       = PF,
+                                     PM       = PM,
+                                     Delta    = Delta)
+  
+  scenario_grid_base$Beta0         <- 1e3
+  scenario_grid_base$Beta1         <- 1e3
+  scenario_grid_base$imputed_pairs <- TRUE
+  
+  # Testing Hypothesis with Alternative
+  
+  phi_param <- compute_jbin_param_cjs(0.4,0.8)
+  p_param   <- compute_jbin_param_cjs(0.2,0.75)
+  
+  gl <- phi_param$cor_lower_bound
+  gu <- phi_param$cor_upper_bound
+  rl <- p_param$cor_lower_bound
+  ru <- p_param$cor_upper_bound
+  
+  scenario_grid_base <- scenario_grid_base %>%
+    filter((PF == PM & PhiF == PhiM)|
+          ((PF != PM & rho_true >= rl & rho_true <= ru) & PhiF == PhiM)|
+          ((PF != PM & rho_true >= rl & rho_true <= ru) & (PhiF != PhiM & gam_true <= gu & gam_true >= gl))|
+          ((PF == PM) & (PhiF != PhiM & gam_true <= gu & gam_true >= gl)))
+  
+  scenario_grid_base$PropF    <- 0.5
+  scenario_grid_base$scenario <- 1:nrow(scenario_grid_base)
+  return(scenario_grid_base)
+}
+
 
 # Compact ifelse for NA
 convert_na <- function(x,y=0){
