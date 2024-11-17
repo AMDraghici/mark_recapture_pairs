@@ -6,6 +6,12 @@ out_dir2   <- src_dir %+% "/Simulation/Run10_100/Output/"
 out_dir3   <- src_dir %+% "/Simulation/Run11_100/Output/"
 out_dir4   <- src_dir %+% "/Simulation/Run12_200/Output/"
 out_dir5   <- src_dir %+% "/Simulation/Run13_Rest/Output/"
+out_dir6   <- src_dir %+% "/Simulation/Run14_100/Output/"
+out_dir7   <- src_dir %+% "/Simulation/Run15_100/Output/"
+out_dir8   <- src_dir %+% "/Simulation/Run16_100/Output/"
+out_dir9   <- src_dir %+% "/Simulation/Run17_100/Output/"
+out_dir10   <- src_dir %+% "/Simulation/Run18_100/Output/"
+out_dir11   <- src_dir %+% "/Simulation/Run19_100/Output/"
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -89,63 +95,168 @@ summ_corr5 <- summ_corr5 %>% select(-iter) #%>% mutate(iter = iter + 300)
 summ_cjs5 <- summ_cjs5  %>% select(-iter) #%>% mutate(iter = iter + 300)
 
 
+# Grab Results5
+files <- list.files(out_dir6)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
 
-summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3,summ_corr4,summ_corr5)
-summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3,summ_cjs4,summ_cjs5)
+# Unpack Summaries
+out_list6     <- lapply(1:nruns, function(i) readRDS(out_dir6 %+% files[i]))
+summ_corr6    <- do.call(rbind, lapply(1:nruns, function(i) out_list6[[i]]$summary_corr))
+summ_cjs6     <- do.call(rbind, lapply(1:nruns, function(i) out_list6[[i]]$summary_cjs))
+
+summ_corr6 <- summ_corr6 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs6 <- summ_cjs6  %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+# Grab Results5
+files <- list.files(out_dir7)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+# Unpack Summaries
+out_list7     <- lapply(1:nruns, function(i) readRDS(out_dir7 %+% files[i]))
+summ_corr7    <- do.call(rbind, lapply(1:nruns, function(i) out_list7[[i]]$summary_corr))
+summ_cjs7     <- do.call(rbind, lapply(1:nruns, function(i) out_list7[[i]]$summary_cjs))
+
+summ_corr7 <- summ_corr7 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs7 <- summ_cjs7  %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+# Unpack Summaries
+
+
+# Grab Results5
+files <- list.files(out_dir8)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+out_list8     <- lapply(1:nruns, function(i) readRDS(out_dir8 %+% files[i]))
+summ_corr8    <- do.call(rbind, lapply(1:nruns, function(i) out_list8[[i]]$summary_corr))
+summ_cjs8     <- do.call(rbind, lapply(1:nruns, function(i) out_list8[[i]]$summary_cjs))
+
+summ_corr8 <- summ_corr8 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs8 <- summ_cjs8 %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+# Unpack Summaries
+files <- list.files(out_dir9)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+out_list9     <- lapply(1:nruns, function(i) readRDS(out_dir9 %+% files[i]))
+summ_corr9    <- do.call(rbind, lapply(1:nruns, function(i) out_list9[[i]]$summary_corr))
+summ_cjs9    <- do.call(rbind, lapply(1:nruns, function(i) out_list9[[i]]$summary_cjs))
+
+summ_corr9 <- summ_corr9 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs9 <- summ_cjs9 %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+# Unpack Summaries
+files <- list.files(out_dir10)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+out_list10     <- lapply(1:nruns, function(i) readRDS(out_dir10 %+% files[i]))
+summ_corr10    <- do.call(rbind, lapply(1:nruns, function(i) out_list10[[i]]$summary_corr))
+summ_cjs10    <- do.call(rbind, lapply(1:nruns, function(i) out_list10[[i]]$summary_cjs))
+
+summ_corr10 <- summ_corr10 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs10 <- summ_cjs10 %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+
+# Unpack Summaries
+
+files <- list.files(out_dir11)
+nruns <- length(files)
+scenario_grid <- get_scenarios()
+
+out_list11     <- lapply(1:nruns, function(i) readRDS(out_dir11 %+% files[i]))
+summ_corr11    <- do.call(rbind, lapply(1:nruns, function(i) out_list11[[i]]$summary_corr))
+summ_cjs11    <- do.call(rbind, lapply(1:nruns, function(i) out_list11[[i]]$summary_cjs))
+
+summ_corr11 <- summ_corr11 %>% select(-iter) #%>% mutate(iter = iter + 300)
+summ_cjs11 <- summ_cjs11 %>% select(-iter) #%>% mutate(iter = iter + 300)
+
+
+
+
+summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3,summ_corr4,summ_corr5,
+                   summ_corr6,summ_corr7,summ_corr8,summ_corr9,summ_corr10, summ_corr11)
+summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3,summ_cjs4,summ_cjs5,
+                  summ_cjs6,summ_cjs7,summ_cjs8,summ_cjs9,summ_cjs10, summ_cjs11)
 
 # drop_scenario <- summ_corr %>% group_by(scenario) %>% summarize(n = n()) %>% filter(n < 600) %>% pull(scenario)
-
-summ_corr<- summ_corr %>% filter(!(scenario %in% drop_scenario))
-summ_cjs <- summ_cjs %>% filter(!(scenario %in% drop_scenario))
+# 
+# summ_corr<- summ_corr %>% filter(!(scenario %in% drop_scenario))
+# summ_cjs <- summ_cjs %>% filter(!(scenario %in% drop_scenario))
 
 # Add Scenario Settings
 summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
 summ_cjs  <-  summ_cjs %>% left_join(scenario_grid, by = c("scenario"))
 
 
-saveRDS(summ_corr, src_dir %+% "/Output/summ_corr5.rds")
-saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs5.rds")
+saveRDS(summ_corr, src_dir %+% "/Output/summ_corr7.rds")
+saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs7.rds")
 
-summ_corr <- readRDS(src_dir %+% "/Output/summ_corr.rds")
-summ_cjs <- readRDS(src_dir %+% "/Output/summ_cjs.rds")
-summ_lrt <- readRDS(src_dir %+% "/Output/summ_lrt.rds")
-summ_chat <- readRDS(src_dir %+% "/Output/summ_chat.rds")
-summ_aic <- readRDS(src_dir %+% "/Output/summ_aic.rds")
-summ_n <- readRDS(src_dir %+% "/Output/summ_n.rds")
+# summ_corr <- readRDS(src_dir %+% "/Output/summ_corr.rds")
+# summ_cjs <- readRDS(src_dir %+% "/Output/summ_cjs.rds")
 
-mc_corr <- summ_corr %>% group_by(Parameter, 
-                                  Rho_Estimator,
-                                  scenario, 
-                                  Truth) %>%
-  # mutate(Pearson = ifelse(Pearson == 0, "MLE", ifelse(Pearson == 2, "Partial-Pearson", "Pearson")),
-  # Parametric = ifelse(Parametric == 0, "Non-Parametric", "Semi-Parametric")) %>% 
-  summarize(MedBias = median(Bias),
-            MeanBias = mean(Bias),
-            mean_est      = mean(Est),
-            median_est = median(Est),
-            sd_est    = sd(Est),
-            med_se   = median(SE),
-            mean_se = mean(SE),
-            Cover95 = mean(In95),
-            Cover50 = mean(In50),
-            Range95 = mean(Range95),
-            Range50 = mean(Range50),
-            Cover095 = mean(Cover095),
-            Cover050 = mean(Cover050),
-            rho = first(rho_true),
-            gamma = first(gam_true),
-            PF     = first(PF),
-            PM     = first(PM),
-            PhiF   = first(PhiF),
-            PhiM   = first(PhiM),
-            n_obs  = first(n_obs),
-            k      = first(k),
-            Beta0 = first(Beta0),
-            Accept95_1 = mean(1 * (Pval0 >= 0.05)),
-            Accept95_2 = mean(1 * (Pval02 > 0.05)),
-            imputed_pairs = first(imputed_pairs))
+summarize_mc_corr <- function(summ_corr){
+  mc_corr <- summ_corr %>% group_by(Parameter, 
+                                    scenario, 
+                                    Truth) %>%
+    filter(gam_true >= 0, rho_true >= 0, gam_true <= 0.8, rho_true <= 0.8) %>% 
+    summarize(MedBias = median(Bias),
+              MeanBias = mean(Bias),
+              mean_est      = mean(Est),
+              median_est = median(Est),
+              sd_est    = sd(Est),
+              med_se   = median(SE),
+              mean_se = mean(SE),
+              Cover95 = mean(In95),
+              Cover50 = mean(In50),
+              Range95 = mean(Range95),
+              Range50 = mean(Range50),
+              Cover095 = mean(Cover095),
+              Cover050 = mean(Cover050),
+              rho = first(rho_true),
+              gamma = first(gam_true),
+              PF     = first(PF),
+              PM     = first(PM),
+              PhiF   = first(PhiF),
+              PhiM   = first(PhiM),
+              n_obs  = first(n_obs),
+              k      = first(k),
+              Beta0 = first(Beta0),
+              Accept95_1 = mean(1 * (Pval0 >= 0.05)),
+              Accept95_2 = mean(1 * (Pval02 >= 0.05)),
+              imputed_pairs = first(imputed_pairs)) %>% 
+    mutate(PF_Label = ifelse(PF < 0.75, 0.45, 0.75),
+           N_Label = ifelse(n_obs < 200, 150, 250))
+  mc_corr
+}
+
+summarize_cjs_corr <- function(mc_cjs){
+  # Comparing Coverage of N model
+  mc_cjs <- summ_cjs %>% 
+    filter(gam_true >= 0, rho_true >= 0, gam_true <= 0.8, rho_true <= 0.8) %>% 
+    group_by(Parameter, scenario, Truth, Version) %>% 
+    summarize(bias            = mean(Bias),
+              In95            = mean(In95),
+              In95_Likelihood = mean(In95_Likelihood),
+              rho             = first(rho_true),
+              gamma           = first(gam_true),
+              PF              = first(PF),
+              PM              = first(PM),
+              PhiF            = first(PhiF),
+              PhiM            = first(PhiM),
+              n_obs           = first(n_obs),
+              Beta0           = first(Beta0),
+              k               = first(k),
+              imputed_pairs   = first(imputed_pairs)) %>% 
+    mutate(PF_Label = ifelse(PF < 0.75,0.45, 0.75),
+           N_Label = ifelse(n_obs < 200, 150, 250))
+}
 
 
+mc_corr <- summarize_mc_corr(summ_corr)
 
 # Investigating Performance of hat Rho
 mc_corr %>% 
