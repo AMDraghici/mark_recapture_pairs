@@ -528,8 +528,10 @@ get_scenarios <- function(){
   PM    <- c(0.45, 0.75)
   PhiF  <- c(0.8)
   PhiM  <- c(0.8)
-  rho   <- sort(unique(c(0, 0.9, -0.1, seq(-0.1, 0.9, by = 0.15))))
-  gamma <- sort(unique(c(0, 0.9, -0.1, seq(-0.1, 0.9, by = 0.15))))
+  # General Scenarios
+  rho   <- sort(unique(c(0, seq(0.05, 0.8, by = 0.15))))
+  gamma <- sort(unique(c(0, seq(0.05, 0.8, by = 0.15))))
+  
   
   scenario_grid_base  <- expand.grid(n_obs    = n,
                                      k        = k,
@@ -687,50 +689,155 @@ get_scenarios <- function(){
 # Get Scenario Grid for correlation estimator simulation study
 get_scenarios_extended <- function(){
   
-  # General Scenarios
-  n     <- c(150,250, 2000)
-  k     <- c(15, 25)
-  PF    <- c(0.2, 0.75)
-  PM    <- c(0.2, 0.75)
-  PhiF  <- c(0.4, 0.8)
-  PhiM  <- c(0.4, 0.8)
-  rho   <- seq(-0.9,0.9,by = 0.2)
-  gamma <- seq(-0.9,0.9,by = 0.2)
-  Delta <- c(0.5,1)
+  # General correlation grids
+  rho   <- sort(unique(c(0, seq(0.05, 0.8, by = 0.15))))
+  gamma <- sort(unique(c(0, seq(0.05, 0.8, by = 0.15))))
   
-  scenario_grid_base  <- expand.grid(n_obs    = n,
-                                     k        = k,
-                                     rho_true = rho,
-                                     gam_true = gamma, 
-                                     PhiF     = PhiF,
-                                     PhiM     = PhiM,
-                                     PF       = PF,
-                                     PM       = PM,
-                                     Delta    = Delta)
+  scenario_list <- vector("list",8L)
   
-  scenario_grid_base$Beta0         <- 1e3
-  scenario_grid_base$Beta1         <- 1e3
-  scenario_grid_base$imputed_pairs <- TRUE
+  # 1. Testing recapture probs near 0.2
+  scenario_list[[1]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = rho,
+                                    gam_true      = gamma,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.2,
+                                    PM            = 0.2,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
   
-  # Testing Hypothesis with Alternative
   
+  # 2. Testing partially mated population
+  scenario_list[[2]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = rho,
+                                    gam_true      = gamma,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.75,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 0.5,
+                                    imputed_pairs = TRUE)
+  
+  
+  
+  # 3. Testing large population 
+  scenario_list[[3]] <- expand.grid(n_obs         = 2000,
+                                    k             = 25,
+                                    rho_true      = rho,
+                                    gam_true      = gamma,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.75,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  # 4. Testing different survival probs
+  # Bounds on correlation 
   phi_param <- compute_jbin_param_cjs(0.4,0.8)
-  p_param   <- compute_jbin_param_cjs(0.2,0.75)
-  
   gl <- phi_param$cor_lower_bound
   gu <- phi_param$cor_upper_bound
+  
+  # gl =  -0.6123724
+  # gu = 0.4082483
+
+  scenario_list[[4]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = rho,
+                                    gam_true      = seq(-0.6,0.4,by = 0.2),
+                                    PhiF          = 0.4,
+                                    PhiM          = 0.8,
+                                    PF            = 0.75,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  # 5. Testing different recapture probs
+  # Bounds on correlation 
+  p_param <- compute_jbin_param_cjs(0.45,0.75)
   rl <- p_param$cor_lower_bound
   ru <- p_param$cor_upper_bound
   
-  scenario_grid_base <- scenario_grid_base %>%
-    filter((PF == PM & PhiF == PhiM)|
-          ((PF != PM & rho_true >= rl & rho_true <= ru) & PhiF == PhiM)|
-          ((PF != PM & rho_true >= rl & rho_true <= ru) & (PhiF != PhiM & gam_true <= gu & gam_true >= gl))|
-          ((PF == PM) & (PhiF != PhiM & gam_true <= gu & gam_true >= gl)))
+  # rl = -0.6382847
+  # ru = 0.522233
   
-  scenario_grid_base$PropF    <- 0.5
-  scenario_grid_base$scenario <- 1:nrow(scenario_grid_base)
-  return(scenario_grid_base)
+  scenario_list[[5]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = c(seq(-0.6,0.5,by = 0.2),0.5),
+                                    gam_true      = gamma,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.45,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  
+  # 6. Exploring negative scenarios 
+  rho_neg <- seq(-0.8,-0.2,by = 0.3)
+  gamma_neg <- seq(-0.8,-0.2,by = 0.3)
+  
+  scenario_list[[6]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = rho_neg,
+                                    gam_true      = gamma,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.75,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  
+  scenario_list[[7]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = rho,
+                                    gam_true      = gamma_neg,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.75,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  
+  scenario_list[[8]] <- expand.grid(n_obs         = 250,
+                                    k             = 25,
+                                    rho_true      = rho_neg,
+                                    gam_true      = gamma_neg,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.75,
+                                    PM            = 0.75,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  
+  # Combine into reference table 
+  scenario_grid <- do.call(rbind,scenario_list)
+  
+  # Add F/M rate, join key and return
+  scenario_grid$PropF    <- 0.5
+  scenario_grid$scenario <- 1:nrow(scenario_grid)
+  return(scenario_grid)
 }
 
 

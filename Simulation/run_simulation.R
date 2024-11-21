@@ -5,7 +5,7 @@ out_dir    <- src_dir %+% "Simulation/Output/"
 Rcpp::sourceCpp(file.path(src_dir, "Src", "generate_pair_data.cpp"))
 source(file.path(src_dir, "Scripts", "fn_generic2.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
-scenario_mapping <- 1:1000
+scenario_mapping <- 1:289
 
 ## Options (ECHO FOR LOGS)
 options(echo = TRUE)
