@@ -1600,9 +1600,9 @@ crm2 <- function (data, ddl = NULL, begin.time = 1, model = "CJS", title = "",
   model_data.save = model_data
   model_data = marked:::cjs.accumulate(x, model_data, nocc, freq, 
                                        chunk_size = chunk_size)
-  scale = marked:::set.scale(names(dml), model_data, scale)
-  model_data = marked:::scale.dm(model_data, scale)
-  par = marked:::scale.par(par, scale)
+  scale = marked:::set_scale(names(dml), model_data, scale)
+  model_data = marked:::scale_dm(model_data, scale)
+  par = marked:::scale_par(par, scale)
   
   markedfunc_eval = 0
   cjsenv = environment()

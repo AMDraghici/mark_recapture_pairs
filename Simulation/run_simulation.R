@@ -1,6 +1,6 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
-src_dir    <- "/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
+src_dir    <- "/home/mdraghic/mark_recapture_pair_swap/"
 out_dir    <- src_dir %+% "Simulation/Output/"
 Rcpp::sourceCpp(file.path(src_dir, "Src", "generate_pair_data.cpp"))
 source(file.path(src_dir, "Scripts", "fn_generic2.R"))
