@@ -41,15 +41,15 @@ NumericMatrix compute_joint_prob(NumericVector probf,
 NumericMatrix compute_cond_prob(NumericMatrix JointProb,
                                 NumericVector probf,
                                 NumericVector probm){
-
+  
   int k = probf.size();
   NumericMatrix prob_matrix(2.0, k);
-
+  
   for(int t = 0; t < k; t++){
     prob_matrix(0, t) = JointProb(1,t)/(1-probm[t]);
     prob_matrix(1, t) = JointProb(3,t)/probm[t];
   }
-
+  
   return prob_matrix;
 }
 
@@ -94,7 +94,7 @@ double minIntCppV(IntegerVector x){
   out = x[0];
   
   for(int i = 1; i < n; i++){
-      out = minIntCpp(x[i],out); 
+    out = minIntCpp(x[i],out); 
   }
   
   return out;
@@ -102,8 +102,8 @@ double minIntCppV(IntegerVector x){
 
 // [[Rcpp::export]]
 IntegerVector initialize_first_capture(int n,
-                         int k,
-                         NumericVector tau){
+                                       int k,
+                                       NumericVector tau){
   
   IntegerVector out = sample(k, n, true, tau); 
   
@@ -115,7 +115,7 @@ NumericMatrix initialize_recruit(int n,
                                  IntegerVector first_capture){
   
   NumericMatrix out(n,k);
-
+  
   for(int i = 0; i < n; i++){
     int t0 = first_capture[i];
     for(int t = t0; t < k; t++){
@@ -139,7 +139,7 @@ NumericMatrix initialize_mating(int n,
   
   return out;
 }
-  
+
 // [[Rcpp::export]]
 NumericMatrix initialize_survival(int n,
                                   int k,
@@ -188,17 +188,17 @@ IntegerMatrix initialize_pairs(int nf,
       females_mating += 1;
     }
   }
-
+  
   //Number of mating males
   for(int j = 0; j < nm; j++){
     if(mating_m(j,t0) == 1){
       males_mating += 1;
     }
   }
-
+  
   // Add a min of zero
   males_mating = maxdblCpp(males_mating, 1.0);
-
+  
   // Operating Sex Ratio (which side randomly samples from bigger side)
   double osr = females_mating/males_mating;
   //Sample from larger pop in 2D without replacement
@@ -237,7 +237,7 @@ IntegerMatrix initialize_pairs(int nf,
       }
     }
   }
-
+  
   return out;
 }
 
@@ -291,39 +291,39 @@ IntegerVector compute_pairs_t(NumericVector repartner,
       }
     }
   }
-
+  
   //Sample from larger pop in 2D without replacement
   if(osr <= 1){
     for(int i = 0; i < nf; i++){
       NumericVector prob = prob_mate(i, _ );
       double sump = sum(prob);
-
+      
       // If no probability then just assign dummy state
       if(sump > 0){
         // prob = normalize_vector(prob);
         int j = sample(nm, 1, false, prob)[0]-1;
         out[i] = j;
         prob_mate(i, _ ) = prob_mate(i, _ ) *  0;
-
+        
         if(j != nm){
           prob_mate( _ ,j) = prob_mate( _ ,j) * 0;
         }
       }
-
+      
     }
   } else {
     for(int j = 0; j < nm; j++){
       NumericVector prob = prob_mate( _ ,j);
       double sump = sum(prob);
-
+      
       if(sump > 0){
         int i = sample(nf, 1, false, prob)[0]-1;
         out[i] = j;
-
+        
         if(i != nf){
           prob_mate(i, _ ) = prob_mate(i, _ ) *  0;
         }
-
+        
         prob_mate( _ ,j) = prob_mate( _ ,j) * 0;
       }
     }
@@ -332,19 +332,58 @@ IntegerVector compute_pairs_t(NumericVector repartner,
   return out;
 }
 
+// [[Rcpp::export]]
+int extract_female_partner(int j, 
+                           IntegerVector pairs){
+  //Grab the female associated to male j by checking entires until they match
+  int nf = pairs.size();
+  
+  // Scan females for male partenr id 
+  for(int i = 0; i < nf; i++){
+    int pairs_i = pairs[i];
+    
+    // If match found exit early with partner id
+    if(pairs_i == j){
+      return(i);
+    }
+  }
+  
+  // No match means unpaired 
+  return(nf);
+}
+
+
 
 // [[Rcpp::export]]
-NumericVector compute_mating_t(NumericVector surv,
-                               IntegerVector first,
-                               int t,
-                               double delta){
+NumericVector compute_mating_f_t(NumericVector surv_f,
+                                 NumericVector surv_m,
+                                 IntegerVector first_f,
+                                 IntegerVector first_m,
+                                 IntegerVector pairs,
+                                 int t,
+                                 double delta){
   
-  int n = first.size();
-  NumericVector out(n);
+  int nf = first_f.size();
+  int nm = first_m.size();
+  NumericVector out(nf);
   
-  for(int i = 0; i < n; i++){
-    if(first[i] < t){
-      if(surv[i] == 1){
+  for(int i = 0; i < nf; i++){
+    
+    int surv_f_i = surv_f[i];
+    int first_f_i = first_f[i];
+    
+    if((surv_f_i == 1) && (first_f_i < t)){
+      
+      int j = pairs[i];
+      
+      if(j != nm){
+        int surv_m_j = surv_m[j];
+        int first_m_j = first_m[j];
+        
+        if((surv_m_j == 1) && (first_m_j < t)){
+          out[i] = 1.0;
+        }
+      } else {
         out[i] = rbinom(1,1,delta)[0];
       }
     }
@@ -352,6 +391,46 @@ NumericVector compute_mating_t(NumericVector surv,
   
   return out; 
 }
+
+
+// [[Rcpp::export]]
+NumericVector compute_mating_m_t(NumericVector surv_f,
+                                 NumericVector surv_m,
+                                 IntegerVector first_f,
+                                 IntegerVector first_m,
+                                 IntegerVector pairs,
+                                 int t,
+                                 double delta){
+  
+  int nm = first_m.size();
+  int nf = first_f.size();
+  NumericVector out(nm);
+  
+  for(int j = 0; j < nm; j++){
+    
+    int surv_m_j = surv_m[j];
+    int first_m_j = first_m[j];
+    
+    if((surv_m_j == 1) && (first_m_j < t)){
+      
+      int i = extract_female_partner(j,pairs);
+      
+      if(i != nf){
+        int surv_f_i = surv_f[i];
+        int first_f_i = first_f[i];
+        
+        if((surv_f_i == 1) && (first_f_i < t)){
+          out[j] = 1.0;
+        }
+      } else {
+        out[j] = rbinom(1,1,delta)[0];
+      }
+    }
+  }
+  
+  return out; 
+}
+
 
 
 // [[Rcpp::export]]
@@ -370,7 +449,7 @@ NumericVector compute_surv_m_t(NumericVector surv_prev,
       } else {
         out[i] = 0;
       }
-     
+      
     }
   }
   
@@ -561,7 +640,7 @@ NumericMatrix compute_hidden_pairs(IntegerMatrix pairs_f,
       if(first_f[i] > t){
         apairs_f(i,t) = nm;
       } else {
-       int j = pairs_f(i,t);
+        int j = pairs_f(i,t);
         if(j != nm){
           if((xm(j,t) == 1) & (xf(i,t) == 1)){
             apairs_f(i,t) = j;
@@ -596,27 +675,27 @@ NumericMatrix compute_hidden_pairs(IntegerMatrix pairs_f,
               }
             }
           }
-        }
+        } 
       }
     }
   }
   
   
   // Update output to match R indexing
-    for(int i = 0; i < nf; i++){
+  for(int i = 0; i < nf; i++){
+    
+    for(int t = 0; t < k; t++){
+      int j = apairs_f(i,t);
       
-      for(int t = 0; t < k; t++){
-        int j = apairs_f(i,t);
-        
-        // If not unknown add 1
-        if(!IntegerVector::is_na(j)){
-          apairs_f(i,t) = apairs_f(i,t) + 1;
-        }
+      // If not unknown add 1
+      if(!IntegerVector::is_na(j)){
+        apairs_f(i,t) = apairs_f(i,t) + 1;
       }
+    }
   }
   
   return apairs_f;
-
+  
 }
 
 
@@ -634,75 +713,95 @@ List simulate_ps_data(int n,
                       NumericVector beta,
                       NumericVector tau,
                       bool imputed_pairs){
-
+  
   //Probability Matrices
   NumericMatrix Phi      = compute_joint_prob(phif, phim, gam);
   NumericMatrix P        = compute_joint_prob(pf,   pm,   rho);
   NumericMatrix Phi_Cond = compute_cond_prob(Phi,   phif, phim);
   NumericMatrix P_Cond   = compute_cond_prob(P,     pf,   pm);
-
+  
   // COnstruct Data Objects
-
+  
   // Males and Females
   int nf = floor(n* propfemale);
   int nm = n - nf;
-
+  
   // Mark-Recapture Objects
-
+  
   //Female capture/recruitment/mating/survival
   IntegerVector first_capture_f = initialize_first_capture(nf, k , tau)-1;
   NumericMatrix mating_f        = initialize_mating(nf, k, first_capture_f, delta);
   NumericMatrix sf              = initialize_survival(nf, k, first_capture_f);
   NumericMatrix repartner(nf, k);
-
+  
   //Male capture/recruitment/mating/survival
   IntegerVector first_capture_m = initialize_first_capture(nm, k , tau)-1;
   NumericMatrix mating_m        = initialize_mating(nm, k, first_capture_m, delta);
   NumericMatrix sm              = initialize_survival(nm, k, first_capture_m);
-
+  
   // Start Condition for looping over time
   int t0f = minIntCppV(first_capture_f);
   int t0m = minIntCppV(first_capture_m);
   int t0  = minIntCpp(t0f, t0m);
-
+  
   // Initialize Pairs Matrix
   IntegerMatrix pairs_f         = initialize_pairs(nf, nm, k, t0, mating_f, mating_m);
-
+  
   // // Generate MR data iteratively on time
   for(int t = t0+1; t < k; t++){
-      sm( _ , t)        = compute_surv_m_t(sm( _ , t-1), first_capture_m, t, phim[t-1]);
-      sf( _ , t)        = compute_surv_f_t(sf( _ , t-1),
+    
+    sm( _ , t)        = compute_surv_m_t(sm( _ , t-1), 
+                                         first_capture_m, 
+                                         t, 
+                                         phim[t-1]);
+    
+    sf( _ , t)        = compute_surv_f_t(sf( _ , t-1),
+                                         sm( _ , t),
+                                         Phi_Cond( _ , t-1),
+                                         phif[t-1],
+                                         t,
+                                         first_capture_f,
+                                         first_capture_m,
+                                         pairs_f( _ ,t-1));
+    
+    mating_m( _ , t)  = compute_mating_m_t(sf( _ , t), 
                                            sm( _ , t),
-                                           Phi_Cond( _ , t-1),
-                                           phif[t-1],
-                                           t,
                                            first_capture_f,
                                            first_capture_m,
-                                           pairs_f( _ ,t-1));
-
-      mating_m( _ , t)  = compute_mating_t(sm( _ , t), first_capture_m, t, delta[t]);
-      mating_f( _ , t)  = compute_mating_t(sf( _ , t), first_capture_f, t, delta[t]);
-      repartner( _ , t) = compute_repartner_t(mating_f(_, t),
-                                              mating_m(_, t),
-                                              pairs_f,
-                                              beta,
-                                              t);
-      pairs_f( _ , t)   = compute_pairs_t(repartner( _ , t),
-                                          pairs_f(_, t-1),
-                                          mating_f(_, t),
-                                          mating_m(_, t),
-                                          nf,
-                                          nm);
+                                           pairs_f(_,t-1),
+                                           t,
+                                           delta[t]);
+    
+    mating_f( _ , t)  = compute_mating_f_t(sf( _ , t), 
+                                           sm( _ , t),
+                                           first_capture_f,
+                                           first_capture_m,
+                                           pairs_f(_,t-1),
+                                           t,
+                                           delta[t]);
+    
+    repartner( _ , t) = compute_repartner_t(mating_f(_, t),
+                                            mating_m(_, t),
+                                            pairs_f,
+                                            beta,
+                                            t);
+    
+    pairs_f( _ , t)   = compute_pairs_t(repartner( _ , t),
+                                        pairs_f(_, t-1),
+                                        mating_f(_, t),
+                                        mating_m(_, t),
+                                        nf,
+                                        nm);
   }
-
+  
   // // Compute Recapture Histories
   NumericMatrix xm = compute_recapture_m(sm, first_capture_m, k, pm);
   NumericMatrix xf = compute_recapture_f(sf, xm, P_Cond, pf, k, first_capture_f, first_capture_m, pairs_f);
-
+  
   // // Compute Hidden Survival
   NumericMatrix af = compute_hidden_survival(xf, first_capture_f, sf, k);
   NumericMatrix am = compute_hidden_survival(xm, first_capture_m, sm, k);
-
+  
   // // Compute Hidden Pairs
   NumericMatrix apairs_f = compute_hidden_pairs(pairs_f,
                                                 xf,
@@ -714,9 +813,9 @@ List simulate_ps_data(int n,
                                                 mating_m,
                                                 first_capture_f,
                                                 first_capture_m,
-                                                k,
+                                                k, 
                                                 imputed_pairs);
-
+  
   List out(14);
   CharacterVector list_names(14);
   
