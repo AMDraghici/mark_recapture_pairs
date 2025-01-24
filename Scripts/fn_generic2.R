@@ -831,6 +831,21 @@ get_scenarios_extended <- function(){
                                     imputed_pairs = TRUE)
   
   
+  # 3b. Testing large population low recapture 
+  scenario_list[[9]] <- expand.grid(n_obs         = 2000,
+                                    k             = 25,
+                                    rho_true      = rho,
+                                    gam_true      = gamma,
+                                    PhiF          = 0.8,
+                                    PhiM          = 0.8,
+                                    PF            = 0.45,
+                                    PM            = 0.45,
+                                    Beta0         = 1e3,
+                                    Beta1         = 1e3,
+                                    Delta         = 1,
+                                    imputed_pairs = TRUE)
+  
+  
   # Combine into reference table 
   scenario_grid <- do.call(rbind,scenario_list)
   
