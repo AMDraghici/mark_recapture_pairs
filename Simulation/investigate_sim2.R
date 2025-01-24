@@ -1,3 +1,4 @@
+# Aggregate main body simulation
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
 src_dir    <- getwd() #"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
@@ -24,504 +25,57 @@ libs <- c("tidyverse","marked")
 load_packages(libs, FALSE)
 # -----------------------------------------------------------------------------------------------------------------
 
-# Grab Results
-files <- list.files(out_dir1)
-nruns <- length(files)
+process_results <- function(path){
+  # Grab Results
+  files <- list.files(path)
+  nruns <- length(files)
+
+  # Unpack Summaries
+  out_list   <- lapply(1:nruns, function(i) readRDS(path %+% files[i]))
+  summ_corr  <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summary_corr))
+  summ_cjs   <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summary_cjs))
+  summ_n     <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summ_n))
+  
+  summ_corr <- summ_corr  %>% select(-iter) 
+  summ_cjs <- summ_cjs %>% select(-iter) 
+  summ_n <- summ_n %>% select(-iter)
+  
+  return(list(summ_corr = summ_corr,
+              summ_cjs = summ_cjs,
+              summ_n = summ_n))
+}
+
+dirs <- c(out_dir1,
+          out_dir2,
+          out_dir3,
+          out_dir4,
+          out_dir5,
+          out_dir6,
+          out_dir7,
+          out_dir8,
+          out_dir9,
+          out_dir10,
+          out_dir11)
+
+results_list <- lapply(1:length(dirs), \(i) process_results(dirs[i]))
+
+summ_corr_list <- lapply(1:length(results_list), \(i) results_list[[i]]$summ_corr)
+summ_cjs_list <- lapply(1:length(results_list), \(i) results_list[[i]]$summ_cjs)
+summ_n_list <- lapply(1:length(results_list), \(i) results_list[[i]]$summ_n)
+
+# Correction from first study
+summ_corr_list[[1]] <- summ_corr_list[[1]]  %>% select(-Pval02) %>% rename(Pval02 = Pval03)
+
+summ_corr <- do.call(rbind,summ_corr_list)
+summ_cjs  <- do.call(rbind,summ_cjs_list)
+summ_n    <- do.call(rbind,summ_n_list)
+
 scenario_grid <- get_scenarios()
 
-# Unpack Summaries
-out_list1     <- lapply(1:nruns, function(i) readRDS(out_dir1 %+% files[i]))
-summ_corr1    <- do.call(rbind, lapply(1:nruns, function(i) out_list1[[i]]$summary_corr))
-summ_cjs1    <- do.call(rbind, lapply(1:nruns, function(i) out_list1[[i]]$summary_cjs))
-
-summ_corr1 <- summ_corr1  %>% select(-iter) ##%>% mutate(iter = iter + 100)
-summ_cjs1 <- summ_cjs1 %>% select(-iter) # #%>% mutate(iter = iter + 100)
-
-summ_corr1 <- summ_corr1 %>% select(-Pval02) %>% rename(Pval02 = Pval03)
-
-# Grab Results2
-files <- list.files(out_dir2)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-# Unpack Summaries
-out_list2     <- lapply(1:nruns, function(i) readRDS(out_dir2 %+% files[i]))
-summ_corr2    <- do.call(rbind, lapply(1:nruns, function(i) out_list2[[i]]$summary_corr))
-summ_cjs2     <- do.call(rbind, lapply(1:nruns, function(i) out_list2[[i]]$summary_cjs))
-
-summ_corr2 <- summ_corr2  %>% select(-iter) ##%>% mutate(iter = iter + 100)
-summ_cjs2 <- summ_cjs2 %>% select(-iter) # #%>% mutate(iter = iter + 100)
-
-
-# Grab Results3
-files <- list.files(out_dir3)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-# Unpack Summaries
-out_list3     <- lapply(1:nruns, function(i) readRDS(out_dir3 %+% files[i]))
-summ_corr3    <- do.call(rbind, lapply(1:nruns, function(i) out_list3[[i]]$summary_corr))
-summ_cjs3     <- do.call(rbind, lapply(1:nruns, function(i) out_list3[[i]]$summary_cjs))
-
-summ_corr3 <- summ_corr3  %>% select(-iter) #%>% mutate(iter = iter + 200)
-summ_cjs3 <- summ_cjs3  %>% select(-iter) #%>% mutate(iter = iter + 200)
-
-
-# Grab Results4
-files <- list.files(out_dir4)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-# Unpack Summaries
-out_list4     <- lapply(1:nruns, function(i) readRDS(out_dir4 %+% files[i]))
-summ_corr4    <- do.call(rbind, lapply(1:nruns, function(i) out_list4[[i]]$summary_corr))
-summ_cjs4     <- do.call(rbind, lapply(1:nruns, function(i) out_list4[[i]]$summary_cjs))
-
-summ_corr4 <- summ_corr4  %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs4 <- summ_cjs4  %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-
-# Grab Results5
-files <- list.files(out_dir5)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-# Unpack Summaries
-out_list5     <- lapply(1:nruns, function(i) readRDS(out_dir5 %+% files[i]))
-summ_corr5    <- do.call(rbind, lapply(1:nruns, function(i) out_list5[[i]]$summary_corr))
-summ_cjs5     <- do.call(rbind, lapply(1:nruns, function(i) out_list5[[i]]$summary_cjs))
-
-summ_corr5 <- summ_corr5 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs5 <- summ_cjs5  %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-
-# Grab Results5
-files <- list.files(out_dir6)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-# Unpack Summaries
-out_list6     <- lapply(1:nruns, function(i) readRDS(out_dir6 %+% files[i]))
-summ_corr6    <- do.call(rbind, lapply(1:nruns, function(i) out_list6[[i]]$summary_corr))
-summ_cjs6     <- do.call(rbind, lapply(1:nruns, function(i) out_list6[[i]]$summary_cjs))
-
-summ_corr6 <- summ_corr6 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs6 <- summ_cjs6  %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-# Grab Results5
-files <- list.files(out_dir7)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-# Unpack Summaries
-out_list7     <- lapply(1:nruns, function(i) readRDS(out_dir7 %+% files[i]))
-summ_corr7    <- do.call(rbind, lapply(1:nruns, function(i) out_list7[[i]]$summary_corr))
-summ_cjs7     <- do.call(rbind, lapply(1:nruns, function(i) out_list7[[i]]$summary_cjs))
-
-summ_corr7 <- summ_corr7 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs7 <- summ_cjs7  %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-# Unpack Summaries
-
-
-# Grab Results5
-files <- list.files(out_dir8)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-out_list8     <- lapply(1:nruns, function(i) readRDS(out_dir8 %+% files[i]))
-summ_corr8    <- do.call(rbind, lapply(1:nruns, function(i) out_list8[[i]]$summary_corr))
-summ_cjs8     <- do.call(rbind, lapply(1:nruns, function(i) out_list8[[i]]$summary_cjs))
-
-summ_corr8 <- summ_corr8 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs8 <- summ_cjs8 %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-# Unpack Summaries
-files <- list.files(out_dir9)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-out_list9     <- lapply(1:nruns, function(i) readRDS(out_dir9 %+% files[i]))
-summ_corr9    <- do.call(rbind, lapply(1:nruns, function(i) out_list9[[i]]$summary_corr))
-summ_cjs9    <- do.call(rbind, lapply(1:nruns, function(i) out_list9[[i]]$summary_cjs))
-
-summ_corr9 <- summ_corr9 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs9 <- summ_cjs9 %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-# Unpack Summaries
-files <- list.files(out_dir10)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-out_list10     <- lapply(1:nruns, function(i) readRDS(out_dir10 %+% files[i]))
-summ_corr10    <- do.call(rbind, lapply(1:nruns, function(i) out_list10[[i]]$summary_corr))
-summ_cjs10    <- do.call(rbind, lapply(1:nruns, function(i) out_list10[[i]]$summary_cjs))
-
-summ_corr10 <- summ_corr10 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs10 <- summ_cjs10 %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-
-# Unpack Summaries
-
-files <- list.files(out_dir11)
-nruns <- length(files)
-scenario_grid <- get_scenarios()
-
-out_list11     <- lapply(1:nruns, function(i) readRDS(out_dir11 %+% files[i]))
-summ_corr11    <- do.call(rbind, lapply(1:nruns, function(i) out_list11[[i]]$summary_corr))
-summ_cjs11    <- do.call(rbind, lapply(1:nruns, function(i) out_list11[[i]]$summary_cjs))
-
-summ_corr11 <- summ_corr11 %>% select(-iter) #%>% mutate(iter = iter + 300)
-summ_cjs11 <- summ_cjs11 %>% select(-iter) #%>% mutate(iter = iter + 300)
-
-
-
-
-summ_corr <- rbind(summ_corr1, summ_corr2,summ_corr3,summ_corr4,summ_corr5,
-                   summ_corr6,summ_corr7,summ_corr8,summ_corr9,summ_corr10, summ_corr11)
-summ_cjs <- rbind(summ_cjs1, summ_cjs2, summ_cjs3,summ_cjs4,summ_cjs5,
-                  summ_cjs6,summ_cjs7,summ_cjs8,summ_cjs9,summ_cjs10, summ_cjs11)
-
-# drop_scenario <- summ_corr %>% group_by(scenario) %>% summarize(n = n()) %>% filter(n < 600) %>% pull(scenario)
-# 
-# summ_corr<- summ_corr %>% filter(!(scenario %in% drop_scenario))
-# summ_cjs <- summ_cjs %>% filter(!(scenario %in% drop_scenario))
-
-# Add Scenario Settings
 summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
 summ_cjs  <-  summ_cjs %>% left_join(scenario_grid, by = c("scenario"))
 
 
-saveRDS(summ_corr, src_dir %+% "/Output/summ_corr7.rds")
-saveRDS(summ_cjs,  src_dir %+% "/Output/summ_cjs7.rds")
-
-# summ_corr <- readRDS(src_dir %+% "/Output/summ_corr.rds")
-# summ_cjs <- readRDS(src_dir %+% "/Output/summ_cjs.rds")
-
-summarize_mc_corr <- function(summ_corr){
-  mc_corr <- summ_corr %>% group_by(Parameter, 
-                                    scenario, 
-                                    Truth) %>%
-    filter(gam_true >= 0, rho_true >= 0, gam_true <= 0.8, rho_true <= 0.8) %>% 
-    summarize(MedBias = median(Bias),
-              MeanBias = mean(Bias),
-              mean_est      = mean(Est),
-              median_est = median(Est),
-              sd_est    = sd(Est),
-              med_se   = median(SE),
-              mean_se = mean(SE),
-              Cover95 = mean(In95),
-              Cover50 = mean(In50),
-              Range95 = mean(Range95),
-              Range50 = mean(Range50),
-              Cover095 = mean(Cover095),
-              Cover050 = mean(Cover050),
-              rho = first(rho_true),
-              gamma = first(gam_true),
-              PF     = first(PF),
-              PM     = first(PM),
-              PhiF   = first(PhiF),
-              PhiM   = first(PhiM),
-              n_obs  = first(n_obs),
-              k      = first(k),
-              Beta0 = first(Beta0),
-              Accept95_1 = mean(1 * (Pval0 >= 0.05)),
-              Accept95_2 = mean(1 * (Pval02 >= 0.05)),
-              imputed_pairs = first(imputed_pairs)) %>% 
-    mutate(PF_Label = ifelse(PF < 0.75, 0.45, 0.75),
-           N_Label = ifelse(n_obs < 200, 150, 250))
-  mc_corr
-}
-
-summarize_cjs_corr <- function(mc_cjs){
-  # Comparing Coverage of N model
-  mc_cjs <- summ_cjs %>% 
-    filter(gam_true >= 0, rho_true >= 0, gam_true <= 0.8, rho_true <= 0.8) %>% 
-    group_by(Parameter, scenario, Truth, Version) %>% 
-    summarize(bias            = mean(Bias),
-              In95            = mean(In95),
-              In95_Likelihood = mean(In95_Likelihood),
-              rho             = first(rho_true),
-              gamma           = first(gam_true),
-              PF              = first(PF),
-              PM              = first(PM),
-              PhiF            = first(PhiF),
-              PhiM            = first(PhiM),
-              n_obs           = first(n_obs),
-              Beta0           = first(Beta0),
-              k               = first(k),
-              imputed_pairs   = first(imputed_pairs)) %>% 
-    mutate(PF_Label = ifelse(PF < 0.75,0.45, 0.75),
-           N_Label = ifelse(n_obs < 200, 150, 250))
-}
-
-
-mc_corr <- summarize_mc_corr(summ_corr)
-
-# Investigating Performance of hat Rho
-mc_corr %>% 
-  filter(Parameter == "gamma" & Truth >= 0 & Truth <= 0.8 & Beta0 > 1 & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover95, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(as.factor(n_obs) + as.factor(k) ~ as.factor(PF)) + 
-  ylim(c(0.9,1)) +
-  geom_hline(yintercept = 0.95, lty = 2) +
-  labs(x = expression(gamma), y = "Mean Bias", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-# Investigating Performance of hat Rho
-# Investigating Performance of hat Rho
-mc_corr %>% 
-  filter(Parameter == "gamma" & Beta0 > 1 & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover50, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(as.factor(n_obs) + as.factor(k) ~ Rho_Estimator + as.factor(PF)) + 
-  # ylim(c(0.6,1)) +
-  geom_hline(yintercept = 0.5, lty = 2) +
-  labs(x = expression(rho), y = "Mean Bias", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-mc_corr %>% 
-  filter(Parameter == "rho" & Beta0 > 1  & Beta0 > 1 & PF > 0.4 & PF != 0.48 & PF != 0.7 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover95, x = rho, col = as.factor(gamma))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(as.factor(n_obs) + as.factor(k) ~ as.factor(PF)) + 
-  ylim(c(0.75,1)) +
-  geom_hline(yintercept = 0.95, lty = 2) + 
-  labs(x = expression(rho), y = "Mean 95% Confidence Interval Coverage", col = expression(gamma)) +
-  theme(legend.position = "bottom")
-
-
-
-mc_corr %>% 
-  filter(Parameter == "rho" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover50, x = rho, col = as.factor(gamma))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~Parametric) + 
-  ylim(c(0,1)) +
-  geom_hline(yintercept = 0.5, lty = 2) + 
-  labs(x = expression(rho), y = "Mean 50% Confidence Interval Coverage", col = expression(gamma)) +
-  theme(legend.position = "bottom")
-
-
-mc_corr %>% 
-  filter(Parameter == "rho" & Beta0 > 1 & k == 25 & n_obs == 250 & Pearson == "Partial-Pearson" & Parametric == "Semi-Parametric" & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = 1-Cover095, x = rho, col = as.factor(gamma))) +
-  geom_line() + 
-  geom_point() + 
-  # facet_grid(n_obs ~k) + 
-  ylim(c(0,1)) +
-  geom_hline(yintercept = c(0.05,0.8), lty = 2) + 
-  labs(x = expression(rho), y = "Average Coverage of 0 by 95% Confidence Interval", col = expression(gamma)) +
-  theme(legend.position = "bottom")
-
-
-# Investigating Performance of hat gamma
-mc_corr %>% 
-  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 &  PhiF == 0.8 &  PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = MedBias, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~Parametric) + 
-  ylim(c(-0.03,0.03)) +
-  geom_hline(yintercept = 0, lty = 2) + 
-  labs(x = expression(gamma), y = "Mean Bias", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-mc_corr %>% 
-  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 150 & k == 15 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover95, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~Parametric) + 
-  ylim(c(0.75,1)) +
-  geom_hline(yintercept = 0.95, lty = 2) + 
-  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-summ_gam_delta %>% 
-  group_by(Parameter, 
-           Pearson,
-           scenario, 
-           Truth)  %>% 
-  summarize(mean_est      = mean(Est),
-            median_est = median(Est),
-            sd_est    = sd(Est),
-            Cover95 = mean(In95),
-            Cover50 = mean(In50),
-            rho = first(rho_true),
-            gamma = first(gam_true),
-            PF     = first(PF),
-            PM     = first(PM),
-            PhiF   = first(PhiF.x),
-            PhiM   = first(PhiM.x),
-            n_obs  = first(n_obs),
-            k      = first(k),
-            Beta0 = first(Beta0),
-            imputed_pairs = first(imputed_pairs)) %>% 
-  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover95, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~.) + 
-  ylim(c(0.75,1)) +
-  geom_hline(yintercept = 0.95, lty = 2) + 
-  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-mc_corr %>% 
-  filter(Parameter == "gamma"& Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = Cover50, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~Parametric) + 
-  ylim(c(0,1)) +
-  geom_hline(yintercept = 0.5, lty = 2) + 
-  labs(x = expression(gamma), y = "Mean 50% Confidence Interval Coverage", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-mc_corr %>% 
-  filter(Parameter == "gamma" & Beta0 > 1 & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = 1 - Accept95_1, x = gamma, col = as.factor(rho))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~ Parametric) + 
-  ylim(c(0,1)) +
-  geom_hline(yintercept = c(0.8), lty = 2) + 
-  labs(x = expression(rho), y = "Mean Coverage of 0 by 95% Confidence Interval", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-mc_corr %>% 
-  filter(Parameter == "rho" & Beta0 < 1 & n_obs == 250 & k == 25 & PhiF == 0.8 & PF == 0.75 & PM == 0.75 & imputed_pairs==T) %>% 
-  ggplot(aes(y = 1 - Accept95_1, x = rho, col = as.factor(gamma))) +
-  geom_line() + 
-  geom_point() + 
-  facet_grid(Pearson ~ Parametric) + 
-  ylim(c(0,1)) +
-  geom_hline(yintercept = c(0.8), lty = 2) + 
-  labs(x = expression(rho), y = "Mean Coverage of 0 by 95% Confidence Interval", col = expression(rho)) +
-  theme(legend.position = "bottom")
-# 
-# summ_cjs2 <- summ_cjs %>% mutate(CChatAdj_Partial_Pearson2 = 2^(log(CChatAdj_Partial_Pearson,base = 2)/2),
-#                                  UBAdj_Partial_Pearson2    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson2), alpha = 0.05)[["ub"]],
-#                                  LBAdj_Partial_Pearson2    = compute_mark_ci(prob =  Est, se = SE * sqrt(CChatAdj_Partial_Pearson2), alpha = 0.05)[["lb"]],
-#                                  In95_Partial_Pearson2     = 1*(Truth <= UBAdj_Partial_Pearson2 & Truth >= LBAdj_Partial_Pearson2))
-
-# Comparing Coverage of N model
-mc_cjs <- summ_cjs %>% group_by(Parameter, scenario, Truth, Version) %>% 
-  summarize(bias = mean(Bias),
-            In95 = mean(In95),
-            In95_Likelihood = mean(In95_Likelihood),
-            rho = first(rho_true),
-            gamma = first(gam_true),
-            PF     = first(PF),
-            PM     = first(PM),
-            PhiF   = first(PhiF),
-            PhiM   = first(PhiM),
-            n_obs  = first(n_obs),
-            Beta0         = first(Beta0),
-            k = first(k),
-            imputed_pairs = first(imputed_pairs))
-
-mc_cjs2 <- summ_cjs %>% group_by(scenario, Version) %>% 
-  summarize(chat          = mean(Deviance_chat),
-            chat_pearson  = mean(Pearson_chat),
-            chat_fletcher = mean(Fletcher_chat),
-            CChat         = mean(CChatAdj_Partial_Pearson),
-            rho           = first(rho_true),
-            gamma         = first(gam_true),
-            PF            = first(PF),
-            PM            = first(PM),
-            PhiF          = first(PhiF),
-            PhiM          = first(PhiM),
-            n_obs         = first(n_obs),
-            k             = first(k),
-            imputed_pairs = first(imputed_pairs),
-            Beta0         = first(Beta0)) %>% 
-  pivot_longer(cols = c("chat", "chat_pearson", "chat_fletcher"), 
-               names_to = "Estimator", values_to = "chat") %>% 
-  mutate(Estimator = ifelse(Estimator == "chat", "Deviance",
-                            ifelse(Estimator == "chat_pearson", "Pearson","Fletcher")))
-
-mc_cjs %>% 
-  filter(Parameter == "P" & gamma >= 0 & gamma <= 0.8 &  rho >= 0 & rho <= 0.8 & Beta0 > 1 & n_obs == 250 & k == 25 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
-  ggplot() +
-  geom_line(aes(x = rho, y = In95, col = as.factor(gamma))) +
-  geom_point(aes(x = rho, y = In95, col = as.factor(gamma))) +
-  geom_line(aes(x = rho, y = In95_Likelihood, col = as.factor(gamma)), lty = 2) +
-  geom_point(aes(x = rho, y = In95_Likelihood, col = as.factor(gamma))) +
-  ylim(c(0.8,1)) +
-  geom_hline(yintercept = 0.95) +
-  facet_grid(. ~ Version) + 
-  labs(x = expression(rho), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-mc_cjs %>% 
-  filter(Parameter == "Phi" & Beta0 > 1 & k == 25 & n_obs == 250 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
-  ggplot() +
-  geom_line(aes(x = gamma, y = In95, col = as.factor(rho))) +
-  geom_point(aes(x = gamma, y = In95, col = as.factor(rho))) +
-  geom_line(aes(x = gamma, y = In95_Likelihood, col = as.factor(rho)), lty = 2) +
-  geom_point(aes(x = gamma, y = In95_Likelihood, col = as.factor(rho))) +
-  ylim(c(0.8,1)) +
-  geom_hline(yintercept = 0.95) +
-  facet_grid(. ~ Version) + 
-  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-mc_cjs2 %>% 
-  filter(n_obs == 250 & k == 25 & PF == 0.75 & PhiF == 0.8 & imputed_pairs==T)  %>% 
-  ggplot() +
-  geom_line(aes(x = rho, y = chat, col = as.factor(gamma))) +
-  geom_point(aes(x = rho, y = chat, col = as.factor(gamma))) +
-  geom_line(aes(x = rho, y = CChat, col = as.factor(gamma)), lty = 2) +
-  # geom_point(aes(x = rho, y = CChat, col = as.factor(gamma)), lty = 2) +
-  geom_hline(yintercept = 0.95) +
-  facet_grid(Estimator ~ Version) + 
-  labs(x = expression(gamma), y = "Mean 95% Confidence Interval Coverage", col = expression(rho)) +
-  theme(legend.position = "bottom")
-
-
-
-success <- summ_cjs$scenario %>% unique()
-scenario_grid %>% filter(!scenario %in% success) %>% pull(scenario)
-scenario_grid %>% filter(!scenario %in% success) %>% pull(scenario) -> x
-
-paste0(x, ",")
-
-
-which(!(1:649 %in% unique(summ_corr$scenario) )) %+% "," 
-
-4,5,6,7,12,13,14,15,22,23,24,25,31,32,50,64,65,90,107,108,118,132,133,186,187,235,236,237,238,239,240,241,242,243,298,315,316,317,384,394,395,408,409,415,416,417,418,428,429,430,431,434,444,454,455,464,465,466,467,468,488,489,490,491,496,497,498,499,503,504,505,506,512,513,514,515,516,523,524,525,526,527,533,534,535,536,537,545,546,547,548,549,553,554,555,556,557,561,562,563,564,572,592,612,624,634,642
-
-
-# Get jobs to 500
-
-rerun_table <- summ_corr %>%
-  filter(Parameter == "rho") %>%
-  group_by(scenario) %>% 
-  summarize(n = n()) %>% 
-  filter(n < 500) %>%
-  ungroup() %>%
-  mutate(reps = (500-n)/100) %>%
-  select(scenario, reps)
-
-scenario_mapping <- c()
-
-for(i in 1:nrow(rerun_table)){
-  scenario <- as.numeric(rerun_table[i,1])
-  reps <- as.numeric(rerun_table[i,2])
-  scenario_mapping <- c(scenario_mapping, rep(scenario, reps))
-}
-
-saveRDS(scenario_mapping, getwd() %+% "/Simulation/scenario_mapping.rds")
+saveRDS(summ_corr, src_dir %+% "/Output/revisions/main/summ_corr_main.rds")
+saveRDS(summ_cjs,  src_dir %+% "/Output/revisions/main/summ_cjs_main.rds")
+saveRDS(summ_n,    src_dir %+% "/Output/revisions/main/summ_n_main.rds")
