@@ -29,7 +29,7 @@ process_results <- function(path){
   out_list   <- lapply(1:nruns, function(i) readRDS(path %+% files[i]))
   keep_bool     <- sapply(1:nruns, function(i) ncol(out_list[[i]]$summary_corr) != 1)
   keep_index    <- 1:length(keep_bool)
-  keep_index    <- 1:nruns #keep_index[keep_bool]
+  keep_index    <- keep_index[keep_bool]
   summ_corr  <- do.call(rbind, lapply(keep_index, function(i) out_list[[i]]$summary_corr))
   summ_cjs   <- do.call(rbind, lapply(keep_index, function(i) out_list[[i]]$summary_cjs))
   summ_n     <- do.call(rbind, lapply(keep_index, function(i) out_list[[i]]$summ_n))
@@ -74,6 +74,6 @@ summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
 summ_cjs  <-  summ_cjs %>% left_join(scenario_grid, by = c("scenario"))
 
 
-saveRDS(summ_corr, src_dir %+% "/Output/revisions/main/summ_corr_re_final.rds")
-saveRDS(summ_cjs,  src_dir %+% "/Output/revisions/main/summ_cjs_main_final.rds")
-saveRDS(summ_n,    src_dir %+% "/Output/revisions/main/summ_n_main_final.rds")
+saveRDS(summ_corr, src_dir %+% "/Output/revisions/supplement/summ_corr_revisions_final.rds")
+saveRDS(summ_cjs,  src_dir %+% "/Output/revisions/supplement/summ_cjs_revisions_final.rds")
+saveRDS(summ_n,    src_dir %+% "/Output/revisions/supplement/summ_n_revisions_final.rds")
