@@ -1,11 +1,11 @@
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
-src_dir    <- getwd() #"/home/mdraghic/mark_recapture_pair_swap/"
+src_dir    <- getwd() 
 out_dir    <- src_dir %+% "Simulation/Output/"
 Rcpp::sourceCpp(file.path(src_dir, "Src", "generate_pair_data.cpp"))
-source(file.path(src_dir, "Scripts", "fn_generic2.R"))
+source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
-scenario_mapping <- 290:338
+scenario_mapping <- 1:638
 
 ## Options (ECHO FOR LOGS)
 options(echo = TRUE)
@@ -18,8 +18,8 @@ load_packages(libs, FALSE)
 # Read command line arguments--------------------------------------------------------------------------------------
 args          <- commandArgs(trailingOnly = TRUE)
 replicate     <- as.numeric(args[1]) 
-scenario      <- 98#scenario_mapping[replicate]
-scenario_grid <- get_scenarios_extended()
+scenario      <- scenario_mapping[replicate]
+scenario_grid <- get_scenarios()
 
 cat("Running scenario #" %+% scenario_grid[scenario,"scenario"] %+% "...", "\n")
 cat("Settings are...","\n")
@@ -33,7 +33,7 @@ runif(1)
 
 # Run Simulation
 results <- execute_simulation(niter         = 100,
-                              bstrp_iter    = 1,
+                              bstrp_iter    = 1000,
                               scenario      = scenario_grid[scenario,"scenario"],
                               PM            = scenario_grid[scenario,"PM"],
                               PF            = scenario_grid[scenario,"PF"],

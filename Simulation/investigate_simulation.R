@@ -1,18 +1,10 @@
 # Aggregate main body simulation
 ## Load Custom Scripts ---------------------------------------------------------------------------------------------
 `%+%`      <- function(a, b) paste0(a, b)
-src_dir    <- getwd() #"/home/mdraghic/projects/def-sbonner/mdraghic/mark_recapture_pair_swap/"
-out_dir1   <- src_dir %+% "/Simulation/Run9(Bug)/Output/"
-out_dir2   <- src_dir %+% "/Simulation/Run10_100/Output/"
-out_dir3   <- src_dir %+% "/Simulation/Run11_100/Output/"
-out_dir4   <- src_dir %+% "/Simulation/Run12_200/Output/"
-out_dir5   <- src_dir %+% "/Simulation/Run13_Rest/Output/"
-out_dir6   <- src_dir %+% "/Simulation/Run14_100/Output/"
-out_dir7   <- src_dir %+% "/Simulation/Run15_100/Output/"
-out_dir8   <- src_dir %+% "/Simulation/Run16_100/Output/"
-out_dir9   <- src_dir %+% "/Simulation/Run17_100/Output/"
-out_dir10   <- src_dir %+% "/Simulation/Run18_100/Output/"
-out_dir11   <- src_dir %+% "/Simulation/Run19_100/Output/"
+src_dir    <- getwd() 
+# Can aggregate multiple simulation studies if desired
+out_dir1   <- src_dir %+% YOUR PATH HERE
+out_dir2   <- src_dir %+% YOUR PATH HERE
 source(file.path(src_dir, "Scripts", "fn_generic.R"))
 source(file.path(src_dir, "Scripts", "fn_sim_pair_data.R"))
 source(file.path(src_dir, "Scripts", "fn_correlation_estimators.R"))
@@ -29,7 +21,7 @@ process_results <- function(path){
   # Grab Results
   files <- list.files(path)
   nruns <- length(files)
-
+  
   # Unpack Summaries
   out_list   <- lapply(1:nruns, function(i) readRDS(path %+% files[i]))
   summ_corr  <- do.call(rbind, lapply(1:nruns, function(i) out_list[[i]]$summary_corr))
@@ -46,16 +38,7 @@ process_results <- function(path){
 }
 
 dirs <- c(out_dir1,
-          out_dir2,
-          out_dir3,
-          out_dir4,
-          out_dir5,
-          out_dir6,
-          out_dir7,
-          out_dir8,
-          out_dir9,
-          out_dir10,
-          out_dir11)
+          out_dir2)
 
 results_list <- lapply(1:length(dirs), \(i) process_results(dirs[i]))
 
@@ -75,7 +58,7 @@ scenario_grid <- get_scenarios()
 summ_corr <-  summ_corr %>% left_join(scenario_grid, by = c("scenario"))
 summ_cjs  <-  summ_cjs %>% left_join(scenario_grid, by = c("scenario"))
 
-
-saveRDS(summ_corr, src_dir %+% "/Output/revisions/main/summ_corr_main.rds")
-saveRDS(summ_cjs,  src_dir %+% "/Output/revisions/main/summ_cjs_main.rds")
-saveRDS(summ_n,    src_dir %+% "/Output/revisions/main/summ_n_main.rds")
+# Store Results
+saveRDS(summ_corr, src_dir)
+saveRDS(summ_cjs,  src_dir)
+saveRDS(summ_n,    src_dir)
