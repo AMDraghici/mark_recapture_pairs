@@ -1902,5 +1902,3 @@ format_to_cjs <- function(model_data){
   # Return Standard CJS Data
   return(results)
 }
-
-
